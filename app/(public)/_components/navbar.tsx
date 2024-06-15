@@ -38,7 +38,7 @@ export const Navbar = () => {
         {isAuthenticated && !isLoading && (
           <>
             <Button variant={"ghost"} size={"sm"}>
-              <Link href={"/documents"}>Enter @ttqteo</Link>
+              <Link href={"/admin"}>To Dashboard</Link>
             </Button>
             <UserButton afterSignOutUrl="/" />
           </>
