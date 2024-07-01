@@ -19,7 +19,7 @@ import {
   SettingsIcon,
   TrashIcon,
 } from "lucide-react";
-import { useParams, usePathname } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { ElementRef, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useMediaQuery } from "usehooks-ts";
@@ -33,6 +33,7 @@ const Navigation = () => {
   const search = useSearch();
   const settings = useSettings();
   const params = useParams();
+  const router = useRouter();
   const pathname = usePathname();
   const isMobile = useMediaQuery("(max-width: 768px)");
   const create = useMutation(api.documents.create);
@@ -120,7 +121,9 @@ const Navigation = () => {
   };
 
   const handleCreate = () => {
-    const promise = create({ title: "Untitled" });
+    const promise = create({ title: "Untitled" }).then((documentId) =>
+      router.push(`/admin/${documentId}`)
+    );
 
     toast.promise(promise, {
       loading: "Creating a new note...",
@@ -128,8 +131,6 @@ const Navigation = () => {
       error: "Failed to create a new note.",
     });
   };
-
-  console.log({ params, bool: !!params.documentId });
 
   return (
     <>

@@ -31,8 +31,6 @@ const Navbar = ({ isCollapsed, onResetWidth }: NavbarProps) => {
     );
   }
 
-  console.log({ document, id: params.documentId });
-
   if (document === null) {
     return null;
   }
