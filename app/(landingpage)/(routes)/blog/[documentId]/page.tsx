@@ -2,12 +2,16 @@
 
 import { Cover } from "@/components/cover";
 import { Toolbar } from "@/components/toolbar";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
+import { ArrowLeftIcon } from "lucide-react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useMemo } from "react";
+import Moment from "react-moment";
 
 interface DocumentIdPageProops {
   params: {
@@ -33,6 +37,8 @@ const DocumentIdPage = ({ params }: DocumentIdPageProops) => {
     });
   };
 
+  const router = useRouter();
+
   if (document === undefined) {
     return (
       <div>
@@ -55,9 +61,18 @@ const DocumentIdPage = ({ params }: DocumentIdPageProops) => {
 
   return (
     <div className="pb-40">
+      <div>
+        <Button variant={"link"} onClick={router.back}>
+          <ArrowLeftIcon className="w-4 h-4" />
+          back
+        </Button>
+      </div>
       <Cover url={document.coverImage} preview />
       <div className="md:max-w-3xl lg:md-max-w-4xl mx-auto">
         <Toolbar initialData={document} preview />
+        <p className="pl-[54px] text-sm text-muted-foreground">
+          <Moment format="DD MMM yyyy">{document._creationTime}</Moment>
+        </p>
         <Editor
           onChange={onChange}
           initialContent={document.content}

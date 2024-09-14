@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Poppins } from "next/font/google";
 import Image from "next/image";
+import Link from "next/link";
 
 const font = Poppins({
   subsets: ["latin"],
@@ -9,9 +10,11 @@ const font = Poppins({
 
 export const Logo = () => {
   return (
-    <div className="hidden md:flex items-center gap-x-2">
-      <Image src="/logo.png" height={32} width={32} alt="logo" />
-      <p className={cn("font-semibold", font.className)}>ttqteo</p>
-    </div>
+    <Link href={"/"}>
+      <div className="flex items-center gap-x-2">
+        <Image src="/logo.png" height={32} width={32} alt="logo" />
+        <p className={cn("font-semibold", font.className)}>ttqteo</p>
+      </div>
+    </Link>
   );
 };

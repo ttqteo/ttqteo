@@ -1,13 +1,11 @@
 "use client";
 
-import { useCreateBlockNote } from "@blocknote/react";
-import { useTheme } from "next-themes";
+import { useEdgeStore } from "@/lib/edgestore";
+import { PartialBlock } from "@blocknote/core";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
-import { PartialBlock } from "@blocknote/core";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { useEdgeStore } from "@/lib/edgestore";
+import { useCreateBlockNote } from "@blocknote/react";
+import { useTheme } from "next-themes";
 
 interface EditorProps {
   onChange: (value: string) => void;

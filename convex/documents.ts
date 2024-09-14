@@ -2,7 +2,17 @@ import { v } from "convex/values";
 
 import { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
-import { argv } from "process";
+
+export const getPublic = query({
+  handler: async (ctx) => {
+    const documents = await ctx.db
+      .query("documents")
+      .filter((q) => q.eq(q.field("isPublished"), true))
+      .collect();
+
+    return documents;
+  },
+});
 
 export const archive = mutation({
   args: { id: v.id("documents") },
