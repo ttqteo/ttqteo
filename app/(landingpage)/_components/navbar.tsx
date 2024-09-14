@@ -16,7 +16,7 @@ import {
   NavigationMenuList,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
-import { LogInIcon } from "lucide-react";
+import { GithubIcon, LogInIcon } from "lucide-react";
 import React from "react";
 
 const components: { title: string; href: string; description: string }[] = [
@@ -28,6 +28,11 @@ const components: { title: string; href: string; description: string }[] = [
   {
     title: "blog",
     href: "/blog",
+    description: "",
+  },
+  {
+    title: "roadmap",
+    href: "/roadmap",
     description: "",
   },
   {
@@ -44,14 +49,25 @@ export const Navbar = () => {
   return (
     <div
       className={cn(
-        "z-50 bg-background dark:bg-[#1F1F1F] fixed top-0 flex items-center justify-between gap-4 w-full p-6",
+        "z-50 bg-background fixed top-0 flex items-center justify-between gap-4 p-6 w-full",
         scrolled && "border-b shadow-sm"
       )}
     >
-      <Logo />
-      <div className="justify-end w-full flex items-center">
+      <div className="flex items-center">
         <NavigationMenu>
           <NavigationMenuList>
+            <NavigationMenuItem>
+              <Link href={"/"} legacyBehavior passHref>
+                <NavigationMenuLink
+                  className={cn(
+                    navigationMenuTriggerStyle(),
+                    "hover:bg-none!important"
+                  )}
+                >
+                  <Logo />
+                </NavigationMenuLink>
+              </Link>
+            </NavigationMenuItem>
             {components.map((component) => (
               <NavigationMenuItem key={component.href}>
                 <Link href={component.href} legacyBehavior passHref>
@@ -65,6 +81,8 @@ export const Navbar = () => {
             ))}
           </NavigationMenuList>
         </NavigationMenu>
+      </div>
+      <div className="justify-end w-full flex items-center">
         {isLoading && <Spinner size={"small"} />}
         {!isAuthenticated && !isLoading && (
           <>
@@ -73,15 +91,24 @@ export const Navbar = () => {
                 log in
               </Button>
             </SignInButton>
+            <Link href={"https://github.com/ttqteo/ttqteo"} target="_blank">
+              <Button
+                variant={"outline"}
+                size="icon"
+                className="rounded-full mr-2"
+              >
+                <GithubIcon className="h-[1.2rem] w-[1.2rem] rounded-full" />
+              </Button>
+            </Link>
           </>
         )}
         {isAuthenticated && !isLoading && (
-          <>
-            <Button variant={"ghost"} size={"sm"}>
-              <Link href={"/admin"}>To Dashboard</Link>
+          <div className="flex gap-2 items-center mr-2">
+            <Button variant={"ghost"} size={"sm"} className="rounded-full">
+              <Link href={"/admin"}>go to dashboard</Link>
             </Button>
             <UserButton afterSignOutUrl="/" />
-          </>
+          </div>
         )}
         <ModeToggle />
       </div>

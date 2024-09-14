@@ -10,10 +10,10 @@ const font = Poppins({
 
 export const Logo = () => {
   return (
-    <Link href={"/"}>
+    <Link href={"/"} className="w-full">
       <div className="flex items-center gap-x-2">
         <Image src="/logo.png" height={32} width={32} alt="logo" />
-        <p className={cn("font-semibold", font.className)}>ttqteo</p>
+        <span className={cn("font-semibold", font.className)}>ttqteo</span>
       </div>
     </Link>
   );

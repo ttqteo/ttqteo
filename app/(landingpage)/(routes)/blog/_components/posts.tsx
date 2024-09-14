@@ -45,7 +45,7 @@ const Posts = () => {
     <div className="grid lg:grid-cols-3 md:grid-cols-2 grid-cols-1 gap-4 w-full">
       {documents.map((document) => (
         <Link href={`/blog/${document._id}`} key={document._id}>
-          <Card className="border-0 rounded-md shadow-none hover:shadow-md transition-all overflow-hidden">
+          <Card className="border-0 rounded-md shadow-none hover:shadow-md dark:hover:shadow-gray-800 transition-all overflow-hidden">
             {!!document.coverImage && (
               <div className="w-full h-[200px] relative group">
                 <Image
