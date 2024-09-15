@@ -36,7 +36,7 @@ const data = [
     date: "Oct, 2024",
     title: "v0.2.0",
     description: "thinking...",
-    feature: ["Markdown Mindmap"],
+    feature: ["Markdown Mindmap", "View Counter"],
     active: false,
   },
   {
