@@ -19,7 +19,7 @@ export const metadata = {
 const data = [
   {
     date: "Sep, 2024",
-    title: "v0.1.0 - First Release",
+    title: "v0.1.0",
     description: "This version will define what this website do.",
     feature: [
       "Home",
@@ -43,7 +43,7 @@ const data = [
     date: "Nov, 2024",
     title: "v0.3.0",
     description: "soon.",
-    feature: [],
+    feature: ["Finance SaaS"],
     active: false,
   },
 ];

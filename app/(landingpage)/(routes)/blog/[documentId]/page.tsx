@@ -68,7 +68,7 @@ const DocumentIdPage = ({ params }: DocumentIdPageProps) => {
         <div>
           <Button variant={"link"} onClick={router.back}>
             <ArrowLeftIcon className="w-4 h-4" />
-            back
+            home
           </Button>
         </div>
         <Cover url={document.coverImage} preview />
