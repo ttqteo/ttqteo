@@ -16,7 +16,6 @@ import {
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import { GithubIcon } from "lucide-react";
-import React from "react";
 
 export const navbarComponents: {
   title: string;
@@ -69,7 +68,10 @@ export const Navbar = () => {
               <NavigationMenuItem key={component.href}>
                 <Link href={component.href} legacyBehavior passHref>
                   <NavigationMenuLink
-                    className={cn(navigationMenuTriggerStyle(), "rounded-full")}
+                    className={cn(
+                      navigationMenuTriggerStyle(),
+                      "rounded-full relative"
+                    )}
                   >
                     {component.title}
                   </NavigationMenuLink>

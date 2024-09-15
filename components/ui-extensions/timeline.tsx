@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { CheckCircle2Icon } from "lucide-react";
 
 const Timeline = React.forwardRef<
   HTMLOListElement,
@@ -82,13 +83,19 @@ TimelineTitle.displayName = "CardTitle";
 
 const TimelineIcon = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
+  React.HTMLAttributes<HTMLDivElement> & { active?: boolean }
+>(({ className, active = true, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex flex-col size-3 bg-primary rounded-full", className)}
+    className={cn(
+      "relative flex flex-col w-3 h-3 rounded-full border-2 bg-white  border-black dark:border-white dark:bg-black",
+      active && "border-none",
+      className
+    )}
     {...props}
-  />
+  >
+    {active && <CheckCircle2Icon className="absolute top-0 left-0 w-3 h-3" />}
+  </div>
 ));
 TimelineIcon.displayName = "TimelineIcon";
 
@@ -98,7 +105,10 @@ const TimelineDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn("text-sm text-muted-foreground max-w-sm", className)}
+    className={cn(
+      "text-start text-sm text-muted-foreground max-w-sm",
+      className
+    )}
     {...props}
   />
 ));

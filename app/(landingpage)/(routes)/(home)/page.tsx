@@ -1,4 +1,9 @@
+import { siteMetadata } from "@/components/metadata";
 import Image from "next/image";
+
+export const metadata = {
+  title: siteMetadata("home"),
+};
 
 const HomePage = () => {
   return (
