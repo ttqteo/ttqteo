@@ -2,21 +2,6 @@
 
 - website: [ttqteo.vercel.app](ttqteo.vercel.app)
 
-this is a public repository that follows the changes on my website day by day.
-
-inspired [notion-clone](https://youtu.be/0OaDyjB9Ib8)
-
-## technologies
-
-- [next.js 14](https://nextjs.org/)
-- [convex](https://www.convex.dev/) (real-time database)
-- [clerk](https://clerk.com/) (authentication)
-- [edge store](https://edgestore.dev/) (store images) 
-
-## shadcn customize
-- [shadcn-timeline](https://github.com/timDeHof/shadcn-timeline)
-
-
 ## about me
 
 <div align="center">
