@@ -1,18 +1,12 @@
-import { Button } from "@/components/ui/button";
 import { Logo } from "./logo";
 
 export const Footer = () => {
   return (
-    <div className="flex items-center w-full p-6 bg-background z-50">
+    <div className="flex items-center justify-between w-full p-6 bg-background z-50">
       <Logo />
-      <div className="md:ml-auto w-full justify-between md:justify-end flex items-center gap-x-2 text-muted-foreground">
-        <Button variant={"ghost"} size={"sm"}>
-          Privacy Policy
-        </Button>
-        <Button variant={"ghost"} size={"sm"}>
-          Terms & Conditions
-        </Button>
-      </div>
+      <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
+        v0.0.1
+      </code>
     </div>
   );
 };

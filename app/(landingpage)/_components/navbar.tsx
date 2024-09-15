@@ -1,7 +1,6 @@
 "use client";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
-import { useScrollTop } from "@/hooks/use-scroll-top";
 import { cn } from "@/lib/utils";
 import { SignInButton, UserButton } from "@clerk/clerk-react";
 import { useConvexAuth } from "convex/react";
@@ -16,10 +15,14 @@ import {
   NavigationMenuList,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
-import { GithubIcon, LogInIcon } from "lucide-react";
+import { GithubIcon } from "lucide-react";
 import React from "react";
 
-const components: { title: string; href: string; description: string }[] = [
+export const navbarComponents: {
+  title: string;
+  href: string;
+  description: string;
+}[] = [
   {
     title: "home",
     href: "/",
@@ -44,16 +47,10 @@ const components: { title: string; href: string; description: string }[] = [
 
 export const Navbar = () => {
   const { isAuthenticated, isLoading } = useConvexAuth();
-  const scrolled = useScrollTop();
 
   return (
-    <div
-      className={cn(
-        "z-50 bg-background fixed top-0 flex items-center justify-between gap-4 p-6 w-full",
-        scrolled && "border-b shadow-sm"
-      )}
-    >
-      <div className="flex items-center">
+    <>
+      <div className="md:flex hidden items-center">
         <NavigationMenu>
           <NavigationMenuList>
             <NavigationMenuItem>
@@ -68,7 +65,7 @@ export const Navbar = () => {
                 </NavigationMenuLink>
               </Link>
             </NavigationMenuItem>
-            {components.map((component) => (
+            {navbarComponents.map((component) => (
               <NavigationMenuItem key={component.href}>
                 <Link href={component.href} legacyBehavior passHref>
                   <NavigationMenuLink
@@ -83,7 +80,7 @@ export const Navbar = () => {
         </NavigationMenu>
       </div>
       <div className="justify-end w-full flex items-center">
-        {isLoading && <Spinner size={"small"} />}
+        {isLoading && <Spinner size={"small"} className="mr-2" />}
         {!isAuthenticated && !isLoading && (
           <>
             <SignInButton mode="modal">
@@ -112,32 +109,6 @@ export const Navbar = () => {
         )}
         <ModeToggle />
       </div>
-    </div>
+    </>
   );
 };
-
-const ListItem = React.forwardRef<
-  React.ElementRef<"a">,
-  React.ComponentPropsWithoutRef<"a">
->(({ className, title, children, ...props }, ref) => {
-  return (
-    <li>
-      <NavigationMenuLink asChild>
-        <a
-          ref={ref}
-          className={cn(
-            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-            className
-          )}
-          {...props}
-        >
-          <div className="text-sm font-medium leading-none">{title}</div>
-          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-            {children}
-          </p>
-        </a>
-      </NavigationMenuLink>
-    </li>
-  );
-});
-ListItem.displayName = "ListItem";
