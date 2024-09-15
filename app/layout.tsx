@@ -6,12 +6,13 @@ import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { EdgeStoreProvider } from "@/lib/edgestore";
+import { appConfig } from "@/lib/config";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "@ttqteo",
-  description: "hello, i am @ttqteo",
+  title: appConfig.name,
+  description: appConfig.description,
   icons: {
     icon: [
       {
