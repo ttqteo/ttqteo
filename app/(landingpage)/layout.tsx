@@ -6,13 +6,11 @@ import LiveClock from "@/components/ui-extensions/live-clock";
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   return (
-    <div className="h-full">
+    <div>
       <Header />
-      <main className="h-full">
-        <div className="min-h-full">
-          <div className="mt-24 container mx-auto">
-            <Suspense fallback={<Spinner />}>{children}</Suspense>
-          </div>
+      <main>
+        <div className="mt-24 container mx-auto">
+          <Suspense fallback={<Spinner />}>{children}</Suspense>
         </div>
         <LiveClock />
         <Footer />

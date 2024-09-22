@@ -10,18 +10,28 @@ import { Logo } from "./logo";
 import { Spinner } from "@/components/ui-extensions/spinner";
 import {
   NavigationMenu,
+  NavigationMenuContent,
   NavigationMenuItem,
   NavigationMenuLink,
   NavigationMenuList,
+  NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import { GithubIcon } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
+import React from "react";
+
+interface Components {
+  title: string;
+  href: string;
+  description: string;
+}
 
 export const navbarComponents: {
   title: string;
   href: string;
   description: string;
+  features?: Components[];
 }[] = [
   {
     title: "home",
@@ -37,6 +47,18 @@ export const navbarComponents: {
     title: "news",
     href: "/news",
     description: "",
+  },
+  {
+    title: "tools",
+    href: "",
+    description: "",
+    features: [
+      {
+        title: "markmap",
+        href: "/tools/markmap",
+        description: "",
+      },
+    ],
   },
   {
     title: "roadmap",
@@ -71,23 +93,50 @@ export const Navbar = () => {
                 </NavigationMenuLink>
               </Link>
             </NavigationMenuItem>
-            {navbarComponents.map((component) => (
-              <NavigationMenuItem key={component.href}>
-                <Link href={component.href} legacyBehavior passHref>
-                  <NavigationMenuLink
+            {navbarComponents.map((component) =>
+              !component?.features ? (
+                <NavigationMenuItem key={component.href}>
+                  <Link href={component.href} legacyBehavior passHref>
+                    <NavigationMenuLink
+                      className={cn(
+                        navigationMenuTriggerStyle(),
+                        path.match(component.title)
+                          ? "font-bold"
+                          : "font-normal text-gray-500",
+                        "rounded-full relative"
+                      )}
+                    >
+                      {component.title}
+                    </NavigationMenuLink>
+                  </Link>
+                </NavigationMenuItem>
+              ) : (
+                <NavigationMenuItem key={component.href}>
+                  <NavigationMenuTrigger
                     className={cn(
-                      navigationMenuTriggerStyle(),
                       path.match(component.title)
                         ? "font-bold"
-                        : "font-normal text-gray-500",
-                      "rounded-full relative"
+                        : "font-normal text-gray-500"
                     )}
                   >
                     {component.title}
-                  </NavigationMenuLink>
-                </Link>
-              </NavigationMenuItem>
-            ))}
+                  </NavigationMenuTrigger>
+                  <NavigationMenuContent className="absolute">
+                    <ul className="w-[400px] p-4 ">
+                      {component.features?.map((feature: Components) => (
+                        <ListItem
+                          key={feature.title}
+                          title={feature.title}
+                          href={feature.href}
+                        >
+                          {feature.description}
+                        </ListItem>
+                      ))}
+                    </ul>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+              )
+            )}
           </NavigationMenuList>
         </NavigationMenu>
       </div>
@@ -124,3 +173,29 @@ export const Navbar = () => {
     </>
   );
 };
+
+const ListItem = React.forwardRef<
+  React.ElementRef<"a">,
+  React.ComponentPropsWithoutRef<"a">
+>(({ className, title, children, ...props }, ref) => {
+  return (
+    <li>
+      <NavigationMenuLink asChild>
+        <a
+          ref={ref}
+          className={cn(
+            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+            className
+          )}
+          {...props}
+        >
+          <div className="text-sm font-medium leading-none">{title}</div>
+          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+            {children}
+          </p>
+        </a>
+      </NavigationMenuLink>
+    </li>
+  );
+});
+ListItem.displayName = "ListItem";
