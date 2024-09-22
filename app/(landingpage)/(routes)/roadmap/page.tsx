@@ -10,7 +10,6 @@ import {
   TimelineTime,
   TimelineTitle,
 } from "@/components/ui-extensions/timeline";
-import { appConfig } from "@/lib/config";
 
 export const metadata = {
   title: siteMetadata("roadmap"),
@@ -36,7 +35,7 @@ const data = [
     date: "Oct, 2024",
     title: "v0.2.0",
     description: "thinking...",
-    feature: ["Markdown Mindmap", "View Counter"],
+    feature: ["Markdown Mindmap", "View Counter", "News"],
     active: false,
   },
   {

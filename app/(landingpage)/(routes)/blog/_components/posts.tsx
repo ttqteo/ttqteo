@@ -11,12 +11,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
 import { useQuery } from "convex/react";
-import {
-  HeartIcon,
-  MessageCircleIcon,
-  Share2Icon,
-  ThumbsUpIcon,
-} from "lucide-react";
+import { HeartIcon, MessageCircleIcon, Share2Icon } from "lucide-react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";

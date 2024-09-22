@@ -16,6 +16,7 @@ import {
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import { GithubIcon } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 
 export const navbarComponents: {
   title: string;
@@ -33,6 +34,11 @@ export const navbarComponents: {
     description: "",
   },
   {
+    title: "news",
+    href: "/news",
+    description: "",
+  },
+  {
     title: "roadmap",
     href: "/roadmap",
     description: "",
@@ -46,6 +52,7 @@ export const navbarComponents: {
 
 export const Navbar = () => {
   const { isAuthenticated, isLoading } = useConvexAuth();
+  const path = usePathname();
 
   return (
     <>
@@ -70,6 +77,9 @@ export const Navbar = () => {
                   <NavigationMenuLink
                     className={cn(
                       navigationMenuTriggerStyle(),
+                      path.match(component.title)
+                        ? "font-bold"
+                        : "font-normal text-gray-500",
                       "rounded-full relative"
                     )}
                   >
