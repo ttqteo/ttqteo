@@ -102,14 +102,21 @@ const NewsClient = () => {
                     </TooltipProvider>
                   </CardHeader>
                   <CardFooter>
-                    <div className="w-full flex justify-between items-center text-sm gap-4">
+                    <div className="w-full flex justify-between items-start text-sm gap-4">
                       <Moment
                         format="DD MMM yyyy"
                         className="whitespace-nowrap"
                       >
                         {news.publishedAt}
                       </Moment>
-                      <div className="line-clamp-1">{news.author}</div>
+                      <div className="flex flex-col justify-end items-end">
+                        <div className="line-clamp-1">{news.author}</div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            {news?.source?.name}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </CardFooter>
                 </Card>

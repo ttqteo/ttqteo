@@ -1,8 +1,7 @@
 import { Suspense } from "react";
-import { Footer } from "./_components/footer";
 import { Header } from "./_components/header";
 import { Spinner } from "@/components/ui-extensions/spinner";
-import LiveClock from "@/components/ui-extensions/live-clock";
+import Footer from "./_components/footer";
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -12,7 +11,6 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
         <div className="mt-24 container mx-auto">
           <Suspense fallback={<Spinner />}>{children}</Suspense>
         </div>
-        <LiveClock />
         <Footer />
       </main>
     </div>

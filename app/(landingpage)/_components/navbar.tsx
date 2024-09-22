@@ -34,11 +34,6 @@ export const navbarComponents: {
   features?: Components[];
 }[] = [
   {
-    title: "home",
-    href: "/",
-    description: "",
-  },
-  {
     title: "blog",
     href: "/blog",
     description: "",
