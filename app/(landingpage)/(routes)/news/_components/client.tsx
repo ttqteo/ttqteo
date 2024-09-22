@@ -24,27 +24,26 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import axios from "axios";
 import { LayoutListIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { News, NewsResponse } from "../_model/news";
-import { newsResponse } from "./demo";
 import Moment from "react-moment";
+import { News, NewsResponse } from "../_model/news";
 
 const NewsClient = () => {
   const [newsData, setNewsData] = useState<NewsResponse>();
   useEffect(() => {
     const getData = async () => {
-      // const resp = await axios.get(`/api/news`);
-      // setNewsData(resp.data);
-      setNewsData(newsResponse);
+      const resp = await axios.get(`/api/news`);
+      setNewsData(resp.data);
     };
     getData();
   }, []);
 
   if (newsData === undefined) {
-    return <Spinner />;
+    return <Spinner>Fetching data...</Spinner>;
   }
 
   if (newsData === null) {
@@ -55,7 +54,7 @@ const NewsClient = () => {
     <>
       <div className="flex w-full justify-between items-center">
         <p className="text-sm text-muted-foreground">
-          Total results: {newsData.totalResults}
+          Total results: {newsData?.totalResults}
         </p>
         <DropdownMenu>
           <DropdownMenuTrigger>
@@ -70,7 +69,7 @@ const NewsClient = () => {
         </DropdownMenu>
       </div>
       <div className="grid grid-cols-3 gap-4">
-        {newsData.articles.map(
+        {newsData?.articles.map(
           (news: News, idx: number) =>
             idx < 11 &&
             news.urlToImage && (
