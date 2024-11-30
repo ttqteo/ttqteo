@@ -1,12 +1,12 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { api } from "@/convex/_generated/api";
 import { useUser } from "@clerk/clerk-react";
 import { useMutation } from "convex/react";
 import { PlusCircleIcon } from "lucide-react";
-import { api } from "@/convex/_generated/api";
-import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 const AdminPage = () => {
   const { user } = useUser();

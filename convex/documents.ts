@@ -3,11 +3,24 @@ import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 
+export const getFiveLatestPublic = query({
+  handler: async (ctx) => {
+    const documents = await ctx.db
+      .query("documents")
+      .filter((q) => q.eq(q.field("isPublished"), true))
+      .order("desc")
+      .take(5);
+
+    return documents;
+  },
+});
+
 export const getPublic = query({
   handler: async (ctx) => {
     const documents = await ctx.db
       .query("documents")
       .filter((q) => q.eq(q.field("isPublished"), true))
+      .order("desc")
       .collect();
 
     return documents;
@@ -288,9 +301,18 @@ export const update = mutation({
       throw new Error("Unauthorized.");
     }
 
-    const document = await ctx.db.patch(id, {
-      ...data,
-    });
+    let document;
+
+    if (args.isPublished) {
+      document = await ctx.db.patch(id, {
+        ...data,
+        updatedAt: Date.now(),
+      });
+    } else {
+      document = await ctx.db.patch(id, {
+        ...data,
+      });
+    }
 
     return document;
   },

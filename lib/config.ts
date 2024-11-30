@@ -1,5 +1,5 @@
 export const appConfig = {
-  version: "v0.1.0",
-  name: "@ttqteo",
-  description: "hello, i am @ttqteo",
+  version: "v0.1.1",
+  name: "ttqteo",
+  description: "Hello, I am ttqteo.",
 };

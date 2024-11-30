@@ -1,8 +1,7 @@
 "use client";
-import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { SignInButton, UserButton } from "@clerk/clerk-react";
+import { UserButton } from "@clerk/clerk-react";
 import { useConvexAuth } from "convex/react";
 import Link from "next/link";
 import { Logo } from "./logo";
@@ -17,8 +16,8 @@ import {
   NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
-import { GithubIcon } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
+import { ExternalLinkIcon } from "lucide-react";
+import { usePathname } from "next/navigation";
 import React from "react";
 
 interface Components {
@@ -45,15 +44,8 @@ export const navbarComponents: {
   },
   {
     title: "tools",
-    href: "",
+    href: "/tools/markmap",
     description: "",
-    features: [
-      {
-        title: "markmap",
-        href: "/tools/markmap",
-        description: "",
-      },
-    ],
   },
   {
     title: "roadmap",
@@ -77,44 +69,45 @@ export const Navbar = () => {
         <NavigationMenu>
           <NavigationMenuList>
             <NavigationMenuItem>
-              <Link href={"/"} legacyBehavior passHref>
-                <NavigationMenuLink
-                  className={cn(
-                    navigationMenuTriggerStyle(),
-                    "hover:bg-none!important"
-                  )}
-                >
-                  <Logo />
-                </NavigationMenuLink>
-              </Link>
+              <Logo />
             </NavigationMenuItem>
             {navbarComponents.map((component) =>
               !component?.features ? (
                 <NavigationMenuItem key={component.href}>
                   <Link href={component.href} legacyBehavior passHref>
                     <NavigationMenuLink
-                      className={cn(
-                        navigationMenuTriggerStyle(),
-                        path.match(component.title)
-                          ? "font-bold"
-                          : "font-normal text-gray-500",
-                        "rounded-full relative"
-                      )}
+                      className={cn(navigationMenuTriggerStyle())}
                     >
-                      {component.title}
+                      <Button
+                        variant={"link"}
+                        className={cn(
+                          "p-0",
+                          path.match(component.title)
+                            ? "font-bold"
+                            : "font-normal text-gray-500"
+                        )}
+                      >
+                        {component.title}
+                      </Button>
                     </NavigationMenuLink>
                   </Link>
                 </NavigationMenuItem>
               ) : (
                 <NavigationMenuItem key={component.href}>
                   <NavigationMenuTrigger
-                    className={cn(
-                      path.match(component.title)
-                        ? "font-bold"
-                        : "font-normal text-gray-500"
-                    )}
+                    className={cn(navigationMenuTriggerStyle())}
                   >
-                    {component.title}
+                    <Button
+                      variant={"link"}
+                      className={cn(
+                        "p-0",
+                        path.match(component.title)
+                          ? "font-bold"
+                          : "font-normal text-gray-500"
+                      )}
+                    >
+                      {component.title}
+                    </Button>
                   </NavigationMenuTrigger>
                   <NavigationMenuContent className="absolute">
                     <ul className="w-[400px] p-4 ">
@@ -141,11 +134,11 @@ export const Navbar = () => {
           <>
             <Link href={"https://github.com/ttqteo/ttqteo"} target="_blank">
               <Button
-                variant={"outline"}
-                size="icon"
-                className="rounded-full mr-2"
+                variant={"link"}
+                className="rounded-full flex gap-2 items-center"
               >
-                <GithubIcon className="h-[1.2rem] w-[1.2rem] rounded-full" />
+                github
+                <ExternalLinkIcon className="h-[1.2rem] w-[1.2rem]" />
               </Button>
             </Link>
           </>
@@ -158,7 +151,6 @@ export const Navbar = () => {
             <UserButton afterSignOutUrl="/" />
           </div>
         )}
-        <ModeToggle />
       </div>
     </>
   );

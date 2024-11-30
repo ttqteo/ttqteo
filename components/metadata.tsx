@@ -15,5 +15,5 @@ export default function Metadata({ title, description }: Props) {
 }
 
 export function siteMetadata(name: string) {
-  return `${appConfig.name} | ${name}`;
+  return `${appConfig.name} - ${name}`;
 }

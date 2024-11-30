@@ -19,30 +19,22 @@ const data = [
   {
     date: "Sep, 2024",
     title: "v0.1.0",
-    description: "This version will define what this website do.",
-    feature: [
-      "Home",
-      "Blog",
-      "Roadmap",
-      "About",
-      "Notion Editor",
-      "Dark Mode",
-      "Dynamic Metadata",
-    ],
-    active: false,
-  },
-  {
-    date: "Oct, 2024",
-    title: "v0.2.0",
-    description: "thinking...",
-    feature: ["Markdown Mindmap", "View Counter", "News"],
-    active: false,
+    description: "Initial Website.",
+    feature: [],
+    active: true,
   },
   {
     date: "Nov, 2024",
-    title: "v0.3.0",
-    description: "soon.",
-    feature: ["Finance SaaS"],
+    title: "v0.1.1",
+    description: "Minor change homepage UI.",
+    feature: [],
+    active: false,
+  },
+  {
+    date: "Jan, 2025",
+    title: "v0.2.0",
+    description: "New feature",
+    feature: ["Finance"],
     active: false,
   },
 ];
@@ -55,7 +47,7 @@ const RoadmapPage = () => {
           Roadmap
         </h1>
         <Timeline>
-          {data.map((item) => (
+          {data.reverse().map((item) => (
             <TimelineItem key={item.date}>
               <TimelineConnector />
               <TimelineHeader>
@@ -67,9 +59,7 @@ const RoadmapPage = () => {
                 <TimelineDescription>
                   <span>{item.description}</span>
                   <ul className="ml-6 list-disc [&>li]:mt-2">
-                    {item.feature.map((feat) => (
-                      <li key={feat}>{feat}</li>
-                    ))}
+                    {item?.feature.map((feat) => <li key={feat}>{feat}</li>)}
                   </ul>
                 </TimelineDescription>
               </TimelineContent>
