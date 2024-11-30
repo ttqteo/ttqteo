@@ -1,6 +1,6 @@
 # @ttqteo
 
-- website: [ttqteo.vercel.app](ttqteo.vercel.app)
+<p>Here's a link to <a href="https://ttqteo.vercel.app" target="_blank">ttqteo</a></p>
 
 ## about me
 
