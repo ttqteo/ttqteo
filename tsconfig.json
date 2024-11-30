@@ -22,6 +22,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "convex/auth.config.js", "app/(landingpage)/_components/footer.old"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "convex/auth.config.js", "app/(homepage)/_components/footer.old"],
   "exclude": ["node_modules"]
 }

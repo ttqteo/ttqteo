@@ -139,11 +139,6 @@ export const Navbar = () => {
         {isLoading && <Spinner size={"small"} className="mr-2" />}
         {!isAuthenticated && !isLoading && (
           <>
-            <SignInButton mode="modal">
-              <Button variant={"ghost"} className="rounded-full mr-2">
-                log in
-              </Button>
-            </SignInButton>
             <Link href={"https://github.com/ttqteo/ttqteo"} target="_blank">
               <Button
                 variant={"outline"}

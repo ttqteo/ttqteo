@@ -3,7 +3,7 @@ import { Header } from "./_components/header";
 import { Spinner } from "@/components/ui-extensions/spinner";
 import Footer from "./_components/footer";
 
-const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
+const HomePageLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <div>
       <Header />
@@ -17,4 +17,4 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-export default DashboardLayout;
+export default HomePageLayout;
