@@ -1,7 +1,25 @@
-# @ttqteo
+<a id="readme-top"></a>
 
-<p>Here's a link to <a href="https://ttqteo.vercel.app" target="_blank">ttqteo</a></p>
+<br />
+<div align="center">
+  <a href="https://github.com/ttqteo/ttqteo">
+    <img src="public/logo.png" alt="Logo" width="80" height="80">
+  </a>
 
+  <h3 align="center">ttqteo</h3>
+
+  <p align="center">
+    Welcome to my world!
+    <br />
+    <code>new</code> <a href="https://ttqteo-v2.vercel.app" target="_blank"><strong>explore my website »</strong></a>
+    <br />
+    <a href="https://ttqteo.vercel.app">v1</a>
+    &middot;
+    <a href="https://ttqteo-finance.vercel.app">finance app</a>
+    &middot;
+    <a href="https://github.com/ttqteo/ttqteo">github</a>
+  </p>
+</div>
 ## about me
 
 <div align="center">
