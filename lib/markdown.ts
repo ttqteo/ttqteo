@@ -1,23 +1,33 @@
+import { promises as fs } from "fs";
+import matter from "gray-matter";
 import { compileMDX } from "next-mdx-remote/rsc";
 import path from "path";
-import { promises as fs } from "fs";
-import remarkGfm from "remark-gfm";
-import rehypePrism from "rehype-prism-plus";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
-import rehypeSlug from "rehype-slug";
 import rehypeCodeTitles from "rehype-code-titles";
-import { page_routes, ROUTES } from "./routes-config";
+import rehypePrism from "rehype-prism-plus";
+import rehypeSlug from "rehype-slug";
+import remarkGfm from "remark-gfm";
 import { visit } from "unist-util-visit";
-import matter from "gray-matter";
+import { page_routes, ROUTES } from "./routes-config";
 
 // custom components imports
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Pre from "@/components/markdown/pre";
-import Note from "@/components/markdown/note";
-import { Stepper, StepperItem } from "@/components/markdown/stepper";
+import Files from "@/components/markdown/files";
 import Image from "@/components/markdown/image";
 import Link from "@/components/markdown/link";
+import Note from "@/components/markdown/note";
 import Outlet from "@/components/markdown/outlet";
+import Pre from "@/components/markdown/pre";
+import { Stepper, StepperItem } from "@/components/markdown/stepper";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getIconName, hasSupportedExtension } from "./utils";
 
 // add custom components
 const components = {
@@ -32,6 +42,13 @@ const components = {
   img: Image,
   a: Link,
   Outlet,
+  Files,
+  table: Table,
+  thead: TableHeader,
+  th: TableHead,
+  tr: TableRow,
+  tbody: TableBody,
+  t: TableCell,
 };
 
 // can be used for other pages like blogs, Guides etc
@@ -44,6 +61,7 @@ async function parseMdx<Frontmatter>(rawMdx: string) {
         rehypePlugins: [
           preProcess,
           rehypeCodeTitles,
+          rehypeCodeTitlesWithLogo,
           rehypePrism,
           rehypeSlug,
           rehypeAutolinkHeadings,
@@ -221,4 +239,39 @@ export async function getBlogForSlug(slug: string) {
   } catch {
     return undefined;
   }
+}
+
+function rehypeCodeTitlesWithLogo() {
+  return (tree: any) => {
+    visit(tree, "element", (node) => {
+      if (
+        node?.tagName === "div" &&
+        node?.properties?.className?.includes("rehype-code-title")
+      ) {
+        const titleTextNode = node.children.find(
+          (child: any) => child.type === "text"
+        );
+        if (!titleTextNode) return;
+
+        // Extract filename and language
+        const titleText = titleTextNode.value;
+        const match = hasSupportedExtension(titleText);
+        if (!match) return;
+
+        const splittedNames = titleText.split(".");
+        const ext = splittedNames[splittedNames.length - 1];
+        const iconClass = `devicon-${getIconName(ext)}-plain text-[17px]`;
+
+        // Insert icon before title text
+        if (iconClass) {
+          node.children.unshift({
+            type: "element",
+            tagName: "i",
+            properties: { className: [iconClass, "code-icon"] },
+            children: [],
+          });
+        }
+      }
+    });
+  };
 }

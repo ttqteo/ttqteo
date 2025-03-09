@@ -18,7 +18,7 @@ export async function generateMetadata(props: PageProps) {
   const { slug } = params;
 
   const res = await getBlogForSlug(slug);
-  if (!res) return null;
+  if (!res) return {};
   const { frontmatter } = res;
   return {
     title: `${!frontmatter.isPublished && "[draft] "}${frontmatter.title}`,

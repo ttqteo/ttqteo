@@ -32,7 +32,7 @@ export default async function AboutPage() {
           Tôi là anh lập trình viên luôn tìm cái mới thoát khỏi khuôn viên,{" "}
           <br /> và đó là điều hiển nhiên.
         </p>
-        <blockquote className="text-muted-foreground mt-6 border-l-2 pl-6 text-2xl italic  text-start sm:text-center">
+        <blockquote className="text-muted-foreground mt-6 border-l-2 sm:pl-6 pl-3 sm:text-2xl text-lg italic text-start sm:text-center">
           {'"'}Tại sao số 10 lại là dấu X vào thời kỳ La Mã <br /> hay điểm
           IELTS chỉ dừng ở 9 là tối đa?{'"'}
         </blockquote>
