@@ -175,6 +175,7 @@ export type BlogMdxFrontmatter = BaseMdxFrontmatter & {
   date: string;
   authors: Author[];
   cover: string;
+  isPublished: boolean;
 };
 
 export async function getAllBlogStaticPaths() {
@@ -200,6 +201,13 @@ export async function getAllBlogs() {
       };
     })
   );
+  if (process.env.NODE_ENV == "production") {
+    return uncheckedRes.filter(
+      (it) => !!it && it.isPublished
+    ) as (BlogMdxFrontmatter & {
+      slug: string;
+    })[];
+  }
   return uncheckedRes.filter((it) => !!it) as (BlogMdxFrontmatter & {
     slug: string;
   })[];

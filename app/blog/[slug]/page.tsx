@@ -21,7 +21,7 @@ export async function generateMetadata(props: PageProps) {
   if (!res) return null;
   const { frontmatter } = res;
   return {
-    title: frontmatter.title,
+    title: `${!frontmatter.isPublished && "[draft] "}${frontmatter.title}`,
     description: frontmatter.description,
   };
 }

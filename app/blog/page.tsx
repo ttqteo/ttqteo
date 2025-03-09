@@ -1,8 +1,8 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Author, BlogMdxFrontmatter, getAllBlogs } from "@/lib/markdown";
 import { formatDate2, stringToDate } from "@/lib/utils";
 import { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -34,6 +34,7 @@ function BlogCard({
   description,
   slug,
   authors,
+  isPublished,
 }: BlogMdxFrontmatter & { slug: string }) {
   return (
     <Link
@@ -43,9 +44,13 @@ function BlogCard({
       <h3 className="sm:text-3xl text-2xl font-bold -mt-1 pr-7">{title}</h3>
       <p className="text-sm text-muted-foreground">{description}</p>
       <div className="flex items-center justify-between w-full mt-auto">
-        <p className="text-sm text-muted-foreground">
-          published on {formatDate2(date)}
-        </p>
+        {isPublished ? (
+          <p className="text-sm text-muted-foreground">
+            <>published on {formatDate2(date)}</>
+          </p>
+        ) : (
+          <Badge variant="destructive">draft</Badge>
+        )}
         <AvatarGroup users={authors} />
       </div>
     </Link>

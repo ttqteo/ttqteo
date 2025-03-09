@@ -30,7 +30,7 @@ export function Navbar() {
             <div className="md:flex hidden">
               <Logo />
             </div>
-            <div className="md:flex hidden items-center gap-4 text-base font-medium text-muted-foreground">
+            <div className="md:flex hidden items-center gap-4 font-medium text-muted-foreground text-lg">
               <NavMenu />
             </div>
           </div>
@@ -71,7 +71,7 @@ export function NavMenu({ isSheet = false }) {
             key={item.title + item.href}
             activeClassName="!text-primary dark:font-medium font-semibold"
             absolute
-            className="flex items-center gap-1 dark:text-stone-300/85 text-stone-800"
+            className="flex items-center gap-1 dark:text-stone-300/85 text-stone-800 hover:text-destructive"
             href={item.href}
           >
             {item.title}

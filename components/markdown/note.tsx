@@ -25,11 +25,12 @@ export default function Note({
   return (
     <div
       className={cn(
-        "border rounded-md px-5 pb-0.5 mt-5 mb-7 text-sm tracking-wide",
+        "border rounded-md px-5 pb-0.5 mt-5 mb-7 text-lg tracking-wide",
         noteClassNames
       )}
     >
-      <p className="font-bold -mb-2.5">{title}:</p> {children}
+      {title != "" && <p className="font-bold -mb-2.5">{title}:</p>}
+      {children}
     </div>
   );
 }
