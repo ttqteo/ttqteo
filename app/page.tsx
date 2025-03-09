@@ -8,10 +8,10 @@ export default function Home() {
       <h1 className="text-8xl sm:text-6xl font-bold mb-4">
         hi, i{"'"}m{" "}
         <span className="underline-offset-4 underline hover:text-destructive">
-          <Link href={"/about"}>@ttqteo</Link>
+          <Link href={"/about"}>ttqteo</Link>
         </span>
       </h1>
-      <p className="mb-8 sm:text-2xl text-xl max-w-[800px] text-muted-foreground">
+      <p className="mb-8 sm:text-2xl text-xl max-w-[800px] text-muted-foreground italic">
         keep it simple, stupid
       </p>
       <p className="mb-8 sm:text-2xl text-xl max-w-[800px] text-muted-foreground">
@@ -20,7 +20,7 @@ export default function Home() {
       <p className="mb-8 sm:text-2xl text-xl max-w-[800px] text-muted-foreground">
         welcome to my world
       </p>
-      <div className="flex gap-2 mb-4">
+      <div className="flex sm:flex-row flex-col gap-2 mb-4">
         <Button
           variant={"outline"}
           className="flex items-center gap-2 rounded-full"

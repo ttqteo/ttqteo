@@ -1,4 +1,4 @@
-import { EarthIcon, GithubIcon, TriangleIcon } from "lucide-react";
+import { GithubIcon, TriangleIcon } from "lucide-react";
 import Link from "next/link";
 import { Button } from "./ui/button";
 
@@ -20,19 +20,13 @@ export function Footer() {
 
 export function FooterButtons() {
   return (
-    <>
+    <div className="flex flex-col gap-0 md:flex-row md:gap-2">
       <Link href="https://github.com/ttqteo/ttqteo">
         <Button variant={"link"}>
           <GithubIcon className="h-[0.8rem] w-4 mr-2 text-primary fill-current" />
           Github
         </Button>
       </Link>
-      <Link href="https://ariadocs.vercel.app/">
-        <Button variant={"link"}>
-          <TriangleIcon className="h-[0.8rem] w-4 mr-2 text-primary fill-current" />
-          Build with AriaDocs
-        </Button>
-      </Link>
-    </>
+    </div>
   );
 }

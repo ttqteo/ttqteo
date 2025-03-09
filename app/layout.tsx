@@ -12,12 +12,26 @@ const eb_garamond = EB_Garamond({
 
 export const metadata: Metadata = {
   title: {
-    template: "ttqteo - %s",
+    template: "%s • ttqteo",
     default: "ttqteo",
   },
   metadataBase: new URL("https://ttqteo.vercel.app/"),
   description:
     "This personal website, named 'ttqteo,' is crafted with Next.js, offering a sleek and responsive design tailored for showcasing your portfolio and tools effectively.",
+  icons: {
+    icon: [
+      {
+        media: "(prefers-color-scheme: light)",
+        url: "/images/logo.png",
+        href: "/images/logo.png",
+      },
+      {
+        media: "(prefers-color-scheme: dark)",
+        url: "/images/logo.png",
+        href: "/images/logo.png",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
@@ -31,12 +45,7 @@ export default function RootLayout({
         className={`${eb_garamond.className} font-regular antialiased tracking-wide text-base`}
         suppressHydrationWarning
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <Navbar />
           <main className="sm:container mx-auto w-[90vw] h-auto scroll-smooth">
             {children}

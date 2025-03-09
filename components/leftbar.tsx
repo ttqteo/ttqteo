@@ -1,3 +1,4 @@
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Sheet,
   SheetClose,
@@ -5,13 +6,11 @@ import {
   SheetHeader,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import DocsMenu from "./docs-menu";
+import { FooterButtons } from "./footer";
 import { Logo, NavMenu } from "./navbar";
 import { Button } from "./ui/button";
-import { AlignLeftIcon } from "lucide-react";
-import { FooterButtons } from "./footer";
 import { DialogTitle } from "./ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import DocsMenu from "./docs-menu";
 
 export function Leftbar() {
   return (
@@ -28,22 +27,20 @@ export function SheetLeftbar() {
     <Sheet>
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="md:hidden flex">
-          <AlignLeftIcon />
+          {/* <AlignLeftIcon /> */}
+          <span className="text-2xl ml-8">menu</span>
         </Button>
       </SheetTrigger>
-      <SheetContent className="flex flex-col gap-4 px-0" side="left">
-        <DialogTitle className="sr-only">Menu</DialogTitle>
+      <SheetContent className="flex flex-col gap-4 px-0 w-full" side="left">
+        <DialogTitle className="sr-only">menu</DialogTitle>
         <SheetHeader>
           <SheetClose className="px-5" asChild>
             <Logo />
           </SheetClose>
         </SheetHeader>
         <div className="flex flex-col gap-4 overflow-y-auto">
-          <div className="flex flex-col gap-2.5 mt-3 mx-2 px-5">
+          <div className="flex flex-col items-center justify-center h-[85vh] gap-3 mt-3 mx-2 px-5">
             <NavMenu isSheet />
-          </div>
-          <div className="mx-2 px-5">
-            <DocsMenu isSheet />
           </div>
           <div className="p-6 pb-4 flex gap-2.5">
             <FooterButtons />

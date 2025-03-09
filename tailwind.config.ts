@@ -80,6 +80,7 @@ const config = {
       },
     },
   },
+  safelist: ["bg-background"],
   plugins: [animate, typography],
 } satisfies Config;
 

@@ -1,14 +1,15 @@
 import { ModeToggle } from "@/components/theme-toggle";
 import { SheetClose } from "@/components/ui/sheet";
-import { page_routes } from "@/lib/routes-config";
-import { CloudIcon } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import Anchor from "./anchor";
 import { SheetLeftbar } from "./leftbar";
-import Search from "./search";
-import Image from "next/image";
 
 export const NAVLINKS = [
+  {
+    title: "home",
+    href: "/",
+  },
   {
     title: "blog",
     href: "/blog",
@@ -51,12 +52,12 @@ export function Logo() {
     <Link href="/" className="flex items-center gap-2.5">
       <Image
         src="/images/logo.png"
-        width={24}
-        height={24}
+        width={32}
+        height={32}
         alt="logo"
         className="rounded-full"
       />
-      <h2 className="text-lg font-bold font-code">ttqteo</h2>
+      <h2 className="text-lg font-bold">ttqteo</h2>
     </Link>
   );
 }
@@ -77,7 +78,7 @@ export function NavMenu({ isSheet = false }) {
           </Anchor>
         );
         return isSheet ? (
-          <SheetClose key={item.title + item.href} asChild>
+          <SheetClose key={item.title + item.href} asChild className="text-3xl">
             {Comp}
           </SheetClose>
         ) : (
