@@ -52,7 +52,6 @@ export function formatDate(dateStr: string): string {
   const date = new Date(year, month - 1, day);
 
   const options: Intl.DateTimeFormatOptions = {
-    weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",

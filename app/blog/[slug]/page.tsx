@@ -21,7 +21,7 @@ export async function generateMetadata(props: PageProps) {
   if (!res) return {};
   const { frontmatter } = res;
   return {
-    title: `${!frontmatter.isPublished && "[draft] "}${frontmatter.title}`,
+    title: `${!frontmatter.isPublished ? "[draft] " : ""}${frontmatter.title}`,
     description: frontmatter.description,
   };
 }
@@ -40,7 +40,7 @@ export default async function BlogPage(props: PageProps) {
   const res = await getBlogForSlug(slug);
   if (!res) notFound();
   return (
-    <div className="lg:w-[60%] sm:[95%] md:[75%] mx-auto">
+    <div className="lg:w-[60%] sm:[95%] md:[75%] mx-auto sm:min-h-[78vh] min-h-[76vh]">
       <Link
         className={buttonVariants({
           variant: "link",
@@ -50,35 +50,35 @@ export default async function BlogPage(props: PageProps) {
       >
         <ArrowLeftIcon className="w-4 h-4 mr-1.5" /> back to blog
       </Link>
-      <div className="flex flex-col gap-3 pb-7 w-full mb-2">
-        <p className="text-muted-foreground text-sm">
-          {formatDate(res.frontmatter.date)}
-        </p>
-        <h1 className="sm:text-4xl text-3xl font-extrabold">
+      <div className="flex flex-col gap-3 pb-2 w-full mb-2">
+        <h1 className="sm:text-4xl text-5xl font-semibold mb-2">
           {res.frontmatter.title}
         </h1>
-        <div className="mt-6 flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">posted by</p>
-          <Authors authors={res.frontmatter.authors} />
-        </div>
+        <Authors
+          authors={res.frontmatter.authors}
+          date={formatDate(res.frontmatter.date)}
+        />
       </div>
+
       <div className="!w-full text-lg">
-        <div className="w-full mb-7">
-          <Image
-            src={res.frontmatter.cover}
-            alt="cover"
-            width={700}
-            height={400}
-            className="w-full h-[400px] rounded-md border object-contain bg-white"
-          />
-        </div>
+        {res.frontmatter.cover !== "" && (
+          <div className="w-full mb-7">
+            <Image
+              src={res.frontmatter.cover}
+              alt="cover"
+              width={700}
+              height={400}
+              className="w-full h-[400px] rounded-md border object-contain bg-white"
+            />
+          </div>
+        )}
         <Typography>{res.content}</Typography>
       </div>
     </div>
   );
 }
 
-function Authors({ authors }: { authors: Author[] }) {
+function Authors({ authors, date }: { authors: Author[]; date: string }) {
   return (
     <div className="flex items-center gap-8 flex-wrap">
       {authors.map((author) => {
@@ -95,10 +95,13 @@ function Authors({ authors }: { authors: Author[] }) {
               </AvatarFallback>
             </Avatar>
             <div className="">
-              <p className="text-sm font-medium">{author.username}</p>
-              <p className="font-code text-[13px] text-muted-foreground">
-                @{author.handle}
+              <p className="flex items-center gap-1 text-sm font-medium">
+                {author.username}
+                <p className="font-code text-[13px] italic text-muted-foreground">
+                  @{author.handle}
+                </p>
               </p>
+              <p className="text-muted-foreground text-sm">{date}</p>
             </div>
           </Link>
         );

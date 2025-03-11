@@ -27,11 +27,10 @@ export function SheetLeftbar() {
     <Sheet>
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="md:hidden flex">
-          {/* <AlignLeftIcon /> */}
-          <span className="text-2xl ml-8">menu</span>
+          <span className="text-2xl mr-8">menu</span>
         </Button>
       </SheetTrigger>
-      <SheetContent className="flex flex-col gap-4 px-0 w-full" side="left">
+      <SheetContent className="flex flex-col gap-4 px-0 w-full " side="left">
         <DialogTitle className="sr-only">menu</DialogTitle>
         <SheetHeader>
           <SheetClose className="px-5" asChild>

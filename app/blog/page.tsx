@@ -35,6 +35,7 @@ function BlogCard({
   slug,
   authors,
   isPublished,
+  tags,
 }: BlogMdxFrontmatter & { slug: string }) {
   return (
     <Link
@@ -53,7 +54,16 @@ function BlogCard({
         )}
         <AvatarGroup users={authors} />
       </div>
+      {/* <TagsGroup tags={tags} /> TODO:*/}
     </Link>
+  );
+}
+
+function TagsGroup({ tags }: { tags: string }) {
+  return (
+    <div className="flex gap-2 justify-start">
+      {tags && tags.split(",").map((tag) => <Badge key={tag}>{tag}</Badge>)}
+    </div>
   );
 }
 

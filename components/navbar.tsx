@@ -23,25 +23,17 @@ export const NAVLINKS = [
 export function Navbar() {
   return (
     <nav className="w-full border-b h-16 sticky top-0 z-50 bg-background">
-      <div className="sm:container mx-auto w-[95vw] h-full flex items-center justify-between md:gap-2">
+      <div className="sm:container px-2 mx-auto w-[95vw] h-full flex items-center justify-between md:gap-2">
         <div className="flex items-center gap-5">
-          <SheetLeftbar />
           <div className="flex items-center gap-6">
-            <div className="md:flex hidden">
-              <Logo />
-            </div>
+            <Logo />
             <div className="md:flex hidden items-center gap-4 font-medium text-muted-foreground text-lg">
               <NavMenu />
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            {/* <Search /> */}
-            <ModeToggle />
-          </div>
-        </div>
+        <SheetLeftbar />
       </div>
     </nav>
   );
@@ -57,7 +49,7 @@ export function Logo() {
         alt="logo"
         className="rounded-full"
       />
-      <h2 className="text-lg font-bold">ttqteo</h2>
+      <h2 className="text-lg font-bold hidden sm:block">ttqteo</h2>
     </Link>
   );
 }
@@ -69,7 +61,7 @@ export function NavMenu({ isSheet = false }) {
         const Comp = (
           <Anchor
             key={item.title + item.href}
-            activeClassName="!text-primary dark:font-medium font-semibold"
+            activeClassName="!text-primary dark:font-medium font-bold"
             absolute
             className="flex items-center gap-1 dark:text-stone-300/85 text-stone-800 hover:text-destructive dark:hover:text-[#e72020]"
             href={item.href}

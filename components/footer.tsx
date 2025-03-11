@@ -1,5 +1,6 @@
-import { GithubIcon, TriangleIcon } from "lucide-react";
+import { GithubIcon } from "lucide-react";
 import Link from "next/link";
+import { ModeToggle } from "./theme-toggle";
 import { Button } from "./ui/button";
 
 export function Footer() {
@@ -20,13 +21,14 @@ export function Footer() {
 
 export function FooterButtons() {
   return (
-    <div className="flex flex-col gap-0 md:flex-row md:gap-2">
+    <div className="w-full flex justify-between sm:justify-end sm:gap-2">
       <Link href="https://github.com/ttqteo/ttqteo">
         <Button variant={"link"}>
           <GithubIcon className="h-[0.8rem] w-4 mr-2 text-primary fill-current" />
           Github
         </Button>
       </Link>
+      <ModeToggle />
     </div>
   );
 }
