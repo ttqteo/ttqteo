@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDate } from "@/lib/utils";
 import Image from "next/image";
+import Views from "./components/views";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -57,6 +58,7 @@ export default async function BlogPage(props: PageProps) {
         <Authors
           authors={res.frontmatter.authors}
           date={formatDate(res.frontmatter.date)}
+          slug={slug}
         />
       </div>
 
@@ -78,9 +80,17 @@ export default async function BlogPage(props: PageProps) {
   );
 }
 
-function Authors({ authors, date }: { authors: Author[]; date: string }) {
+function Authors({
+  authors,
+  date,
+  slug,
+}: {
+  authors: Author[];
+  date: string;
+  slug: string;
+}) {
   return (
-    <div className="flex items-center gap-8 flex-wrap">
+    <div className="flex items-center gap-8 flex-wrap justify-between">
       {authors.map((author) => {
         return (
           <Link
@@ -106,6 +116,7 @@ function Authors({ authors, date }: { authors: Author[]; date: string }) {
           </Link>
         );
       })}
+      <Views slug={slug} />
     </div>
   );
 }
