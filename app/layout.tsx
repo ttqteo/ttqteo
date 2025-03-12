@@ -4,6 +4,7 @@ import { Navbar } from "@/components/navbar";
 import type { Metadata } from "next";
 import { EB_Garamond } from "next/font/google";
 import "./globals.css";
+import { ConvexClientProvider } from "@/components/contexts/convex-provider";
 
 const eb_garamond = EB_Garamond({
   weight: ["400", "500", "600", "700", "800"],
@@ -52,13 +53,15 @@ export default function RootLayout({
         className={`${eb_garamond.className} font-regular antialiased tracking-wide text-base`}
         suppressHydrationWarning
       >
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <Navbar />
-          <main className="sm:container mx-auto w-[90vw] h-auto scroll-smooth">
-            {children}
-          </main>
-          <Footer />
-        </ThemeProvider>
+        <ConvexClientProvider>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <Navbar />
+            <main className="sm:container mx-auto w-[90vw] h-auto scroll-smooth">
+              {children}
+            </main>
+            <Footer />
+          </ThemeProvider>
+        </ConvexClientProvider>
       </body>
     </html>
   );
