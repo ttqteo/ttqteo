@@ -6,7 +6,15 @@ import { EyeIcon, HeartIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
-const Views = ({ slug }: { slug: string }) => {
+const Views = ({
+  slug,
+  isDetail = false,
+  isPublished = false,
+}: {
+  slug: string;
+  isDetail?: boolean;
+  isPublished?: boolean;
+}) => {
   const blogDetails = useQuery(api.blogs.getBySlug, { slug });
   const updateViews = useMutation(api.blogs.incrementViews);
   const updateLikes = useMutation(api.blogs.incrementLikes);
@@ -14,7 +22,7 @@ const Views = ({ slug }: { slug: string }) => {
   const [isLiking, setIsLiking] = useState(false);
 
   useEffect(() => {
-    if (!hasViewedRef.current) {
+    if (!hasViewedRef.current && isDetail && isPublished) {
       updateViews({ slug });
       hasViewedRef.current = true;
     }
