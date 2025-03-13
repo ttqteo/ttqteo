@@ -1,13 +1,13 @@
 import { Typography } from "@/components/typography";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { buttonVariants } from "@/components/ui/button";
 import { Author, getAllBlogStaticPaths, getBlogForSlug } from "@/lib/markdown";
+import { formatDate } from "@/lib/utils";
 import { ArrowLeftIcon } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { formatDate } from "@/lib/utils";
-import Image from "next/image";
-import Views from "./components/views";
+import Views from "../components/views";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -59,6 +59,7 @@ export default async function BlogPage(props: PageProps) {
           authors={res.frontmatter.authors}
           date={formatDate(res.frontmatter.date)}
           slug={slug}
+          isPublished={res.frontmatter.isPublished}
         />
       </div>
 
@@ -84,10 +85,12 @@ function Authors({
   authors,
   date,
   slug,
+  isPublished,
 }: {
   authors: Author[];
   date: string;
   slug: string;
+  isPublished: boolean;
 }) {
   return (
     <div className="flex items-center gap-8 flex-wrap justify-between">
@@ -107,16 +110,16 @@ function Authors({
             <div className="">
               <p className="flex items-center gap-1 text-sm font-medium">
                 {author.username}
-                <p className="font-code text-[13px] italic text-muted-foreground">
+                <span className="font-code text-[13px] italic text-muted-foreground">
                   @{author.handle}
-                </p>
+                </span>
               </p>
               <p className="text-muted-foreground text-sm">{date}</p>
             </div>
           </Link>
         );
       })}
-      <Views slug={slug} />
+      <Views slug={slug} isDetail isPublished={isPublished} />
     </div>
   );
 }
