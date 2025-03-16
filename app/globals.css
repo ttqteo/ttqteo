@@ -79,6 +79,14 @@
   margin: 0 !important;
 }
 
+.prose input[type="checkbox"]:disabled {
+  accent-color: #4CAF50 !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+  margin-right: 8px !important;
+  margin-left: -4px !important;
+}
+
 pre {
   padding: 2px 0 !important;
   width: inherit !important;

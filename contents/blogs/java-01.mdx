@@ -1,0 +1,107 @@
+---
+title: "bài viết về Java, phần 1"
+description: "bổ sung sau"
+date: 01-04-2025
+authors:
+  - avatar: "https://avatars.githubusercontent.com/ttqteo"
+    handle: ttqteo
+    username: Tran Tu Quang
+    handleUrl: "https://github.com/ttqteo"
+cover: ""
+isPublished: false
+tags: "java"
+---
+
+xin chào các bạn, mình là @ttqteo. 
+
+mình đến với Java chính thức là từ tết 2022, khi được giao task liên quan đến làm hệ thống micro-service bằng Java và sau 3 tháng mình làm được một hệ thống cơ bản 
+
+
+```java
+import java.util.Scanner;
+
+public class HelloWorld {
+
+    public static void main(String[] args) {
+
+        // Creates a reader instance which takes
+        // input from standard input - keyboard
+        Scanner reader = new Scanner(System.in);
+        System.out.print("Enter a number: ");
+
+        // nextInt() reads the next integer from the keyboard
+        int number = reader.nextInt();
+
+        // println() prints the following line to the output screen
+        System.out.println("You entered: " + number);
+    }
+}
+```
+
+# Java Collections
+
+Set trong java là gì?
+
+- HashSet 
+- Độ phức tạp O(1)
+```java
+HashSet<Integer> set = new HashSet<>();
+set.add(1);
+set.add(2);
+set.add(3);
+
+System.out.println(set);
+set.remove(1);
+set.contains(2);
+set.size();
+set.retainAll(set2);
+```
+
+- LinkedHashSet
+- Độ phức tạp O(1)
+```java
+LinkedHashSet set = new LinkedHashSet<>();
+set.add(1);
+set.add(2);
+set.add(3);
+
+System.out.println(set);
+```
+
+-> LinkedHashSet và HashSet không khác gì nhau lắm
+
+- TreeSet
+- Khác biệt: Có thứ tự
+- Độ phức tạp O(log(n))
+```java
+TreeSet set = new TreeSet<>();
+set.add(1);
+set.add(2);
+set.add(3);
+```
+
+Vì có thứ tự nên dùng được
+```java
+TreeSet<Integer> set = new TreeSet<>();
+set.first(); // phần tử đầu tiên
+set.last(); // phần tử cuối cùng
+set.lower(2); // phần tử nhỏ hơn 2
+set.higher(2); // phần tử lớn hơn 2
+set.ceiling(2); // phần tử nhỏ nhất và lớn hơn hoặc bằng 2
+set.floor(2); // phần tử lớn nhất và bé hơn hoặc bằng 2
+set.pollFirst(); // xoá phần tử đầu tiên
+set.pollLast(); // xoá phần tử cuối cùng
+```
+
+
+- Độ phức tạp https://vallicon.com/post/%C4%91%E1%BB%99-ph%E1%BB%A9c-t%E1%BA%A1p-th%E1%BB%9Di-gian-(time-complexity)-ar38zOBEwgR
+
+| Set                      | Add        | Remove     | Contains   | Next       | Size      | Data Structure            |
+|--------------------------|-----------|-----------|-----------|-----------|-----------|---------------------------|
+| HashSet                  | O(1)      | O(1)      | O(1)      | O(h/n)    | O(1)      | Hash Table                |
+| LinkedHashSet            | O(1)      | O(1)      | O(1)      | O(1)      | O(1)      | Hash Table + Linked List  |
+| EnumSet                  | O(1)      | O(1)      | O(1)      | O(1)      | O(1)      | Bit Vector                |
+| TreeSet                  | O(log n)  | O(log n)  | O(log n)  | O(log n)  | O(log n)  | **Red-black tree**            |
+| CopyOnWriteArraySet      | O(n)      | O(n)      | O(n)      | O(1)      | O(1)      | Array                     |
+| ConcurrentSkipListSet    | O(log n)  | O(log n)  | O(log n)  | O(1)      | O(n)      | Skip List                 |
+
