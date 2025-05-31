@@ -1,0 +1,268 @@
+---
+title: "serverless với s3 + lambda + api gateway, và github actions"
+description: "bài thực hành cơ bản để làm quen với serverless và aws"
+date: 18-03-2025
+authors:
+  - avatar: "https://avatars.githubusercontent.com/ttqteo"
+    handle: ttqteo
+    username: Tran Tu Quang
+    handleUrl: "https://github.com/ttqteo"
+cover: ""
+isPublished: false
+tags: "aws"
+---
+
+repository này private nên sẽ không đăng link github lên.
+
+## Chuẩn bị
+
+Bước 1. Tạo AWS IAM với user có permission để deploy serverless
+
+![AWS IAM for S3 Upload](/images/blog/aws-practices-01/01.png)
+
+Trong đó inline policy:
+```json
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Effect": "Allow",
+			"Action": [
+				"ssm:GetParameter",
+				"ssm:GetParameters",
+				"ssm:GetParametersByPath"
+			],
+			"Resource": "arn:aws:ssm:us-west-1:959332317770:parameter/serverless-framework/deployment/*"
+		}
+	]
+}
+```
+
+Bước 2. Tạo git repo, đồng thời gắn secret repository
+
+Trên github, setup sercet key
+```txt
+AWS_ACCESS_KEY_ID # Get from AWS IAM
+AWS_SECRET_ACCESS_KEY # Get from AWS IAM
+SERVERLESS_ACCESS_KEY # Get from Serverless Framework
+```
+
+Bước 3. Tạo dưới local với git workflow để deploy s3
+
+<Files
+  items={[
+    { 
+      type: "file", 
+      name: ".github/workflows/main.yml",
+    },
+    { type: "file", name: "README.md" },
+    { type: "file", name: "serverless.yml" },
+  ]}
+/>
+
+Bước 3.1. `.github/workflows/main.yml`
+
+```yaml
+name: Deploy File Upload Service
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the main branch
+on:
+  push:
+    branches: [ master ]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "deploy"
+  deploy:
+    name: deploy
+
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    - uses: actions/checkout@v4
+
+    - uses: actions/cache@v4
+      with:
+        path: '**/node_modules'
+        key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v1
+      with:
+        node-version: 20.x
+
+    - name: Install dependencies
+      run: yarn install
+
+    - name: serverless deploy
+      uses: serverless/github-action@master
+      with:
+        args: deploy
+      env:
+        SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+```
+
+Bước 3.2. `serverless.yml`
+
+```yaml
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: ttqteo
+service: s3-upload-file-demo
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: dev
+  region: us-west-1
+  
+custom:
+  fileUploadBucketName: ${self:service}-bucket-${self:provider.stage}
+
+resources:
+  Resources:
+    FileBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.fileUploadBucketName}
+        OwnershipControls:
+          Rules:
+            - ObjectOwnership: BucketOwnerEnforced  # ✅ Required for new AWS rules
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: false  # ✅ Allow public access via bucket policy
+          BlockPublicPolicy: false
+          IgnorePublicAcls: false
+          RestrictPublicBuckets: false
+```
+
+Bước 3.3 Push commit đầu tiên để chạy với github actions và kiểm tra S3 Bucket xem có được tạo chưa
+
+Bước 4. Tạo lambda function và api gateway trong serverless.yml
+
+```yaml
+...
+[...]
+plugins:
+  - serverless-iam-roles-per-function
+
+functions:
+  s3FileUploader:
+    handler: src/upload.handler
+    name: s3-file-uploader
+    description: "A lambda function to upload files to S3 bucket"
+    timeout: 60 # seconds
+    memorySize: 128 # MB
+    events:
+      - http:
+          path: images/upload
+          method: POST
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - s3:Put*
+        Resource: arn:aws:s3:::${self:custom.fileUploadBucketName}/*
+    environment:
+      FILE_UPLOAD_BUCKET_NAME: ${self:custom.fileUploadBucketName}
+
+resources:
+[...]
+```
+
+Bước 5. Chạy 
+
+```sh
+yarn add -D serverless-iam-roles-per-function
+yarn add aws-sdk
+```
+
+Bước 6. Tạo `src/upload.js`
+
+```js
+const AWS = require("aws-sdk");
+const s3 = new AWS.S3();
+
+const BUCKET_NAME = process.env.FILE_UPLOAD_BUCKET_NAME;
+
+module.exports.handler = async (event) => {
+  console.log(event);
+
+  const response = {
+    isBase64Encoded: false,
+    statusCode: 200,
+    body: JSON.stringify({ message: "Successfully uploaded file to S3" }),
+  };
+
+  try {
+    const parsedBody = JSON.parse(event.body);
+    const base64File = parsedBody.file;
+    const decodedFile = Buffer.from(
+      base64File.replace(/^data:image\/\w+;base64,/, ""),
+      "base64"
+    );
+    const params = {
+      Bucket: BUCKET_NAME,
+      Key: `images/${new Date().toISOString()}.jpeg`,
+      Body: decodedFile,
+      ContentType: "image/jpeg",
+    };
+
+    const uploadResult = await s3.upload(params).promise();
+
+    response.body = JSON.stringify({
+      message: "Successfully uploaded file to S3",
+      uploadResult,
+    });
+  } catch (err) {
+    console.error(err);
+    response.statusCode = 500;
+    response.body = JSON.stringify({
+      message: "Failed to uploading file to S3",
+      errorMessage: err,
+    });
+  }
+
+  return response;
+};
+```
+
+Bước 7. Push commit lên và đợi github actions deploy xong
+
+Bước 8. Test postman
+
+```json
+{
+    "message": "Successfully uploaded file to S3",
+    "uploadResult": {
+        "ETag": "\"c6e68efe05d22d0b2b20462853f100df\"",
+        "ServerSideEncryption": "AES256",
+        "Location": "https://s3-upload-file-demo-bucket-dev-2.s3.us-west-1.amazonaws.com/images/2025-03-18T14%3A27%3A26.043Z.jpeg",
+        "key": "images/2025-03-18T14:27:26.043Z.jpeg",
+        "Key": "images/2025-03-18T14:27:26.043Z.jpeg",
+        "Bucket": "s3-upload-file-demo-bucket-dev-2"
+    }
+}
+```
+
+Bước 9. Xoá tài nguyên để tránh bị tính phí
+
+```sh
+serverless remove
+```
+
+Nếu gặp lỗi
+
+```sh
+ServerlessError2: An error occurred: FileBucket - Resource handler returned message: "The bucket you tried to delete is not empty (Service: S3, Status Code: 409, Request ID: 5FXXE44Y2TKDSG9F, Extended Request ID: hRtbCb8pgy3hyN/1TA1KKQRvYeTj5V015kABXET1l0Ot58tXvqXVJbCBbNCecqgp0S04OP7L07J/FqsZXownqRcp8mMvhmVDc1fNn09+WZQ=)" (RequestToken: 7e82d34c-57cb-9b47-6d39-12506b0fc3db, HandlerErrorCode: GeneralServiceException).
+```
+
+Go to S3 -> delete bucket with `permanetly delete`
+
+Do again
+```sh
+serverless remove
+```
