@@ -1,11 +1,11 @@
 import { ThemeProvider } from "@/components/contexts/theme-provider";
 import { Footer } from "@/components/footer";
-import { Navbar } from "@/components/navbar";
-import { AdminToolbar } from "@/components/admin-toolbar";
 import { isAdmin } from "@/lib/supabase-server";
 import type { Metadata } from "next";
 import { EB_Garamond } from "next/font/google";
 import "./globals.css";
+import { AdminToolbar } from "@/components/admin-toolbar";
+import { Navbar } from "@/components/navbar";
 
 const eb_garamond = EB_Garamond({
   weight: ["400", "500", "600", "700", "800"],
@@ -55,13 +55,13 @@ export default async function RootLayout({
       <body
         className={`${
           eb_garamond.className
-        } font-regular antialiased tracking-wide text-base ${
-          admin ? "pt-8" : ""
-        }`}
+        } antialiased tracking-wide text-base ${admin ? "pt-8" : ""}`}
         suppressHydrationWarning
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {/* @ts-expect-error Async Server Component */}
           <AdminToolbar />
+          {/* @ts-expect-error Async Server Component */}
           <Navbar />
           <main className="sm:container mx-auto w-[90vw] h-auto scroll-smooth">
             {children}
