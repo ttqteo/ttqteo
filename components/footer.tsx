@@ -1,4 +1,4 @@
-import { GithubIcon } from "lucide-react";
+import { GithubIcon, Linkedin } from "lucide-react";
 import Link from "next/link";
 import { ModeToggle } from "./theme-toggle";
 import { Button } from "./ui/button";
@@ -22,10 +22,16 @@ export function Footer() {
 export function FooterButtons() {
   return (
     <div className="w-full flex justify-between sm:justify-end sm:gap-2">
-      <Link href="https://github.com/ttqteo/ttqteo">
+      <Link href="https://github.com/ttqteo">
         <Button variant={"link"}>
           <GithubIcon className="h-[0.8rem] w-4 mr-2 text-primary fill-current" />
-          Github
+          GitHub
+        </Button>
+      </Link>
+      <Link href="https://linkedin.com/in/ttqteo">
+        <Button variant={"link"}>
+          <Linkedin className="h-[0.8rem] w-4 mr-2 text-primary" />
+          LinkedIn
         </Button>
       </Link>
       <ModeToggle />

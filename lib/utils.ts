@@ -74,6 +74,11 @@ export function formatDate2(dateStr: string): string {
 }
 
 export function stringToDate(date: string) {
+  // Handle ISO format from database (e.g., "2024-12-13T10:30:00Z")
+  if (date.includes("T") || date.includes(":")) {
+    return new Date(date);
+  }
+  // Handle dd-MM-yyyy format from MDX
   const [day, month, year] = date.split("-").map(Number);
   return new Date(year, month - 1, day);
 }

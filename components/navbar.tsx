@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import Anchor from "./anchor";
 import { SheetLeftbar } from "./leftbar";
+import { isAdmin } from "@/lib/supabase-server";
 
 export const NAVLINKS = [
   {
@@ -20,9 +21,15 @@ export const NAVLINKS = [
   },
 ];
 
-export function Navbar() {
+export async function Navbar() {
+  const admin = await isAdmin();
+
   return (
-    <nav className="w-full border-b h-16 sticky top-0 z-50 bg-background">
+    <nav
+      className={`w-full border-b h-16 sticky z-50 bg-background ${
+        admin ? "top-8" : "top-0"
+      }`}
+    >
       <div className="sm:container px-2 mx-auto w-[95vw] h-full flex items-center justify-between md:gap-2">
         <div className="flex items-center gap-5">
           <div className="flex items-center gap-6">

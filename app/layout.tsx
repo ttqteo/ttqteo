@@ -1,10 +1,11 @@
 import { ThemeProvider } from "@/components/contexts/theme-provider";
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
+import { AdminToolbar } from "@/components/admin-toolbar";
+import { isAdmin } from "@/lib/supabase-server";
 import type { Metadata } from "next";
 import { EB_Garamond } from "next/font/google";
 import "./globals.css";
-import { ConvexClientProvider } from "@/components/contexts/convex-provider";
 
 const eb_garamond = EB_Garamond({
   weight: ["400", "500", "600", "700", "800"],
@@ -23,23 +24,25 @@ export const metadata: Metadata = {
     icon: [
       {
         media: "(prefers-color-scheme: light)",
-        url: "/images/logo.png",
-        href: "/images/logo.png",
+        url: "/images/logo-dark-circle.png",
+        href: "/images/logo-dark-circle.png",
       },
       {
         media: "(prefers-color-scheme: dark)",
-        url: "/images/logo.png",
-        href: "/images/logo.png",
+        url: "/images/logo-light-circle.png",
+        href: "/images/logo-light-circle.png",
       },
     ],
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const admin = await isAdmin();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -50,18 +53,21 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${eb_garamond.className} font-regular antialiased tracking-wide text-base`}
+        className={`${
+          eb_garamond.className
+        } font-regular antialiased tracking-wide text-base ${
+          admin ? "pt-8" : ""
+        }`}
         suppressHydrationWarning
       >
-        <ConvexClientProvider>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <Navbar />
-            <main className="sm:container mx-auto w-[90vw] h-auto scroll-smooth">
-              {children}
-            </main>
-            <Footer />
-          </ThemeProvider>
-        </ConvexClientProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <AdminToolbar />
+          <Navbar />
+          <main className="sm:container mx-auto w-[90vw] h-auto scroll-smooth">
+            {children}
+          </main>
+          <Footer />
+        </ThemeProvider>
       </body>
     </html>
   );

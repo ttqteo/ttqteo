@@ -2,12 +2,21 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { api } from "@/convex/_generated/api";
-import { Author, BlogMdxFrontmatter } from "@/lib/markdown";
+import { Author } from "@/lib/markdown";
 import { formatDate2 } from "@/lib/utils";
-import { useQuery } from "convex/react";
 import Link from "next/link";
 import Views from "./views";
+
+type BlogCardProps = {
+  date: string;
+  title: string;
+  description: string;
+  slug: string;
+  isPublished: boolean;
+  authors?: Author[];
+  tags?: string;
+  cover?: string;
+};
 
 export function BlogCard({
   date,
@@ -16,27 +25,25 @@ export function BlogCard({
   slug,
   authors,
   isPublished,
-  tags,
-}: BlogMdxFrontmatter & { slug: string }) {
+}: BlogCardProps) {
   return (
     <Link
       href={`/blog/${slug}`}
-      className="flex flex-col gap-1 items-start py-5 px-3 w-full sm:w-[400px] hover:text-destructive"
+      className="flex flex-col gap-2 items-start py-5 px-3 w-full max-w-3xl hover:text-destructive"
     >
-      <h3 className="sm:text-3xl text-2xl font-bold -mt-1 pr-7">{title}</h3>
-      <p className="text-sm text-muted-foreground">{description}</p>
+      <h3 className="sm:text-4xl text-3xl font-bold -mt-1 pr-7">{title}</h3>
+      <p className="text-base text-muted-foreground">{description}</p>
       <div className="flex items-center justify-between w-full mt-auto">
         {isPublished ? (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-base text-muted-foreground">
             <>published on {formatDate2(date)}</>
           </p>
         ) : (
           <Badge variant="destructive">draft</Badge>
         )}
-        <AvatarGroup users={authors} />
+        {authors && authors.length > 0 && <AvatarGroup users={authors} />}
       </div>
       <Views slug={slug} />
-      {/* <TagsGroup tags={tags} /> TODO:*/}
     </Link>
   );
 }
