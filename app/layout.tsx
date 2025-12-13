@@ -1,11 +1,7 @@
 import { ThemeProvider } from "@/components/contexts/theme-provider";
-import { Footer } from "@/components/footer";
-import { isAdmin } from "@/lib/supabase-server";
 import type { Metadata } from "next";
 import { EB_Garamond } from "next/font/google";
 import "./globals.css";
-import { AdminToolbar } from "@/components/admin-toolbar";
-import { Navbar } from "@/components/navbar";
 
 const eb_garamond = EB_Garamond({
   weight: ["400", "500", "600", "700", "800"],
@@ -36,13 +32,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const admin = await isAdmin();
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -53,20 +47,11 @@ export default async function RootLayout({
         />
       </head>
       <body
-        className={`${
-          eb_garamond.className
-        } antialiased tracking-wide text-base ${admin ? "pt-8" : ""}`}
+        className={`${eb_garamond.className} antialiased tracking-wide text-base`}
         suppressHydrationWarning
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {/* @ts-expect-error Async Server Component */}
-          <AdminToolbar />
-          {/* @ts-expect-error Async Server Component */}
-          <Navbar />
-          <main className="sm:container mx-auto w-[90vw] h-auto scroll-smooth">
-            {children}
-          </main>
-          <Footer />
+          {children}
         </ThemeProvider>
       </body>
     </html>

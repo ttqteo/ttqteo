@@ -32,10 +32,18 @@ export default async function BlogIndexPage() {
 
   // Get database posts
   const supabase = await createSupabaseServerClient();
-  const { data: dbPosts } = await supabase
+  const { data: dbPosts, error } = await supabase
     .from("blogs")
     .select("slug, title, description, created_at, is_published")
     .eq("is_published", true);
+
+  // Log error for debugging (will show in server logs)
+  if (error) {
+    console.error("Supabase query error:", error.message);
+    console.error(
+      "If you see a 406 error, the 'blogs' table might not exist. Run schema.sql in Supabase Dashboard."
+    );
+  }
 
   const dbBlogs: UnifiedBlog[] = (dbPosts || []).map((post) => ({
     slug: post.slug,
