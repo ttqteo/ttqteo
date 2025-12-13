@@ -39,7 +39,7 @@ export async function generateMetadata(props: PageProps) {
     .from("blogs")
     .select("title, description, is_published")
     .eq("slug", slug)
-    .single();
+    .maybeSingle();
 
   if (post) {
     return {
@@ -113,7 +113,7 @@ export default async function BlogPage(props: PageProps) {
     .from("blogs")
     .select("*")
     .eq("slug", slug)
-    .single();
+    .maybeSingle();
 
   if (!post) notFound();
 

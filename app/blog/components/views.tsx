@@ -29,7 +29,7 @@ const Views = ({
         .from("blogs")
         .select("views, likes")
         .eq("slug", slug)
-        .single();
+        .maybeSingle();
 
       if (data) {
         setStats({ views: data.views, likes: data.likes });
@@ -51,7 +51,7 @@ const Views = ({
           .from("blogs")
           .select("views, likes")
           .eq("slug", slug)
-          .single();
+          .maybeSingle();
         if (data) setStats(data);
       };
 
