@@ -50,7 +50,8 @@ export function SimpleEditor({ content, onChange }: SimpleEditorProps) {
     },
     editorProps: {
       attributes: {
-        class: "prose prose-sm max-w-none focus:outline-none min-h-[500px] p-4",
+        class:
+          "prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[500px] p-4 text-lg prose-p:my-1 leading-normal",
       },
     },
   });

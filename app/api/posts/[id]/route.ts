@@ -51,7 +51,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       title,
       slug,
       description,
-      content: content ? JSON.parse(content) : null,
+      content: content || null,
       is_published,
       updated_at: new Date().toISOString(),
     })

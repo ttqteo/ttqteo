@@ -46,7 +46,7 @@ export default async function EditPostPage({ params }: PageProps) {
         title: post.title,
         slug: post.slug,
         description: post.description || "",
-        content: post.content ? JSON.stringify(post.content) : "",
+        content: post.content || "",
         is_published: post.is_published,
       }}
     />
