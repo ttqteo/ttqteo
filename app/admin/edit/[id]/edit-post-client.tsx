@@ -112,7 +112,9 @@ export default function EditPostClient({
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
-      const slug = `${year}/${month}/${day}/${name}`;
+      // Add random suffix to avoid duplicates
+      const suffix = Math.random().toString(36).substring(2, 6);
+      const slug = `${year}/${month}/${day}/${name}-${suffix}`;
       setPost((prev) => ({ ...prev, slug }));
     }
   }, [post.title, isNew]);

@@ -84,7 +84,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
     slug: post.slug,
     title: post.title || "Untitled",
     is_published: post.is_published,
-    updated_at: post.updated_at,
+    updated_at: post.updated_at || post.created_at || new Date().toISOString(),
     deleted_at: post.deleted_at,
     source: "db" as const,
   }));
@@ -184,11 +184,13 @@ export default async function AdminPage({ searchParams }: PageProps) {
                 </div>
                 <p className="text-sm text-muted-foreground">
                   /{post.slug} •{" "}
-                  {new Date(post.updated_at).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
+                  {post.updated_at
+                    ? new Date(post.updated_at).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })
+                    : "No date"}
                 </p>
               </div>
               <div className="flex gap-2">
