@@ -11,12 +11,18 @@ export default async function Template({ children }: PropsWithChildren) {
 
   return (
     <div className={`min-h-screen flex flex-col ${admin ? "pt-8" : ""}`}>
-      <AdminToolbar />
-      <Navbar />
+      <div className="focus-mode-hidden">
+        <AdminToolbar />
+      </div>
+      <div className="focus-mode-hidden">
+        <Navbar />
+      </div>
       <main className="sm:container mx-auto w-[90vw] h-auto scroll-smooth flex-1">
         {children}
       </main>
-      <Footer />
+      <div className="focus-mode-hidden">
+        <Footer />
+      </div>
     </div>
   );
 }

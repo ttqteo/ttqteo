@@ -96,7 +96,7 @@
 }
 
 .prose input[type="checkbox"]:disabled {
-  accent-color: #4CAF50 !important;
+  accent-color: #4caf50 !important;
   cursor: pointer !important;
   opacity: 1 !important;
   margin-right: 8px !important;
@@ -109,7 +109,7 @@ pre {
   overflow-x: auto;
 }
 
-pre>code {
+pre > code {
   display: grid;
   max-width: inherit !important;
   padding: 14px 0 !important;
@@ -139,7 +139,7 @@ pre>code {
   @apply px-2 -mb-8 w-full text-sm pb-5 font-medium mt-5 font-code;
 }
 
-.highlight-comp>code {
+.highlight-comp > code {
   background-color: transparent !important;
 }
 
@@ -183,4 +183,13 @@ pre>code {
 
 *::-webkit-scrollbar-track {
   background-color: transparent; /* Transparent track */
+}
+
+/* Focus Mode - hide navbar, footer, admin toolbar */
+body.focus-mode .focus-mode-hidden {
+  display: none !important;
+}
+
+body.focus-mode {
+  --focus-transition: 0.3s ease;
 }

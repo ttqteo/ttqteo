@@ -1,5 +1,6 @@
 "use client";
 
+import { useFocusMode } from "@/components/contexts/focus-mode-context";
 import { SimpleEditor } from "@/components/simple-editor";
 import {
   AlertDialog,
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/tooltip";
 import {
   ArrowLeftIcon,
+  FocusIcon,
   Loader2Icon,
   LogOutIcon,
   SaveIcon,
@@ -29,7 +31,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 interface PostData {
@@ -41,6 +43,8 @@ interface PostData {
   is_published: boolean;
 }
 
+const DRAFT_STORAGE_KEY = "editor-draft";
+
 export default function EditPostClient({
   initialData,
   isNew,
@@ -49,6 +53,7 @@ export default function EditPostClient({
   isNew: boolean;
 }) {
   const router = useRouter();
+  const { focusMode, toggleFocusMode } = useFocusMode();
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [post, setPost] = useState<PostData>({
     title: initialData?.title || "",
@@ -57,6 +62,44 @@ export default function EditPostClient({
     content: initialData?.content || "",
     is_published: initialData?.is_published || false,
   });
+
+  // Restore draft from sessionStorage on mount (only for new posts)
+  useEffect(() => {
+    if (isNew) {
+      const savedDraft = sessionStorage.getItem(DRAFT_STORAGE_KEY);
+      if (savedDraft) {
+        try {
+          const parsed = JSON.parse(savedDraft);
+          setPost((prev) => ({ ...prev, ...parsed }));
+        } catch {
+          // Invalid JSON, ignore
+        }
+      }
+    }
+  }, [isNew]);
+
+  // Save draft to sessionStorage on change (only for new posts)
+  const saveDraft = useCallback(() => {
+    if (isNew) {
+      sessionStorage.setItem(
+        DRAFT_STORAGE_KEY,
+        JSON.stringify({
+          title: post.title,
+          description: post.description,
+          content: post.content,
+        })
+      );
+    }
+  }, [isNew, post.title, post.description, post.content]);
+
+  useEffect(() => {
+    saveDraft();
+  }, [saveDraft]);
+
+  // Clear draft after successful save
+  const clearDraft = () => {
+    sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+  };
 
   // Auto-generate slug from title with date prefix (year/month/day/name)
   useEffect(() => {
@@ -112,6 +155,7 @@ export default function EditPostClient({
       });
 
       if (res.ok) {
+        clearDraft();
         router.push("/admin");
         router.refresh();
       } else {
@@ -128,12 +172,30 @@ export default function EditPostClient({
   return (
     <div className="max-w-3xl mx-auto py-8">
       <div className="flex items-center justify-between mb-6">
-        <Button variant="ghost" asChild>
-          <Link href="/admin">
-            <ArrowLeftIcon className="w-4 h-4 mr-2" />
-            Back
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {!focusMode && (
+            <Button variant="ghost" asChild>
+              <Link href="/admin">
+                <ArrowLeftIcon className="w-4 h-4 mr-2" />
+                Back
+              </Link>
+            </Button>
+          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={focusMode ? "default" : "outline"}
+                size="icon"
+                onClick={toggleFocusMode}
+              >
+                <FocusIcon className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {focusMode ? "Exit Focus Mode" : "Focus Mode"} (⌘⇧F)
+            </TooltipContent>
+          </Tooltip>
+        </div>
         <div className="flex gap-2">
           {!isNew && (
             <AlertDialog>
@@ -263,36 +325,39 @@ export default function EditPostClient({
           className="text-3xl font-bold h-auto py-2 border-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:ring-primary focus-visible:ring-offset-0"
         />
 
-        {/* Slug Preview */}
-        {(() => {
-          const now = new Date();
-          const datePrefix = `${now.getFullYear()}/${String(
-            now.getMonth() + 1
-          ).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
-          const slugName = post.title
-            ? post.title
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, "-")
-                .replace(/^-|-$/g, "")
-            : "post-slug";
-          return (
-            <div className="text-sm text-muted-foreground">
-              <span>preview: </span>
-              <span className="font-mono">
-                /blog/{datePrefix}/{slugName}
-              </span>
-            </div>
-          );
-        })()}
+        {/* Slug Preview - hide in focus mode */}
+        {!focusMode &&
+          (() => {
+            const now = new Date();
+            const datePrefix = `${now.getFullYear()}/${String(
+              now.getMonth() + 1
+            ).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
+            const slugName = post.title
+              ? post.title
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, "-")
+                  .replace(/^-|-$/g, "")
+              : "post-slug";
+            return (
+              <div className="text-sm text-muted-foreground">
+                <span>preview: </span>
+                <span className="font-mono">
+                  /blog/{datePrefix}/{slugName}
+                </span>
+              </div>
+            );
+          })()}
 
-        {/* Description */}
-        <Input
-          type="text"
-          value={post.description}
-          onChange={(e) => setPost({ ...post, description: e.target.value })}
-          placeholder="Brief description..."
-          className="text-muted-foreground border-none shadow-none focus-visible:ring-0 focus-visible:ring-primary focus-visible:ring-offset-0"
-        />
+        {/* Description - hide in focus mode */}
+        {!focusMode && (
+          <Input
+            type="text"
+            value={post.description}
+            onChange={(e) => setPost({ ...post, description: e.target.value })}
+            placeholder="Brief description..."
+            className="text-muted-foreground border-none shadow-none focus-visible:ring-0 focus-visible:ring-primary focus-visible:ring-offset-0"
+          />
+        )}
 
         {/* WYSIWYG Editor */}
         <SimpleEditor
