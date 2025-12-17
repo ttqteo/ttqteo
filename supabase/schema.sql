@@ -6,14 +6,15 @@ create table if not exists public.blogs (
   slug text unique not null,
   title text not null,
   description text,
-  content jsonb, -- Tiptap JSON content
+  content text, -- HTML content
   cover text,
   is_published boolean default false,
   views integer default 0,
   likes integer default 0,
   author_id uuid references auth.users(id),
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  deleted_at timestamp with time zone default null
 );
 
 -- Enable RLS

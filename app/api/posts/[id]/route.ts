@@ -42,7 +42,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 
   const body = await request.json();
-  const { title, slug, description, content, is_published } = body;
+  const { title, slug, description, content, is_published, deleted_at } = body;
 
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
@@ -53,6 +53,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       description,
       content: content || null,
       is_published,
+      deleted_at,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
@@ -67,7 +68,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 }
 
 // DELETE /api/posts/[id]
-export async function DELETE(_request: NextRequest, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const { id } = await params;
 
   const user = await getUser();
@@ -80,8 +81,25 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const isPermanent = searchParams.get("permanent") === "true";
+
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("blogs").delete().eq("id", id);
+  let error;
+
+  if (isPermanent) {
+    const { error: deleteError } = await supabase
+      .from("blogs")
+      .delete()
+      .eq("id", id);
+    error = deleteError;
+  } else {
+    const { error: updateError } = await supabase
+      .from("blogs")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", id);
+    error = updateError;
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

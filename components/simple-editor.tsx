@@ -4,6 +4,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
+import Image from "@tiptap/extension-image";
 import {
   Bold,
   Italic,
@@ -21,9 +22,12 @@ import {
   Link2,
   UnderlineIcon,
   Code2,
+  ImageIcon,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useImageUpload } from "./use-image-upload";
 
 interface SimpleEditorProps {
   content: string;
@@ -31,6 +35,9 @@ interface SimpleEditorProps {
 }
 
 export function SimpleEditor({ content, onChange }: SimpleEditorProps) {
+  const { uploadImage, isUploading } = useImageUpload();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -42,6 +49,11 @@ export function SimpleEditor({ content, onChange }: SimpleEditorProps) {
         openOnClick: false,
       }),
       Underline,
+      Image.configure({
+        HTMLAttributes: {
+          class: "rounded-lg border my-4",
+        },
+      }),
     ],
     content: content || "",
     immediatelyRender: false,
@@ -74,8 +86,29 @@ export function SimpleEditor({ content, onChange }: SimpleEditorProps) {
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = await uploadImage(file);
+      if (url) {
+        editor.chain().focus().setImage({ src: url }).run();
+      }
+    }
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <div className="border rounded-lg overflow-hidden">
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept="image/*"
+        onChange={handleImageUpload}
+      />
       {/* Full Toolbar */}
       <div className="flex flex-wrap gap-1 p-2 border-b bg-muted/30">
         {/* Undo/Redo */}
@@ -225,6 +258,22 @@ export function SimpleEditor({ content, onChange }: SimpleEditorProps) {
           className="h-8 px-2"
         >
           <Link2 className="w-4 h-4" />
+        </Button>
+
+        {/* Image */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
+          className="h-8 px-2"
+        >
+          {isUploading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <ImageIcon className="w-4 h-4" />
+          )}
         </Button>
 
         <div className="w-px h-6 bg-border mx-1" />

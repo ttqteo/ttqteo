@@ -9,6 +9,7 @@ import { stringToDate } from "@/lib/utils";
 import { FileTextIcon, PencilIcon, PlusIcon, TrashIcon } from "lucide-react";
 import Link from "next/link";
 import { LoginButton } from "./login-button";
+import { AdminPostActions } from "./post-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +20,17 @@ type UnifiedPost = {
   is_published: boolean;
   updated_at: string;
   source: "mdx" | "db";
+  deleted_at?: string | null;
 };
 
-export default async function AdminPage() {
+type PageProps = {
+  searchParams: Promise<{ view?: string }>;
+};
+
+export default async function AdminPage({ searchParams }: PageProps) {
   const user = await getUser();
+  const { view } = await searchParams;
+  const isTrash = view === "trash";
 
   // Not authenticated - show login
   if (!user) {
@@ -58,10 +66,18 @@ export default async function AdminPage() {
 
   // Get database posts
   const supabase = await createSupabaseServerClient();
-  const { data: dbPosts } = await supabase
+  let query = supabase
     .from("blogs")
-    .select("id, slug, title, is_published, created_at, updated_at")
+    .select("id, slug, title, is_published, created_at, updated_at, deleted_at")
     .order("updated_at", { ascending: false });
+
+  if (isTrash) {
+    query = query.not("deleted_at", "is", null);
+  } else {
+    query = query.is("deleted_at", null);
+  }
+
+  const { data: dbPosts } = await query;
 
   const dbItems: UnifiedPost[] = (dbPosts || []).map((post) => ({
     id: post.id,
@@ -69,19 +85,23 @@ export default async function AdminPage() {
     title: post.title || "Untitled",
     is_published: post.is_published,
     updated_at: post.updated_at,
+    deleted_at: post.deleted_at,
     source: "db" as const,
   }));
 
-  // Get MDX blogs
-  const mdxBlogs = await getAllBlogs();
-  const mdxItems: UnifiedPost[] = mdxBlogs.map((blog) => ({
-    id: `mdx-${blog.slug}`,
-    slug: blog.slug,
-    title: blog.title,
-    is_published: blog.isPublished,
-    updated_at: stringToDate(blog.date).toISOString(),
-    source: "mdx" as const,
-  }));
+  // Get MDX blogs (only for active view, MDX doesn't have trash)
+  let mdxItems: UnifiedPost[] = [];
+  if (!isTrash) {
+    const mdxBlogs = await getAllBlogs();
+    mdxItems = mdxBlogs.map((blog) => ({
+      id: `mdx-${blog.slug}`,
+      slug: blog.slug,
+      title: blog.title,
+      is_published: blog.isPublished,
+      updated_at: stringToDate(blog.date).toISOString(),
+      source: "mdx" as const,
+    }));
+  }
 
   // Merge and sort by date
   const allPosts = [...dbItems, ...mdxItems].sort(
@@ -93,20 +113,44 @@ export default async function AdminPage() {
   return (
     <div className="max-w-3xl mx-auto py-8">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold">admin dashboard</h1>
-        <div className="flex gap-2">
-          <Button asChild>
-            <Link href="/admin/edit/new">
-              <PlusIcon className="w-4 h-4 mr-2" />
-              New Blog
+        <div>
+          <h1 className="text-2xl font-bold">admin dashboard</h1>
+          <div className="flex gap-4 mt-4 text-sm">
+            <Link
+              href="/admin"
+              className={
+                !isTrash ? "font-bold underline" : "text-muted-foreground"
+              }
+            >
+              All Posts
             </Link>
-          </Button>
+            <Link
+              href="/admin?view=trash"
+              className={
+                isTrash ? "font-bold underline" : "text-muted-foreground"
+              }
+            >
+              Trash
+            </Link>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          {!isTrash && (
+            <Button asChild>
+              <Link href="/admin/edit/new">
+                <PlusIcon className="w-4 h-4 mr-2" />
+                New Blog
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
 
       {allPosts.length === 0 ? (
         <p className="text-muted-foreground text-center py-12">
-          No blogs yet. Create your first post!
+          {isTrash
+            ? "Trash is empty."
+            : "No blogs yet. Create your first post!"}
         </p>
       ) : (
         <div className="space-y-2">
@@ -132,6 +176,11 @@ export default async function AdminPage() {
                       MDX
                     </span>
                   )}
+                  {post.deleted_at && (
+                    <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">
+                      Deleted
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground">
                   /{post.slug} •{" "}
@@ -145,18 +194,18 @@ export default async function AdminPage() {
               <div className="flex gap-2">
                 {post.source === "db" ? (
                   <>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/admin/edit/${post.id}`}>
-                        <PencilIcon className="w-4 h-4" />
-                      </Link>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-destructive"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </Button>
+                    {!isTrash && (
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/admin/edit/${post.id}`}>
+                          <PencilIcon className="w-4 h-4" />
+                        </Link>
+                      </Button>
+                    )}
+                    <AdminPostActions
+                      id={post.id}
+                      title={post.title}
+                      isDeleted={!!post.deleted_at}
+                    />
                   </>
                 ) : (
                   <Button variant="outline" size="sm" asChild>

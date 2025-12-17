@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       title,
       slug,
       description,
-      content: content ? JSON.parse(content) : null,
+      content: content || "",
       is_published,
       author_id: user.id,
     })

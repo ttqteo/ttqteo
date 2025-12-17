@@ -1,12 +1,36 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { SimpleEditor } from "@/components/simple-editor";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SimpleEditor } from "@/components/simple-editor";
-import { ArrowLeftIcon, SaveIcon, SendIcon } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  ArrowLeftIcon,
+  Loader2Icon,
+  LogOutIcon,
+  SaveIcon,
+  SendIcon,
+  TrashIcon,
+} from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 interface PostData {
   id?: string;
@@ -25,7 +49,7 @@ export default function EditPostClient({
   isNew: boolean;
 }) {
   const router = useRouter();
-  const [saving, setSaving] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [post, setPost] = useState<PostData>({
     title: initialData?.title || "",
     slug: initialData?.slug || "",
@@ -50,8 +74,30 @@ export default function EditPostClient({
     }
   }, [post.title, isNew]);
 
-  const handleSave = async (publish: boolean) => {
-    setSaving(true);
+  const handleDelete = async () => {
+    setLoadingAction("delete");
+    try {
+      const res = await fetch(`/api/posts/${initialData?.id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        toast.success("Post moved to trash");
+        router.push("/admin");
+        router.refresh();
+      } else {
+        const error = await res.json();
+        toast.error(error.message || "Failed to delete");
+      }
+    } catch {
+      toast.error("Failed to delete");
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleSave = async (publish: boolean, action: string) => {
+    setLoadingAction(action);
     try {
       const url = isNew ? "/api/posts" : `/api/posts/${initialData?.id}`;
       const method = isNew ? "POST" : "PUT";
@@ -70,12 +116,12 @@ export default function EditPostClient({
         router.refresh();
       } else {
         const error = await res.json();
-        alert(error.message || "Failed to save");
+        toast.error(error.message || "Failed to save");
       }
     } catch {
-      alert("Failed to save");
+      toast.error("Failed to save");
     } finally {
-      setSaving(false);
+      setLoadingAction(null);
     }
   };
 
@@ -89,18 +135,121 @@ export default function EditPostClient({
           </Link>
         </Button>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => handleSave(false)}
-            disabled={saving}
-          >
-            <SaveIcon className="w-4 h-4 mr-2" />
-            Save Draft
-          </Button>
-          <Button onClick={() => handleSave(true)} disabled={saving}>
-            <SendIcon className="w-4 h-4 mr-2" />
-            Publish
-          </Button>
+          {!isNew && (
+            <AlertDialog>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      disabled={!!loadingAction}
+                    >
+                      {loadingAction === "delete" ? (
+                        <Loader2Icon className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <TrashIcon className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </AlertDialogTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Move to trash</TooltipContent>
+              </Tooltip>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Move to trash?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This post will be moved to the trash. You can restore it
+                    later.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Move to Trash
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          {post.is_published ? (
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleSave(false, "unpublish")}
+                    disabled={!!loadingAction}
+                  >
+                    {loadingAction === "unpublish" ? (
+                      <Loader2Icon className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <LogOutIcon className="w-4 h-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Unpublish</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    onClick={() => handleSave(true, "save")}
+                    disabled={!!loadingAction}
+                  >
+                    {loadingAction === "save" ? (
+                      <Loader2Icon className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <SaveIcon className="w-4 h-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Save</TooltipContent>
+              </Tooltip>
+            </>
+          ) : (
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleSave(false, "save-draft")}
+                    disabled={!!loadingAction}
+                  >
+                    {loadingAction === "save-draft" ? (
+                      <Loader2Icon className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <SaveIcon className="w-4 h-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Save Draft</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    onClick={() => handleSave(true, "publish")}
+                    disabled={!!loadingAction}
+                  >
+                    {loadingAction === "publish" ? (
+                      <Loader2Icon className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <SendIcon className="w-4 h-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Publish</TooltipContent>
+              </Tooltip>
+            </>
+          )}
         </div>
       </div>
 
