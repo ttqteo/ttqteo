@@ -121,7 +121,7 @@ export default async function BlogPage(props: PageProps) {
   const admin = await isAdmin();
 
   return (
-    <div className="lg:w-[60%] sm:[95%] md:[75%] mx-auto sm:min-h-[78vh] min-h-[76vh]">
+    <div className="w-full mx-auto sm:min-h-[78vh] min-h-[76vh]">
       <div className="flex items-center justify-between mb-7">
         <Link
           className={buttonVariants({

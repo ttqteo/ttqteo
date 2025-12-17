@@ -24,40 +24,30 @@ const Views = ({
   const [isLiking, setIsLiking] = useState(false);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      const { data, error } = await supabase
+    const fetchAndMaybeIncrement = async () => {
+      const { data } = await supabase
         .from("blogs")
         .select("views, likes")
         .eq("slug", slug)
         .maybeSingle();
 
-      if (data) {
-        setStats({ views: data.views, likes: data.likes });
-      } else {
-        // If no data found, assume 0/0 (or it will create on increment)
-        setStats({ views: 0, likes: 0 });
+      let currentViews = data?.views ?? 0;
+      let currentLikes = data?.likes ?? 0;
+
+      // If this is detail page and published, increment view
+      if (!hasViewedRef.current && isDetail && isPublished) {
+        // Optimistic update - show incremented value immediately
+        currentViews += 1;
+        hasViewedRef.current = true;
+
+        // Fire and forget - increment in background
+        supabase.rpc("increment_views", { blog_slug: slug });
       }
+
+      setStats({ views: currentViews, likes: currentLikes });
     };
 
-    fetchStats();
-  }, [slug]);
-
-  useEffect(() => {
-    if (!hasViewedRef.current && isDetail && isPublished) {
-      const incrementView = async () => {
-        await supabase.rpc("increment_views", { blog_slug: slug });
-        // Optimistic update or refetch? Let's just refetch to be accurate
-        const { data } = await supabase
-          .from("blogs")
-          .select("views, likes")
-          .eq("slug", slug)
-          .maybeSingle();
-        if (data) setStats(data);
-      };
-
-      incrementView();
-      hasViewedRef.current = true;
-    }
+    fetchAndMaybeIncrement();
   }, [slug, isDetail, isPublished]);
 
   const handleLike = async (e: React.MouseEvent) => {
