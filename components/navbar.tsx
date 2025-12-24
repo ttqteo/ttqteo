@@ -16,6 +16,10 @@ export const NAVLINKS = [
     href: "/blog",
   },
   {
+    title: "mindmap",
+    href: "/mindmap",
+  },
+  {
     title: "about",
     href: "/about",
   },
