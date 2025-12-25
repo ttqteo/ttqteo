@@ -22,6 +22,8 @@ import {
   Minimize2,
   X,
   Loader2,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useFocusMode } from "@/components/contexts/focus-mode-context";
@@ -38,15 +40,7 @@ interface TreeNode {
 }
 
 const DEFAULT_MINDMAP = `mindmap
-  Mindmap
-    Topic 1
-      Subtopic 1.1
-      Subtopic 1.2
-    Topic 2
-      Subtopic 2.1
-      Subtopic 2.2
-    Topic 3
-      Subtopic 3.1`;
+  root((...))`;
 
 // Color palette for different levels
 const LEVEL_COLORS = [
@@ -198,6 +192,7 @@ interface NodeComponentProps {
   node: TreeNode;
   parentId: string | null;
   parentLevel: number;
+  nextSiblingId: string | null;
   onEdit: (id: string, newText: string) => void;
   onAddChild: (id: string) => void;
   onEditAndAddChild: (id: string, newText: string) => void;
@@ -214,6 +209,7 @@ function NodeComponent({
   node,
   parentId,
   parentLevel,
+  nextSiblingId,
   onEdit,
   onAddChild,
   onEditAndAddChild,
@@ -228,7 +224,8 @@ function NodeComponent({
   const [editValue, setEditValue] = useState(
     node.text === "..." ? "" : node.text
   );
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const nodeRef = useRef<HTMLDivElement>(null);
   const isEditing = editingId === node.id;
   const isSelected = selectedId === node.id && !isEditing;
@@ -239,14 +236,15 @@ function NodeComponent({
   const colors = isRoot ? LEVEL_COLORS[0] : LEVEL_COLORS[colorIndex];
 
   useEffect(() => {
-    if (isEditing && inputRef.current) {
-      // Use requestAnimationFrame to ensure DOM is ready
-      requestAnimationFrame(() => {
+    if (isEditing) {
+      // Use setTimeout to ensure new nodes are fully rendered
+      const timeoutId = setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.focus();
           inputRef.current.select();
         }
-      });
+      }, 100);
+      return () => clearTimeout(timeoutId);
     }
   }, [isEditing]);
 
@@ -262,18 +260,35 @@ function NodeComponent({
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      // Enter while editing: save and create new sibling
+      // Enter: save, then move to next sibling or create new one
       e.preventDefault();
+      onEdit(node.id, editValue);
       setEditingId(null);
-      onEditAndAddSibling(node.id, editValue);
+
+      if (nextSiblingId) {
+        // Move to next sibling
+        setTimeout(() => setEditingId(nextSiblingId), 50);
+      } else {
+        // No next sibling, create new one
+        onEditAndAddSibling(node.id, editValue);
+      }
     } else if (e.key === "Tab") {
       // Tab: save and create new child
       e.preventDefault();
       setEditingId(null);
       onEditAndAddChild(node.id, editValue);
     } else if (e.key === "Escape") {
-      // Escape: cancel and revert
-      setEditValue(node.text);
+      // Escape: cancel - delete if new node AND empty, otherwise save/revert
+      if (node.text === "..." && editValue.trim() === "") {
+        // New node with nothing typed - delete it
+        onDelete(node.id);
+      } else if (node.text === "..." && editValue.trim() !== "") {
+        // New node with content typed - save it
+        onEdit(node.id, editValue);
+      } else {
+        // Existing node - revert to original text
+        setEditValue(node.text);
+      }
       setEditingId(null);
     }
   };
@@ -313,6 +328,7 @@ function NodeComponent({
           relative px-4 py-2 rounded-lg border-2 cursor-pointer
           transition-all duration-200 hover:shadow-md
           text-center font-medium outline-none
+          max-w-[250px] break-words
           ${colors.bg} ${colors.text} ${colors.border}
           ${
             isEditing ? "ring-2 ring-offset-2 ring-blue-500" : "hover:scale-105"
@@ -320,19 +336,28 @@ function NodeComponent({
         `}
       >
         {isEditing ? (
-          <input
+          <textarea
             ref={inputRef}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
-            onKeyDown={handleKeyDown}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                handleKeyDown(
+                  e as unknown as React.KeyboardEvent<HTMLInputElement>
+                );
+              } else if (e.key === "Tab" || e.key === "Escape") {
+                handleKeyDown(
+                  e as unknown as React.KeyboardEvent<HTMLInputElement>
+                );
+              }
+            }}
             onBlur={handleBlur}
-            size={Math.max(editValue.length, 5)}
+            rows={Math.max(1, Math.ceil(editValue.length / 22))}
             className={`
-              bg-transparent text-center font-medium outline-none ${colors.text}
+              bg-transparent text-center font-medium outline-none w-full resize-none ${colors.text}
             `}
             style={{
               caretColor: "currentColor",
-              width: `${Math.max(editValue.length * 0.6 + 1, 4)}em`,
             }}
           />
         ) : (
@@ -340,58 +365,101 @@ function NodeComponent({
         )}
       </div>
 
-      {/* Children */}
+      {/* Collapse toggle + Children */}
       {node.children.length > 0 && (
-        <div className="flex items-center ml-2">
-          {/* Connection line from parent */}
-          <div className={`w-6 h-0.5 ${colors.line}`} />
-
-          {/* Vertical line + children container */}
-          <div className="relative flex flex-col gap-2">
-            {/* Vertical connector line spanning all children */}
-            {node.children.length > 1 && (
-              <div
-                className={`absolute left-0 w-0.5 ${colors.line}`}
-                style={{
-                  top: "18px",
-                  bottom: "18px",
-                }}
-              />
+        <div className="flex items-center">
+          {/* Collapse toggle button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsCollapsed(!isCollapsed);
+            }}
+            className={`
+              w-5 h-5 flex items-center justify-center rounded-full
+              ${colors.bg} ${colors.text} ${colors.border}
+              border hover:opacity-80 transition-all ml-1
+            `}
+            title={isCollapsed ? "Expand" : "Collapse"}
+          >
+            {isCollapsed ? (
+              <ChevronRight className="w-3 h-3" />
+            ) : (
+              <ChevronDown className="w-3 h-3" />
             )}
+          </button>
 
-            {node.children.map((child) => {
-              // Get child's colors for the connecting line
-              const childColorIndex = Math.min(
-                parentLevel + 2,
-                LEVEL_COLORS.length - 1
-              );
-              const childColors =
-                child.children.length > 0
-                  ? LEVEL_COLORS[childColorIndex]
-                  : CHILD_COLORS[childColorIndex % CHILD_COLORS.length];
+          {/* Children (only when not collapsed) */}
+          {!isCollapsed && (
+            <div className="flex items-center ml-1">
+              {/* Connection line from parent */}
+              <div className={`w-4 h-0.5 ${colors.line}`} />
 
-              return (
-                <div key={child.id} className="flex items-center">
-                  <div className={`w-4 h-0.5 ${childColors.line}`} />
-                  <NodeComponent
-                    node={child}
-                    parentId={node.id}
-                    parentLevel={parentLevel + 1}
-                    onEdit={onEdit}
-                    onAddChild={onAddChild}
-                    onEditAndAddChild={onEditAndAddChild}
-                    onAddSibling={onAddSibling}
-                    onEditAndAddSibling={onEditAndAddSibling}
-                    onDelete={onDelete}
-                    editingId={editingId}
-                    setEditingId={setEditingId}
-                    selectedId={selectedId}
-                    setSelectedId={setSelectedId}
-                  />
-                </div>
-              );
-            })}
-          </div>
+              {/* Children container with vertical line */}
+              <div
+                className={`flex flex-col gap-3 ${
+                  node.children.length > 1 ? "border-l-2" : ""
+                }`}
+                style={{
+                  borderColor:
+                    node.children.length > 1 ? "currentColor" : "transparent",
+                }}
+              >
+                {node.children.map((child, index) => {
+                  // Get child's colors for the connecting line
+                  const childColorIndex = Math.min(
+                    parentLevel + 2,
+                    LEVEL_COLORS.length - 1
+                  );
+                  const childColors =
+                    child.children.length > 0
+                      ? LEVEL_COLORS[childColorIndex]
+                      : CHILD_COLORS[childColorIndex % CHILD_COLORS.length];
+
+                  // Get next sibling ID
+                  const nextSibling = node.children[index + 1];
+                  const isFirst = index === 0;
+                  const isLast = index === node.children.length - 1;
+
+                  return (
+                    <div key={child.id} className="flex items-center relative">
+                      {/* Horizontal connector */}
+                      <div className={`w-4 h-0.5 ${childColors.line}`} />
+                      {/* Cover vertical line at top/bottom edges */}
+                      {isFirst && node.children.length > 1 && (
+                        <div className="absolute left-[-2px] top-0 w-0.5 h-1/2 bg-background" />
+                      )}
+                      {isLast && node.children.length > 1 && (
+                        <div className="absolute left-[-2px] bottom-0 w-0.5 h-1/2 bg-background" />
+                      )}
+                      <NodeComponent
+                        node={child}
+                        parentId={node.id}
+                        parentLevel={parentLevel + 1}
+                        nextSiblingId={nextSibling?.id || null}
+                        onEdit={onEdit}
+                        onAddChild={onAddChild}
+                        onEditAndAddChild={onEditAndAddChild}
+                        onAddSibling={onAddSibling}
+                        onEditAndAddSibling={onEditAndAddSibling}
+                        onDelete={onDelete}
+                        editingId={editingId}
+                        setEditingId={setEditingId}
+                        selectedId={selectedId}
+                        setSelectedId={setSelectedId}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Show child count when collapsed */}
+          {isCollapsed && (
+            <span className="ml-2 text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+              {node.children.length} items
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -411,6 +479,8 @@ export function MindmapViewer({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showCodePopup, setShowCodePopup] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [isResizing, setIsResizing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingEditRef = useRef<{ parentId: string; isChild: boolean } | null>(
     null
@@ -475,7 +545,7 @@ export function MindmapViewer({
             setEditingId(newNodeId);
           }
         }
-      }, 100);
+      }, 200);
 
       return () => clearTimeout(timeoutId);
     }
@@ -752,8 +822,12 @@ export function MindmapViewer({
   );
 
   const resetCode = useCallback(() => {
-    setCode(DEFAULT_MINDMAP);
+    const rootOnlyMindmap = `mindmap
+  root((...))`;
+    setCode(rootOnlyMindmap);
     setEditingId(null);
+    // Mark to focus on root after reset
+    pendingEditRef.current = { parentId: "", isChild: false };
   }, []);
 
   const addRootChild = useCallback(() => {
@@ -773,7 +847,7 @@ export function MindmapViewer({
     `}
     >
       <div
-        className={`relative border-none bg-background ${
+        className={`relative border-none bg-background flex flex-col ${
           isFullscreen ? "h-screen" : ""
         }`}
       >
@@ -842,93 +916,164 @@ export function MindmapViewer({
           </AlertDialog>
         </div>
 
-        {showCodePopup && (
-          <div className="absolute top-14 right-4 w-[400px] max-h-[80vh] bg-background border rounded-lg shadow-xl z-30 flex flex-col animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30">
-              <span className="text-sm font-semibold">Code</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowCodePopup(false)}
-                className="h-6 w-6"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="overflow-auto p-4 flex flex-col gap-4">
-              <div className="border rounded-lg bg-background overflow-hidden">
-                <div className="bg-muted/50 px-3 py-1.5 border-b flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground font-mono">
-                    mermaid
-                  </span>
-                  <div className="flex gap-2"></div>
-                </div>
-                <Textarea
-                  ref={textareaRef}
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  onKeyDown={handleCodeKeyDown}
-                  className="font-mono text-xs border-0 rounded-none focus-visible:ring-0 resize-none w-full min-h-[300px]"
-                  placeholder="Enter your mermaid mindmap syntax..."
-                />
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Code Sidebar */}
+          {showCodePopup && (
+            <div
+              className="border-r bg-background flex flex-col animate-in slide-in-from-left duration-200 relative"
+              style={{ width: sidebarWidth, minWidth: 200, maxWidth: 600 }}
+            >
+              {/* Resize handle */}
+              <div
+                className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 transition-colors z-10"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setIsResizing(true);
+                  const startX = e.clientX;
+                  const startWidth = sidebarWidth;
 
-        <div
-          className={`${
-            isFullscreen ? "h-full" : "min-h-[400px]"
-          } overflow-auto relative`}
-        >
-          {isLoading ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
-              <div className="flex flex-col items-center gap-2">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground animate-pulse">
-                  Loading mindmap...
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="min-w-max p-6">
-              <p className="text-xs text-muted-foreground mb-4 text-center">
-                💡 Click to edit •{" "}
-                <kbd className="px-1 py-0.5 bg-muted rounded text-xs">
-                  Enter
-                </kbd>{" "}
-                = new sibling •{" "}
-                <kbd className="px-1 py-0.5 bg-muted rounded text-xs">Tab</kbd>{" "}
-                = new child •{" "}
-                <kbd className="px-1 py-0.5 bg-muted rounded text-xs">Esc</kbd>{" "}
-                = cancel
-              </p>
+                  const handleMouseMove = (e: MouseEvent) => {
+                    const newWidth = startWidth + (e.clientX - startX);
+                    setSidebarWidth(Math.min(600, Math.max(200, newWidth)));
+                  };
 
-              {tree ? (
-                <div className="flex justify-center py-4">
-                  <NodeComponent
-                    node={tree}
-                    parentId={null}
-                    parentLevel={-1}
-                    onEdit={handleEdit}
-                    onAddChild={handleAddChild}
-                    onEditAndAddChild={handleEditAndAddChild}
-                    onAddSibling={handleAddSibling}
-                    onEditAndAddSibling={handleEditAndAddSibling}
-                    onDelete={handleDelete}
-                    editingId={editingId}
-                    setEditingId={setEditingId}
-                    selectedId={selectedId}
-                    setSelectedId={setSelectedId}
+                  const handleMouseUp = () => {
+                    setIsResizing(false);
+                    document.removeEventListener("mousemove", handleMouseMove);
+                    document.removeEventListener("mouseup", handleMouseUp);
+                  };
+
+                  document.addEventListener("mousemove", handleMouseMove);
+                  document.addEventListener("mouseup", handleMouseUp);
+                }}
+              />
+              <div className="flex-1 overflow-auto p-3">
+                <div className="border rounded-lg bg-background overflow-hidden">
+                  <div className="bg-muted/50 px-3 py-1.5 border-b flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground font-mono">
+                      mermaid
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowCodePopup(false)}
+                      className="h-5 w-5 hover:bg-muted"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  {/* Code editor - single textarea */}
+                  <Textarea
+                    ref={textareaRef}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    onKeyDown={handleCodeKeyDown}
+                    onMouseUp={(e) => {
+                      // Wait for cursor position to update, then select corresponding node
+                      setTimeout(() => {
+                        const textarea = e.currentTarget;
+                        if (!textarea) return;
+                        const cursorPos = textarea.selectionStart;
+                        const textBeforeCursor = textarea.value.substring(
+                          0,
+                          cursorPos
+                        );
+                        const lineIndex =
+                          textBeforeCursor.split("\n").length - 1;
+                        const lines = textarea.value.split("\n");
+                        const clickedLine = lines[lineIndex]?.trim() || "";
+
+                        if (tree && clickedLine && clickedLine !== "mindmap") {
+                          const findNodeByText = (
+                            n: TreeNode
+                          ): TreeNode | null => {
+                            if (
+                              clickedLine === n.text ||
+                              clickedLine.replace(/root\(\(|\)\)/g, "") ===
+                                n.text
+                            ) {
+                              return n;
+                            }
+                            for (const c of n.children) {
+                              const found = findNodeByText(c);
+                              if (found) return found;
+                            }
+                            return null;
+                          };
+                          const matchedNode = findNodeByText(tree);
+                          if (matchedNode) {
+                            setSelectedId(matchedNode.id);
+                          }
+                        }
+                      }, 10);
+                    }}
+                    className="font-mono text-xs border-0 rounded-none focus-visible:ring-0 resize-none w-full min-h-[400px]"
+                    placeholder="Enter your mermaid mindmap syntax..."
                   />
                 </div>
-              ) : (
-                <div className="text-center text-muted-foreground py-8">
-                  No mindmap data. Reset or enter code to add content.
-                </div>
-              )}
+              </div>
             </div>
           )}
+
+          <div
+            className={`flex-1 ${
+              isFullscreen ? "h-full" : "min-h-[400px]"
+            } overflow-auto relative`}
+          >
+            {isLoading ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground animate-pulse">
+                    Loading mindmap...
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="min-w-max p-6">
+                <p className="text-xs text-muted-foreground mb-4 text-start">
+                  💡 Click to edit •{" "}
+                  <kbd className="px-1 py-0.5 bg-muted rounded text-xs">
+                    Enter
+                  </kbd>{" "}
+                  = next/new sibling •{" "}
+                  <kbd className="px-1 py-0.5 bg-muted rounded text-xs">
+                    Tab
+                  </kbd>{" "}
+                  = new child •{" "}
+                  <kbd className="px-1 py-0.5 bg-muted rounded text-xs">
+                    Esc
+                  </kbd>{" "}
+                  = cancel
+                </p>
+
+                {tree ? (
+                  <div className="flex justify-center py-4">
+                    <NodeComponent
+                      node={tree}
+                      parentId={null}
+                      parentLevel={-1}
+                      nextSiblingId={null}
+                      onEdit={handleEdit}
+                      onAddChild={handleAddChild}
+                      onEditAndAddChild={handleEditAndAddChild}
+                      onAddSibling={handleAddSibling}
+                      onEditAndAddSibling={handleEditAndAddSibling}
+                      onDelete={handleDelete}
+                      editingId={editingId}
+                      setEditingId={setEditingId}
+                      selectedId={selectedId}
+                      setSelectedId={setSelectedId}
+                    />
+                  </div>
+                ) : (
+                  <div className="text-center text-muted-foreground py-8">
+                    No mindmap data. Reset or enter code to add content.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

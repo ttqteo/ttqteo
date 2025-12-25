@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { MindmapViewer } from "./mindmap-viewer";
+import { ExampleCards } from "./example-cards";
 
 export const metadata: Metadata = {
   title: "mindmap",
@@ -61,16 +62,7 @@ export default function MindmapPage() {
 
       <div className="mt-8">
         <h2 className="text-2xl font-semibold mb-4">Examples</h2>
-        <div className="grid gap-6 md:grid-cols-2">
-          {SAMPLE_MINDMAPS.map((sample, index) => (
-            <div key={index} className="border rounded-lg p-4">
-              <h3 className="font-medium mb-2">{sample.title}</h3>
-              <pre className="text-xs bg-muted p-3 rounded overflow-x-auto font-mono">
-                {sample.code}
-              </pre>
-            </div>
-          ))}
-        </div>
+        <ExampleCards samples={SAMPLE_MINDMAPS} />
       </div>
     </div>
   );
