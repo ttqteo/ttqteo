@@ -33,7 +33,14 @@ export async function AdminToolbar({ editPostId }: AdminToolbarProps) {
           )}
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-zinc-400 text-xs">admin mode</span>
+          <span className="text-zinc-400 text-xs">admin mode</span>•
+          <Link
+            href="/admin/edit/new"
+            className="flex items-center gap-1.5 hover:text-zinc-300 transition-colors text-xs"
+          >
+            <span>+ new blog</span>
+          </Link>
+          •
           <form action="/api/auth/logout" method="POST">
             <button
               type="submit"

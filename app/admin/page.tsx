@@ -10,6 +10,7 @@ import { FileTextIcon, PencilIcon, PlusIcon, TrashIcon } from "lucide-react";
 import Link from "next/link";
 import { LoginButton } from "./login-button";
 import { AdminPostActions } from "./post-actions";
+import { AdminTabs } from "./admin-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -115,24 +116,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold">admin dashboard</h1>
-          <div className="flex gap-4 mt-4 text-sm">
-            <Link
-              href="/admin"
-              className={
-                !isTrash ? "font-bold underline" : "text-muted-foreground"
-              }
-            >
-              All Posts
-            </Link>
-            <Link
-              href="/admin?view=trash"
-              className={
-                isTrash ? "font-bold underline" : "text-muted-foreground"
-              }
-            >
-              Trash
-            </Link>
-          </div>
+          <AdminTabs isTrash={isTrash} />
         </div>
         <div className="flex gap-2">
           {!isTrash && (

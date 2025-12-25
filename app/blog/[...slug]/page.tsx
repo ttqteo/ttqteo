@@ -121,8 +121,8 @@ export default async function BlogPage(props: PageProps) {
   const admin = await isAdmin();
 
   return (
-    <div className="w-full mx-auto sm:min-h-[78vh] min-h-[76vh]">
-      <div className="flex items-center justify-between mb-7">
+    <div className="w-full mx-auto lg:w-[60%] sm:[95%] md:[75%] sm:min-h-[78vh] min-h-[76vh]">
+      <div className="flex items-center sm:justify-between mb-7">
         <Link
           className={buttonVariants({
             variant: "link",
@@ -171,7 +171,9 @@ export default async function BlogPage(props: PageProps) {
         )}
         <div
           className="prose prose-lg dark:prose-invert max-w-none"
-          dangerouslySetInnerHTML={{ __html: post.content || "" }}
+          dangerouslySetInnerHTML={{
+            __html: (post.content || "").replace(/<p><\/p>/g, "<p><br></p>"),
+          }}
         />
       </div>
     </div>

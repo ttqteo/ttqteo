@@ -26,6 +26,11 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useEffect, useRef } from "react";
 import { useImageUpload } from "./use-image-upload";
 
@@ -47,6 +52,7 @@ export function SimpleEditor({ content, onChange }: SimpleEditorProps) {
       }),
       Link.configure({
         openOnClick: false,
+        autolink: true,
       }),
       Underline,
       Image.configure({
@@ -100,8 +106,41 @@ export function SimpleEditor({ content, onChange }: SimpleEditorProps) {
     }
   };
 
+  // Toolbar button helper
+  const ToolbarButton = ({
+    onClick,
+    isActive,
+    disabled,
+    tooltip,
+    children,
+  }: {
+    onClick: () => void;
+    isActive?: boolean;
+    disabled?: boolean;
+    tooltip: string;
+    children: React.ReactNode;
+  }) => (
+    <Tooltip delayDuration={0}>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant={isActive ? "secondary" : "ghost"}
+          size="sm"
+          onClick={onClick}
+          disabled={disabled}
+          className="h-8 px-2"
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" sideOffset={5}>
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
+  );
+
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="border rounded-lg">
       <input
         type="file"
         ref={fileInputRef}
@@ -109,207 +148,162 @@ export function SimpleEditor({ content, onChange }: SimpleEditorProps) {
         accept="image/*"
         onChange={handleImageUpload}
       />
-      {/* Full Toolbar */}
-      <div className="flex flex-wrap gap-1 p-2 border-b bg-muted/30">
+      <div className="sticky top-16 z-30 flex flex-wrap gap-1 p-2 border-b bg-background/95 backdrop-blur rounded-t-lg">
         {/* Undo/Redo */}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
+        <ToolbarButton
           onClick={() => editor.chain().focus().undo().run()}
           disabled={!editor.can().undo()}
-          className="h-8 px-2"
+          tooltip="Undo (⌘Z)"
         >
           <Undo className="w-4 h-4" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
+        </ToolbarButton>
+        <ToolbarButton
           onClick={() => editor.chain().focus().redo().run()}
           disabled={!editor.can().redo()}
-          className="h-8 px-2"
+          tooltip="Redo (⌘⇧Z)"
         >
           <Redo className="w-4 h-4" />
-        </Button>
+        </ToolbarButton>
 
         <div className="w-px h-6 bg-border mx-1" />
 
         {/* Headings */}
-        <Button
-          type="button"
-          variant={
-            editor.isActive("heading", { level: 1 }) ? "secondary" : "ghost"
-          }
-          size="sm"
+        <ToolbarButton
           onClick={() =>
             editor.chain().focus().toggleHeading({ level: 1 }).run()
           }
-          className="h-8 px-2"
+          isActive={editor.isActive("heading", { level: 1 })}
+          tooltip="Heading 1"
         >
           <Heading1 className="w-4 h-4" />
-        </Button>
-        <Button
-          type="button"
-          variant={
-            editor.isActive("heading", { level: 2 }) ? "secondary" : "ghost"
-          }
-          size="sm"
+        </ToolbarButton>
+        <ToolbarButton
           onClick={() =>
             editor.chain().focus().toggleHeading({ level: 2 }).run()
           }
-          className="h-8 px-2"
+          isActive={editor.isActive("heading", { level: 2 })}
+          tooltip="Heading 2"
         >
           <Heading2 className="w-4 h-4" />
-        </Button>
-        <Button
-          type="button"
-          variant={
-            editor.isActive("heading", { level: 3 }) ? "secondary" : "ghost"
-          }
-          size="sm"
+        </ToolbarButton>
+        <ToolbarButton
           onClick={() =>
             editor.chain().focus().toggleHeading({ level: 3 }).run()
           }
-          className="h-8 px-2"
+          isActive={editor.isActive("heading", { level: 3 })}
+          tooltip="Heading 3"
         >
           <Heading3 className="w-4 h-4" />
-        </Button>
+        </ToolbarButton>
 
         <div className="w-px h-6 bg-border mx-1" />
 
         {/* Lists */}
-        <Button
-          type="button"
-          variant={editor.isActive("bulletList") ? "secondary" : "ghost"}
-          size="sm"
+        <ToolbarButton
           onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className="h-8 px-2"
+          isActive={editor.isActive("bulletList")}
+          tooltip="Bullet List"
         >
           <List className="w-4 h-4" />
-        </Button>
-        <Button
-          type="button"
-          variant={editor.isActive("orderedList") ? "secondary" : "ghost"}
-          size="sm"
+        </ToolbarButton>
+        <ToolbarButton
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className="h-8 px-2"
+          isActive={editor.isActive("orderedList")}
+          tooltip="Numbered List"
         >
           <ListOrdered className="w-4 h-4" />
-        </Button>
+        </ToolbarButton>
 
         <div className="w-px h-6 bg-border mx-1" />
 
         {/* Text Formatting */}
-        <Button
-          type="button"
-          variant={editor.isActive("bold") ? "secondary" : "ghost"}
-          size="sm"
+        <ToolbarButton
           onClick={() => editor.chain().focus().toggleBold().run()}
-          className="h-8 px-2"
+          isActive={editor.isActive("bold")}
+          tooltip="Bold (⌘B)"
         >
           <Bold className="w-4 h-4" />
-        </Button>
-        <Button
-          type="button"
-          variant={editor.isActive("italic") ? "secondary" : "ghost"}
-          size="sm"
+        </ToolbarButton>
+        <ToolbarButton
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          className="h-8 px-2"
+          isActive={editor.isActive("italic")}
+          tooltip="Italic (⌘I)"
         >
           <Italic className="w-4 h-4" />
-        </Button>
-        <Button
-          type="button"
-          variant={editor.isActive("underline") ? "secondary" : "ghost"}
-          size="sm"
+        </ToolbarButton>
+        <ToolbarButton
           onClick={() => editor.chain().focus().toggleUnderline().run()}
-          className="h-8 px-2"
+          isActive={editor.isActive("underline")}
+          tooltip="Underline (⌘U)"
         >
           <UnderlineIcon className="w-4 h-4" />
-        </Button>
-        <Button
-          type="button"
-          variant={editor.isActive("strike") ? "secondary" : "ghost"}
-          size="sm"
+        </ToolbarButton>
+        <ToolbarButton
           onClick={() => editor.chain().focus().toggleStrike().run()}
-          className="h-8 px-2"
+          isActive={editor.isActive("strike")}
+          tooltip="Strikethrough"
         >
           <Strikethrough className="w-4 h-4" />
-        </Button>
-        <Button
-          type="button"
-          variant={editor.isActive("code") ? "secondary" : "ghost"}
-          size="sm"
+        </ToolbarButton>
+        <ToolbarButton
           onClick={() => editor.chain().focus().toggleCode().run()}
-          className="h-8 px-2"
+          isActive={editor.isActive("code")}
+          tooltip="Inline Code"
         >
           <Code className="w-4 h-4" />
-        </Button>
+        </ToolbarButton>
 
         <div className="w-px h-6 bg-border mx-1" />
 
         {/* Link */}
-        <Button
-          type="button"
-          variant={editor.isActive("link") ? "secondary" : "ghost"}
-          size="sm"
+        <ToolbarButton
           onClick={addLink}
-          className="h-8 px-2"
+          isActive={editor.isActive("link")}
+          tooltip="Add Link"
         >
           <Link2 className="w-4 h-4" />
-        </Button>
+        </ToolbarButton>
 
         {/* Image */}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
+        <ToolbarButton
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading}
-          className="h-8 px-2"
+          tooltip="Upload Image"
         >
           {isUploading ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
             <ImageIcon className="w-4 h-4" />
           )}
-        </Button>
+        </ToolbarButton>
 
         <div className="w-px h-6 bg-border mx-1" />
 
         {/* Blockquote & Code Block */}
-        <Button
-          type="button"
-          variant={editor.isActive("blockquote") ? "secondary" : "ghost"}
-          size="sm"
+        <ToolbarButton
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          className="h-8 px-2"
+          isActive={editor.isActive("blockquote")}
+          tooltip="Quote"
         >
           <Quote className="w-4 h-4" />
-        </Button>
-        <Button
-          type="button"
-          variant={editor.isActive("codeBlock") ? "secondary" : "ghost"}
-          size="sm"
+        </ToolbarButton>
+        <ToolbarButton
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          className="h-8 px-2"
+          isActive={editor.isActive("codeBlock")}
+          tooltip="Code Block"
         >
           <Code2 className="w-4 h-4" />
-        </Button>
+        </ToolbarButton>
 
         <div className="w-px h-6 bg-border mx-1" />
 
         {/* Horizontal Rule */}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
+        <ToolbarButton
           onClick={() => editor.chain().focus().setHorizontalRule().run()}
-          className="h-8 px-2"
+          tooltip="Horizontal Line"
         >
           <Minus className="w-4 h-4" />
-        </Button>
+        </ToolbarButton>
       </div>
 
       {/* Editor */}

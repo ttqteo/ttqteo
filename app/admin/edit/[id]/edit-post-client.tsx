@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/tooltip";
 import {
   ArrowLeftIcon,
-  FocusIcon,
   Loader2Icon,
   LogOutIcon,
   SaveIcon,
@@ -45,6 +44,14 @@ interface PostData {
 
 const DRAFT_STORAGE_KEY = "editor-draft";
 
+function removeVietnameseTones(str: string): string {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D");
+}
+
 export default function EditPostClient({
   initialData,
   isNew,
@@ -53,8 +60,9 @@ export default function EditPostClient({
   isNew: boolean;
 }) {
   const router = useRouter();
-  const { focusMode, toggleFocusMode } = useFocusMode();
+  const { setFocusMode } = useFocusMode();
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [post, setPost] = useState<PostData>({
     title: initialData?.title || "",
     slug: initialData?.slug || "",
@@ -62,6 +70,17 @@ export default function EditPostClient({
     content: initialData?.content || "",
     is_published: initialData?.is_published || false,
   });
+
+  // Auto-enable focus mode when entering editor, disable when leaving
+  useEffect(() => {
+    setFocusMode(true);
+    return () => setFocusMode(false);
+  }, [setFocusMode]);
+
+  // Update document title with post title
+  useEffect(() => {
+    document.title = `edit • ${post.title}` || "New Post";
+  }, [post.title]);
 
   // Restore draft from sessionStorage on mount (only for new posts)
   useEffect(() => {
@@ -80,7 +99,7 @@ export default function EditPostClient({
 
   // Save draft to sessionStorage on change (only for new posts)
   const saveDraft = useCallback(() => {
-    if (isNew) {
+    if (isNew && (post.title || post.description || post.content)) {
       sessionStorage.setItem(
         DRAFT_STORAGE_KEY,
         JSON.stringify({
@@ -89,6 +108,7 @@ export default function EditPostClient({
           content: post.content,
         })
       );
+      setLastSaved(new Date());
     }
   }, [isNew, post.title, post.description, post.content]);
 
@@ -108,7 +128,7 @@ export default function EditPostClient({
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, "0");
       const day = String(now.getDate()).padStart(2, "0");
-      const name = post.title
+      const name = removeVietnameseTones(post.title)
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
@@ -172,200 +192,170 @@ export default function EditPostClient({
   };
 
   return (
-    <div className="max-w-3xl mx-auto py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          {!focusMode && (
-            <Button variant="ghost" asChild>
+    <div className="min-h-[80vh]">
+      {/* Sticky Top Header */}
+      <div className="sticky top-0 bg-background/95 backdrop-blur border-b z-40">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" asChild>
               <Link href="/admin">
-                <ArrowLeftIcon className="w-4 h-4 mr-2" />
-                Back
+                <ArrowLeftIcon className="w-5 h-5" />
               </Link>
             </Button>
-          )}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={focusMode ? "default" : "outline"}
-                size="icon"
-                onClick={toggleFocusMode}
-              >
-                <FocusIcon className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {focusMode ? "Exit Focus Mode" : "Focus Mode"} (⌘⇧F)
-            </TooltipContent>
-          </Tooltip>
-        </div>
-        <div className="flex gap-2">
-          {!isNew && (
-            <AlertDialog>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      disabled={!!loadingAction}
+            {/* Auto-save Status */}
+            {isNew && lastSaved && (
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                <span>Saved</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {!isNew && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    disabled={!!loadingAction}
+                  >
+                    {loadingAction === "delete" ? (
+                      <Loader2Icon className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <TrashIcon className="w-4 h-4" />
+                    )}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Move to trash?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This post will be moved to the trash. You can restore it
+                      later.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
-                      {loadingAction === "delete" ? (
-                        <Loader2Icon className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <TrashIcon className="w-4 h-4" />
-                      )}
-                    </Button>
-                  </AlertDialogTrigger>
-                </TooltipTrigger>
-                <TooltipContent>Move to trash</TooltipContent>
-              </Tooltip>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Move to trash?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This post will be moved to the trash. You can restore it
-                    later.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDelete}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Move to Trash
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-          {post.is_published ? (
-            <>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleSave(false, "unpublish")}
-                    disabled={!!loadingAction}
-                  >
-                    {loadingAction === "unpublish" ? (
-                      <Loader2Icon className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <LogOutIcon className="w-4 h-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Unpublish</TooltipContent>
-              </Tooltip>
+                      Move to Trash
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    onClick={() => handleSave(true, "save")}
-                    disabled={!!loadingAction}
-                  >
-                    {loadingAction === "save" ? (
-                      <Loader2Icon className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <SaveIcon className="w-4 h-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Save</TooltipContent>
-              </Tooltip>
-            </>
-          ) : (
-            <>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleSave(false, "save-draft")}
-                    disabled={!!loadingAction}
-                  >
-                    {loadingAction === "save-draft" ? (
-                      <Loader2Icon className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <SaveIcon className="w-4 h-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Save Draft</TooltipContent>
-              </Tooltip>
+            {post.is_published ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => handleSave(false, "unpublish")}
+                  disabled={!!loadingAction}
+                >
+                  {loadingAction === "unpublish" ? (
+                    <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <LogOutIcon className="w-4 h-4 mr-2" />
+                  )}
+                  Unpublish
+                </Button>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    onClick={() => handleSave(true, "publish")}
-                    disabled={!!loadingAction}
-                  >
-                    {loadingAction === "publish" ? (
-                      <Loader2Icon className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <SendIcon className="w-4 h-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Publish</TooltipContent>
-              </Tooltip>
-            </>
-          )}
+                <Button
+                  onClick={() => handleSave(true, "save")}
+                  disabled={!!loadingAction}
+                >
+                  {loadingAction === "save" ? (
+                    <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <SaveIcon className="w-4 h-4 mr-2" />
+                  )}
+                  Save
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => handleSave(false, "save-draft")}
+                  disabled={!!loadingAction}
+                >
+                  {loadingAction === "save-draft" ? (
+                    <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <SaveIcon className="w-4 h-4 mr-2" />
+                  )}
+                  Save Draft
+                </Button>
+
+                <Button
+                  className="bg-pink-500 hover:bg-pink-600 text-white"
+                  onClick={() => handleSave(true, "publish")}
+                  disabled={!!loadingAction}
+                >
+                  {loadingAction === "publish" ? (
+                    <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <SendIcon className="w-4 h-4 mr-2" />
+                  )}
+                  Publish
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="space-y-4">
-        {/* Title */}
-        <Input
-          type="text"
-          value={post.title}
-          onChange={(e) => setPost({ ...post, title: e.target.value })}
-          placeholder="Blog title..."
-          className="text-3xl font-bold h-auto py-2 border-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:ring-primary focus-visible:ring-offset-0"
-        />
+      {/* Main Content */}
+      <div className="py-8">
+        <div className="max-w-3xl mx-auto px-4 space-y-6">
+          {/* Title */}
+          <Input
+            type="text"
+            value={post.title}
+            onChange={(e) => setPost({ ...post, title: e.target.value })}
+            placeholder="Title"
+            className="text-4xl font-serif font-bold h-auto py-2 border-none shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/50"
+          />
 
-        {/* Slug Preview - hide in focus mode */}
-        {!focusMode &&
-          (() => {
+          {/* Description / Subtitle */}
+          <Input
+            type="text"
+            value={post.description}
+            onChange={(e) => setPost({ ...post, description: e.target.value })}
+            placeholder="Add a subtitle..."
+            className="text-lg text-muted-foreground border-none shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/40"
+          />
+
+          {/* Slug Preview */}
+          {(() => {
             const now = new Date();
             const datePrefix = `${now.getFullYear()}/${String(
               now.getMonth() + 1
             ).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
             const slugName = post.title
-              ? post.title
+              ? removeVietnameseTones(post.title)
                   .toLowerCase()
                   .replace(/[^a-z0-9]+/g, "-")
                   .replace(/^-|-$/g, "")
               : "post-slug";
             return (
               <div className="text-sm text-muted-foreground">
-                <span>preview: </span>
-                <span className="font-mono">
+                <span className="font-mono bg-muted px-2 py-1 rounded">
                   /blog/{datePrefix}/{slugName}
                 </span>
               </div>
             );
           })()}
 
-        {/* Description - hide in focus mode */}
-        {!focusMode && (
-          <Input
-            type="text"
-            value={post.description}
-            onChange={(e) => setPost({ ...post, description: e.target.value })}
-            placeholder="Brief description..."
-            className="text-muted-foreground border-none shadow-none focus-visible:ring-0 focus-visible:ring-primary focus-visible:ring-offset-0"
+          {/* WYSIWYG Editor */}
+          <SimpleEditor
+            content={post.content}
+            onChange={(content) => setPost({ ...post, content })}
           />
-        )}
-
-        {/* WYSIWYG Editor */}
-        <SimpleEditor
-          content={post.content}
-          onChange={(content) => setPost({ ...post, content })}
-        />
+        </div>
       </div>
     </div>
   );

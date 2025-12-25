@@ -193,3 +193,8 @@ body.focus-mode .focus-mode-hidden {
 body.focus-mode {
   --focus-transition: 0.3s ease;
 }
+
+/* Remove admin toolbar padding space in focus mode */
+body.focus-mode .pt-8 {
+  padding-top: 0 !important;
+}
