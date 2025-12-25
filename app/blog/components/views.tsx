@@ -40,7 +40,7 @@ const Views = ({
         currentViews += 1;
         hasViewedRef.current = true;
 
-        // Fire and forget - increment in background
+        // Increment in background
         supabase.rpc("increment_views", { blog_slug: slug });
       }
 

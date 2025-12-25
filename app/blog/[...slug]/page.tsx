@@ -170,7 +170,7 @@ export default async function BlogPage(props: PageProps) {
           </div>
         )}
         <div
-          className="prose prose-lg dark:prose-invert max-w-none"
+          className="prose prose-lg dark:prose-invert max-w-none prose-p:my-2 prose-headings:mt-6 prose-headings:mb-3"
           dangerouslySetInnerHTML={{
             __html: (post.content || "").replace(/<p><\/p>/g, "<p><br></p>"),
           }}

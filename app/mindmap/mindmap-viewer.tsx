@@ -3,6 +3,17 @@
 import { useState, useRef, useCallback, KeyboardEvent, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Check,
   Copy,
   Code,
@@ -27,7 +38,7 @@ interface TreeNode {
 }
 
 const DEFAULT_MINDMAP = `mindmap
-  root((Mindmap))
+  Mindmap
     Topic 1
       Subtopic 1.1
       Subtopic 1.2
@@ -741,7 +752,6 @@ export function MindmapViewer({
   );
 
   const resetCode = useCallback(() => {
-    if (!window.confirm("Are you sure you want to reset the mindmap?")) return;
     setCode(DEFAULT_MINDMAP);
     setEditingId(null);
   }, []);
@@ -805,15 +815,31 @@ export function MindmapViewer({
               <Maximize2 className="h-4 w-4" />
             )}
           </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={resetCode}
-            title="Reset Mindmap"
-            className="h-8 w-8 bg-background/80 backdrop-blur-sm text-destructive hover:text-destructive"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                title="Reset Mindmap"
+                className="h-8 w-8 bg-background/80 backdrop-blur-sm text-destructive hover:text-destructive"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Reset Mindmap?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will reset the mindmap to its default state. All your
+                  changes will be lost.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={resetCode}>Reset</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         {showCodePopup && (
