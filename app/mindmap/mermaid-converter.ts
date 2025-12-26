@@ -43,12 +43,13 @@ function nodeToMermaid(node: MindmapNode, level: number): string {
  * Escapes special characters in text for Mermaid syntax
  */
 function escapeText(text: string): string {
-  // Mermaid has issues with certain characters
+  // Mermaid has issues with certain characters. Replace newlines with <br/> to keep single line structure.
   return text
     .replace(/\(/g, "［")
     .replace(/\)/g, "］")
     .replace(/\[/g, "〔")
-    .replace(/\]/g, "〕");
+    .replace(/\]/g, "〕")
+    .replace(/\n/g, "<br/>");
 }
 
 /**
@@ -204,7 +205,8 @@ function unescapeText(text: string): string {
     .replace(/［/g, "(")
     .replace(/］/g, ")")
     .replace(/〔/g, "[")
-    .replace(/〕/g, "]");
+    .replace(/〕/g, "]")
+    .replace(/<br\s*\/?>/gi, "\n");
 }
 
 /**

@@ -94,25 +94,50 @@ const NODE_PADDING_Y = 8;
 const HORIZONTAL_GAP = 60;
 const VERTICAL_GAP = 16;
 const BORDER_RADIUS = 8;
-const CHAR_WIDTH = 8;
 const LINE_HEIGHT = 20;
 
 /**
  * Calculate node dimensions based on text
  */
+// Calculate node dimensions based on text
 function measureNode(text: string): { width: number; height: number } {
-  const textWidth = text.length * CHAR_WIDTH;
+  // Constants for measurement - more conservative to prevent clipping
+  const AVG_CHAR_WIDTH = 10; // Slightly generous average
+  const SAFE_CHAR_WIDTH = 14; // Even more conservative for wrapping calculation (Vietnamese support)
+  const LINE_HEIGHT_MEASURE = 22; // Slightly more than actual to be safe
+
+  // Split by newline first
+  const sourceLines = text.split("\n");
+
+  // 1. Calculate Width based on Average
+  let maxContentWidth = 0;
+  for (const line of sourceLines) {
+    maxContentWidth = Math.max(maxContentWidth, line.length * AVG_CHAR_WIDTH);
+  }
+
   const width = Math.min(
     NODE_MAX_WIDTH,
-    Math.max(60, textWidth + NODE_PADDING_X * 2)
+    Math.max(60, maxContentWidth + NODE_PADDING_X * 2)
   );
 
-  // Calculate number of lines needed
-  const charsPerLine = Math.floor((width - NODE_PADDING_X * 2) / CHAR_WIDTH);
-  const lines = Math.ceil(text.length / charsPerLine) || 1;
+  // 2. Calculate Height based on Final Width
+  const availableWidth = width - NODE_PADDING_X * 2;
+  const charsPerLine = Math.max(
+    1,
+    Math.floor(availableWidth / SAFE_CHAR_WIDTH)
+  );
+
+  let totalLines = 0;
+  for (const line of sourceLines) {
+    // Math.ceil(line.length / charsPerLine) is an estimate.
+    // We use a very conservative SAFE_CHAR_WIDTH to account for word wrapping waste.
+    const wrappedLines = Math.ceil(line.length / charsPerLine) || 1;
+    totalLines += wrappedLines;
+  }
+
   const height = Math.max(
     NODE_MIN_HEIGHT,
-    lines * LINE_HEIGHT + NODE_PADDING_Y * 2
+    totalLines * LINE_HEIGHT_MEASURE + NODE_PADDING_Y * 2 + 4 // Added 4px safety buffer
   );
 
   return { width, height };
@@ -507,14 +532,25 @@ export function MindmapSvgPreview({
     });
   }, [layout, svgSize]);
 
-  // Auto-fit on initial load, layout change, or fullscreen toggle
+  // Perform initial fit on load
+  const hasInitialFit = useRef(false);
+
+  useEffect(() => {
+    if (layout && !hasInitialFit.current) {
+      setTimeout(() => {
+        fitToView();
+        hasInitialFit.current = true;
+      }, 100);
+    }
+  }, [layout, fitToView]);
+
+  // Refit on fullscreen toggle (always useful)
   useEffect(() => {
     if (layout) {
-      // Delay slightly to ensure container dimensions are stable
-      const timer = setTimeout(fitToView, 100);
-      return () => clearTimeout(timer);
+      fitToView();
     }
-  }, [layout, isFullscreen, fitToView]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFullscreen]);
 
   // Zoom with wheel - use native event for preventDefault to work
   useEffect(() => {
@@ -573,9 +609,33 @@ export function MindmapSvgPreview({
         setEditValue(
           nodeLayout.node.text === "..." ? "" : nodeLayout.node.text
         );
+
+        // Auto-zoom to focus on the node
+        if (containerRef.current) {
+          const { offsetWidth, offsetHeight } = containerRef.current;
+          const targetScale = 1.2; // Comfortable zoom level for editing
+          // If current scale is already larger, maybe keep it? Or force 1.2?
+          // User said "zoom focus 1% certain". Let's force a good readable scale (e.g. 1.0 or 1.2).
+          const finalScale = Math.max(scale, targetScale);
+
+          setScale(finalScale);
+          // Center the node:
+          // Node center in SVG coords = nodeLayout.x + width/2, nodeLayout.y + height/2
+          // Screen center = offsetWidth/2, offsetHeight/2
+          // formula: screenX = svgX * scale + posX
+          // posX = screenX - svgX * scale
+
+          const nodeCenterX = nodeLayout.x + nodeLayout.width / 2;
+          const nodeCenterY = nodeLayout.y + nodeLayout.height / 2;
+
+          setPosition({
+            x: offsetWidth / 2 - nodeCenterX * finalScale,
+            y: offsetHeight / 2 - nodeCenterY * finalScale,
+          });
+        }
       }
     },
-    [onTreeChange, isDark]
+    [onTreeChange, isDark, scale]
   );
 
   // Update node text and optionally add child/sibling
@@ -1157,11 +1217,79 @@ export function MindmapSvgPreview({
                   lineHeight: "1.3",
                   overflow: "hidden",
                   textShadow: style.textShadow,
+                  whiteSpace: "pre-wrap", // Support multiline text
                 }}
                 className="pointer-events-none"
               >
                 {node.text === "..." ? ".." : node.text}
               </div>
+            </foreignObject>
+          )}
+          {isEditing && (
+            <foreignObject
+              x={x}
+              y={y}
+              width={width}
+              height={height}
+              style={{ pointerEvents: "auto" }}
+            >
+              <textarea
+                ref={inputRef as any}
+                value={editValue}
+                onChange={(e) => {
+                  setEditValue(e.target.value);
+                  updateAndAddNode(editingNode.id, e.target.value, "none");
+                  // Auto-grow height
+                  e.target.style.height = "auto";
+                  e.target.style.height = e.target.scrollHeight + "px";
+                }}
+                onKeyDown={(e) => {
+                  e.stopPropagation(); // Prevent map shortcuts
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    setEditingNode(null); // Finish editing
+                  }
+                  if (e.key === "Escape") {
+                    setEditingNode(null); // Cancel/Finish
+                  }
+                  if (e.key === "Tab") {
+                    e.preventDefault();
+                    updateAndAddNode(
+                      editingNode.id,
+                      editValue,
+                      e.shiftKey ? "addSibling" : "addChild"
+                    );
+                    // Keep editing the current node? Usually tab moves to child.
+                    // Current logic just adds child. We might want to switch focus?
+                    // For now just keep behavior but maybe close edit
+                    setEditingNode(null);
+                  }
+                }}
+                onBlur={() => {
+                  // Commit changes on blur
+                  // updateAndAddNode(editingNode.id, editValue, "none"); // Already updated on change
+                  setEditingNode(null);
+                }}
+                style={{
+                  width: "100%",
+                  minHeight: "100%",
+                  fontSize: `${style.fontSize}px`,
+                  padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
+                  borderRadius: `${BORDER_RADIUS}px`,
+                  textAlign: "center",
+                  resize: "none",
+                  overflow: "hidden",
+                  backgroundColor: style.bg,
+                  color: style.text,
+                  border: `2px solid ${style.border}`,
+                  lineHeight: "1.3",
+                  fontWeight: style.fontWeight,
+                  fontFamily: "inherit",
+                }}
+                className="shadow-xl focus:outline-none"
+                // Initial height calc
+                rows={1}
+              />
             </foreignObject>
           )}
         </g>
