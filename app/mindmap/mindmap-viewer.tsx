@@ -409,7 +409,11 @@ export function MindmapViewer({
                     onChange={(e) => handleCodeChange(e.target.value)}
                     onBlur={() => setIsTyping(false)}
                     onKeyDown={handleCodeKeyDown}
-                    className="absolute inset-0 w-full h-full font-mono text-xs border-0 rounded-none focus-visible:ring-0 resize-none p-3 leading-relaxed"
+                    className="absolute inset-0 w-full h-full font-mono text-xs border-0 rounded-none focus-visible:ring-0 resize-none p-3 leading-relaxed break-all"
+                    style={{
+                      overflowWrap: "break-word",
+                      wordBreak: "break-all",
+                    }}
                     placeholder="Enter your mermaid mindmap syntax..."
                     spellCheck={false}
                   />

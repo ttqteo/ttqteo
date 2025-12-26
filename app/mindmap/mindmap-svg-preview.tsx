@@ -433,6 +433,15 @@ export function MindmapSvgPreview({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
+  // Mini map state
+  const [showMiniMap, setShowMiniMap] = useState(true);
+  const miniMapRef = useRef<HTMLDivElement>(null);
+  const MINI_MAP_WIDTH = 160;
+  const MINI_MAP_HEIGHT = 100;
+  const MINI_MAP_PADDING = 8;
+  const MINI_MAP_INNER_WIDTH = MINI_MAP_WIDTH - MINI_MAP_PADDING * 2;
+  const MINI_MAP_INNER_HEIGHT = MINI_MAP_HEIGHT - MINI_MAP_PADDING * 2;
+
   // Editing state
   const [editingNode, setEditingNode] = useState<{
     id: string;
@@ -1071,6 +1080,38 @@ export function MindmapSvgPreview({
     setScale((prev) => Math.max(prev - 0.25, 0.25));
   }, []);
 
+  // Mini map click handler - navigate to clicked position
+  const handleMiniMapClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!containerRef.current || !miniMapRef.current) return;
+
+      const rect = miniMapRef.current.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      // Calculate scale factor for mini map
+      const miniMapScale = Math.min(
+        MINI_MAP_WIDTH / svgSize.width,
+        MINI_MAP_HEIGHT / svgSize.height
+      );
+
+      // Convert mini map click to SVG coordinates
+      const svgX = clickX / miniMapScale;
+      const svgY = clickY / miniMapScale;
+
+      // Get container dimensions
+      const containerWidth = containerRef.current.offsetWidth;
+      const containerHeight = containerRef.current.offsetHeight;
+
+      // Center viewport on clicked position
+      setPosition({
+        x: containerWidth / 2 - svgX * scale,
+        y: containerHeight / 2 - svgY * scale,
+      });
+    },
+    [svgSize, scale]
+  );
+
   // Render a node and its connections
   const renderNode = (nodeLayout: NodeLayout): React.ReactNode => {
     const { node, x, y, width, height, level, children } = nodeLayout;
@@ -1248,7 +1289,7 @@ export function MindmapSvgPreview({
                   color: style.text,
                   textAlign: "center",
                   userSelect: "none",
-                  wordBreak: "break-word",
+                  wordBreak: "break-all",
                   lineHeight: "1.3",
                   textShadow: style.textShadow,
                   whiteSpace: "pre-wrap", // Support multiline text
@@ -1267,21 +1308,23 @@ export function MindmapSvgPreview({
               height={height}
               style={{ pointerEvents: "auto" }}
             >
-              <textarea
+              <div
                 ref={inputRef as any}
-                value={editValue}
-                onChange={(e) => {
-                  setEditValue(e.target.value);
-                  updateAndAddNode(editingNode.id, e.target.value, "none");
+                contentEditable
+                suppressContentEditableWarning
+                onInput={(e) => {
+                  const text = (e.target as HTMLDivElement).innerText;
+                  setEditValue(text);
+                  updateAndAddNode(editingNode.id, text, "none");
                 }}
                 onKeyDown={(e) => {
-                  e.stopPropagation(); // Prevent map shortcuts
+                  e.stopPropagation();
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    setEditingNode(null); // Finish editing
+                    setEditingNode(null);
                   }
                   if (e.key === "Escape") {
-                    setEditingNode(null); // Cancel/Finish
+                    setEditingNode(null);
                   }
                   if (e.key === "Tab") {
                     e.preventDefault();
@@ -1290,25 +1333,20 @@ export function MindmapSvgPreview({
                       editValue,
                       e.shiftKey ? "addSibling" : "addChild"
                     );
-                    // Keep editing the current node? Usually tab moves to child.
-                    // Current logic just adds child. We might want to switch focus?
-                    // For now just keep behavior but maybe close edit
                     setEditingNode(null);
                   }
                 }}
-                onBlur={() => {
-                  // Commit changes on blur
-                  // updateAndAddNode(editingNode.id, editValue, "none"); // Already updated on change
-                  setEditingNode(null);
-                }}
+                onBlur={() => setEditingNode(null)}
                 style={{
                   width: "100%",
                   height: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   fontSize: `${style.fontSize}px`,
                   padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
                   borderRadius: `${BORDER_RADIUS}px`,
                   textAlign: "center",
-                  resize: "none",
                   overflow: "hidden",
                   backgroundColor: style.bg,
                   color: style.text,
@@ -1317,9 +1355,14 @@ export function MindmapSvgPreview({
                   fontWeight: style.fontWeight,
                   fontFamily: "inherit",
                   boxSizing: "border-box",
+                  wordBreak: "break-all",
+                  whiteSpace: "pre-wrap",
+                  outline: "none",
                 }}
-                className="shadow-xl focus:outline-none"
-              />
+                className="shadow-xl"
+              >
+                {editValue}
+              </div>
             </foreignObject>
           )}
         </g>
@@ -1517,6 +1560,149 @@ export function MindmapSvgPreview({
         <div className="w-px h-3 bg-border/50 mx-1" />
         <MindmapTips />
       </div>
+
+      {/* Mini Map (Bottom Right) */}
+      {showMiniMap && layout && (
+        <div
+          ref={miniMapRef}
+          className="absolute bottom-14 right-4 z-[100] pointer-events-auto cursor-pointer rounded-lg border border-border/50 shadow-lg overflow-hidden p-2"
+          style={{
+            width: MINI_MAP_WIDTH,
+            height: MINI_MAP_HEIGHT,
+            backgroundColor: isDark
+              ? "rgba(20,20,20,0.9)"
+              : "rgba(255,255,255,0.9)",
+            backdropFilter: "blur(8px)",
+          }}
+          onClick={handleMiniMapClick}
+        >
+          {/* Mini map content */}
+          <svg
+            width={MINI_MAP_INNER_WIDTH}
+            height={MINI_MAP_INNER_HEIGHT}
+            style={{ display: "block" }}
+          >
+            {/* Render simplified nodes */}
+            <g
+              transform={`scale(${
+                Math.min(
+                  MINI_MAP_INNER_WIDTH / svgSize.width,
+                  MINI_MAP_INNER_HEIGHT / svgSize.height
+                ) * 0.95
+              })`}
+            >
+              {/* Simplified node rectangles */}
+              {(() => {
+                const nodes: React.ReactNode[] = [];
+                const renderSimplified = (nl: NodeLayout) => {
+                  const colors = getNodeColor(nl.level, nl.branchIndex, isDark);
+                  nodes.push(
+                    <rect
+                      key={nl.node.id}
+                      x={nl.x}
+                      y={nl.y}
+                      width={nl.width}
+                      height={nl.height}
+                      rx={4}
+                      fill={
+                        nl.level === 0
+                          ? colors.bg
+                          : isDark
+                          ? "rgba(255,255,255,0.3)"
+                          : "rgba(0,0,0,0.2)"
+                      }
+                    />
+                  );
+                  nl.children.forEach(renderSimplified);
+                };
+                renderSimplified(layout);
+                return nodes;
+              })()}
+            </g>
+
+            {/* Viewport indicator */}
+            {containerRef.current && (
+              <rect
+                x={
+                  (-position.x / scale) *
+                  Math.min(
+                    MINI_MAP_INNER_WIDTH / svgSize.width,
+                    MINI_MAP_INNER_HEIGHT / svgSize.height
+                  ) *
+                  0.95
+                }
+                y={
+                  (-position.y / scale) *
+                  Math.min(
+                    MINI_MAP_INNER_WIDTH / svgSize.width,
+                    MINI_MAP_INNER_HEIGHT / svgSize.height
+                  ) *
+                  0.95
+                }
+                width={
+                  (containerRef.current.offsetWidth / scale) *
+                  Math.min(
+                    MINI_MAP_INNER_WIDTH / svgSize.width,
+                    MINI_MAP_INNER_HEIGHT / svgSize.height
+                  ) *
+                  0.95
+                }
+                height={
+                  (containerRef.current.offsetHeight / scale) *
+                  Math.min(
+                    MINI_MAP_INNER_WIDTH / svgSize.width,
+                    MINI_MAP_INNER_HEIGHT / svgSize.height
+                  ) *
+                  0.95
+                }
+                fill="transparent"
+                stroke={isDark ? "#60a5fa" : "#3b82f6"}
+                strokeWidth={2}
+                rx={2}
+              />
+            )}
+          </svg>
+
+          {/* Toggle button */}
+          <button
+            className="absolute top-1 right-1 p-0.5 rounded bg-background/50 hover:bg-background/80 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowMiniMap(false);
+            }}
+            title="Hide mini map"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10">
+              <path
+                d="M2 2L8 8M8 2L2 8"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Mini map toggle button when hidden */}
+      {!showMiniMap && (
+        <button
+          className="absolute bottom-14 right-4 z-[100] pointer-events-auto p-2 rounded-lg border border-border/50 bg-background/90 backdrop-blur-md shadow-sm hover:bg-accent transition-colors"
+          onClick={() => setShowMiniMap(true)}
+          title="Show mini map"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <rect x="7" y="7" width="6" height="6" rx="1" />
+          </svg>
+        </button>
+      )}
 
       {/* 3. Edit input overlay (Topmost) */}
       {editingNode && (
