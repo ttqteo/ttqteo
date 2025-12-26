@@ -225,6 +225,9 @@ function NodeComponent({
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={(e) => {
+              // Ignore events during IME composition
+              if (e.nativeEvent.isComposing) return;
+
               if (e.key === "Enter" && !e.shiftKey) {
                 handleKeyDown(
                   e as unknown as React.KeyboardEvent<HTMLInputElement>

@@ -36,7 +36,7 @@ interface MindmapViewerProps {
   initialTree?: MindmapNode;
 }
 
-type ViewMode = "editor" | "preview" | "split";
+type ViewMode = "editor" | "preview";
 
 export function MindmapViewer({
   initialTree = DEFAULT_MINDMAP,
@@ -111,6 +111,9 @@ export function MindmapViewer({
 
   const handleCodeKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      // Ignore events during IME composition
+      if (e.nativeEvent.isComposing) return;
+
       const textarea = textareaRef.current;
       if (!textarea) return;
 
@@ -219,24 +222,13 @@ export function MindmapViewer({
             >
               <Layers className="h-4 w-4" />
             </Button>
-            <Button
-              variant={viewMode === "split" ? "default" : "ghost"}
-              size="icon"
-              onClick={() => setViewMode("split")}
-              title="Split view"
-              className="h-8 w-8 rounded-none border-x"
-            >
-              <div className="flex gap-0.5">
-                <div className="w-1.5 h-3 bg-current rounded-sm" />
-                <div className="w-1.5 h-3 bg-current rounded-sm opacity-50" />
-              </div>
-            </Button>
+
             <Button
               variant={viewMode === "preview" ? "default" : "ghost"}
               size="icon"
               onClick={() => setViewMode("preview")}
               title="Preview only"
-              className="h-8 w-8 rounded-none"
+              className="h-8 w-8 rounded-none border-l"
             >
               <Eye className="h-4 w-4" />
             </Button>
@@ -381,13 +373,9 @@ export function MindmapViewer({
                 </div>
               </div>
             ) : (
-              <div
-                className={`h-full ${
-                  viewMode === "split" ? "grid grid-cols-2 divide-x" : ""
-                }`}
-              >
+              <div className="h-full">
                 {/* Editor panel */}
-                {(viewMode === "editor" || viewMode === "split") && (
+                {viewMode === "editor" && (
                   <div className="overflow-auto p-6">
                     <MindmapEditor
                       tree={tree}
@@ -398,7 +386,7 @@ export function MindmapViewer({
                 )}
 
                 {/* Preview panel */}
-                {(viewMode === "preview" || viewMode === "split") && (
+                {viewMode === "preview" && (
                   <div className="relative h-full">
                     <div className="p-2 border bg-muted/30">
                       <span className="text-xs text-muted-foreground">

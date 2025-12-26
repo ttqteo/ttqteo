@@ -65,6 +65,7 @@ export function parseMermaidToTree(code: string): MindmapNode | null {
   const nodeStack: { node: MindmapNode; indent: number }[] = [];
   let idCounter = 0;
 
+  // First pass: build tree structure
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed === "mindmap") continue;
@@ -106,7 +107,83 @@ export function parseMermaidToTree(code: string): MindmapNode | null {
     }
   }
 
+  // Second pass: Infer semantic types
+  if (rootNode) {
+    inferSemanticTypesRecursive(rootNode, 0, null);
+  }
+
   return rootNode;
+}
+
+/**
+ * Infers and assigns semantic types to the node and its children
+ */
+export function inferSemanticTypesRecursive(
+  node: MindmapNode,
+  depth: number,
+  parent: MindmapNode | null
+) {
+  node.semanticType = inferSemanticType(node, depth, parent);
+
+  for (const child of node.children) {
+    inferSemanticTypesRecursive(child, depth + 1, node);
+  }
+}
+
+/**
+ * Determines the semantic type of a node based on context and keywords
+ */
+export function inferSemanticType(
+  node: MindmapNode,
+  depth: number,
+  parent: MindmapNode | null
+): import("./types").SemanticType {
+  // 1. Root is always Root
+  if (depth === 0) return "Root";
+
+  // 2. Check node content for warning indicators (highest priority)
+  if (
+    node.text.startsWith("⚠️") ||
+    node.text.startsWith("!") ||
+    node.text.toLowerCase().includes("lưu ý") ||
+    node.text.toLowerCase().includes("warning")
+  ) {
+    return "Warning";
+  }
+
+  // 3. Check special branch overrides from parent
+  const parentText = parent?.text?.toLowerCase() || "";
+
+  // Helper to check keywords
+  const hasKeyword = (text: string, keywords: string[]) =>
+    keywords.some((k) => text.includes(k));
+
+  if (hasKeyword(parentText, ["notes", "ghi chú", "details", "note"])) {
+    return "Explanation";
+  }
+
+  if (hasKeyword(parentText, ["examples", "ví dụ", "e.g.", "vd", "example"])) {
+    return "Example";
+  }
+
+  if (
+    hasKeyword(parentText, [
+      "warnings",
+      "lưu ý",
+      "caution",
+      "cảnh báo",
+      "⚠️",
+      "warning",
+    ])
+  ) {
+    return "Warning";
+  }
+
+  // 4. Default by depth
+  if (depth === 1) return "Concept";
+
+  // 5. Default fallback
+  return "Idea";
 }
 
 /**
@@ -135,6 +212,8 @@ export function cloneTree(node: MindmapNode): MindmapNode {
     id: node.id,
     text: node.text,
     children: node.children.map(cloneTree),
+    isDraft: node.isDraft,
+    isCollapsed: node.isCollapsed,
   };
 }
 

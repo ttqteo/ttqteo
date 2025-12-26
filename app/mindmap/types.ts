@@ -2,12 +2,21 @@
  * Core type definitions for mindmap data structure
  */
 
+export type SemanticType =
+  | "Root"
+  | "Concept"
+  | "Idea"
+  | "Explanation"
+  | "Example"
+  | "Warning";
+
 export interface MindmapNode {
   id: string;
   text: string;
   children: MindmapNode[];
   isDraft?: boolean; // true = uncommitted draft node
   isCollapsed?: boolean; // true = children are hidden
+  semanticType?: SemanticType;
 }
 
 /**

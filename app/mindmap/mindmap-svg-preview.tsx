@@ -1,10 +1,23 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
-import { ZoomIn, ZoomOut, RotateCcw, Move } from "lucide-react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import {
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Move,
+  BrainCircuit,
+  BookOpen,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { MindmapNode } from "./types";
-import { generateNodeId } from "./mermaid-converter";
+import { MindmapNode, SemanticType } from "./types";
+import {
+  generateNodeId,
+  inferSemanticTypesRecursive,
+  cloneTree,
+} from "./mermaid-converter";
+import { MindmapHelpModal } from "./help-modal";
+import { MindmapTips } from "./tips";
 
 interface MindmapSvgPreviewProps {
   tree: MindmapNode;
@@ -204,6 +217,90 @@ function getNodeColor(
 }
 
 /**
+ * Get semantic style for a node based on type, depth, and mode
+ */
+function getSemanticStyle(
+  type: SemanticType | undefined,
+  level: number,
+  mode: "brainstorm" | "study",
+  baseColors: { bg: string; text: string; border: string }
+) {
+  // Default to Idea if undefined
+  const semanticType = type || "Idea";
+
+  const style = {
+    hasBox: false,
+    fontSize: 14,
+    fontWeight: 400,
+    opacity: 1,
+    dashed: false,
+    ...baseColors, // Inherit base colors by default
+  };
+
+  // 1. Determine Box Presence
+  if (semanticType === "Root") {
+    style.hasBox = true;
+    style.fontSize = 18;
+    style.fontWeight = 700;
+  } else if (semanticType === "Warning") {
+    style.hasBox = true;
+    style.bg = "#fef3c7"; // Amber-100
+    style.border = "#d97706"; // Amber-600
+    style.text = "#92400e"; // Amber-800
+    style.fontWeight = 500;
+  } else if (mode === "study") {
+    // Study Mode Rules
+    if (semanticType === "Concept") {
+      style.hasBox = true; // Box for concepts
+      style.fontWeight = 600;
+      style.fontSize = 16;
+    } else if (semanticType === "Explanation") {
+      style.fontSize = 12;
+      style.text = "#6b7280"; // Gray-500
+    } else if (semanticType === "Example") {
+      style.fontSize = 12;
+      style.dashed = true;
+      style.text = "#4b5563"; // Gray-600
+    }
+  } else {
+    // Brainstorm Mode Rules
+    if (semanticType === "Concept") {
+      style.hasBox = false; // key diff: no box for concepts
+      style.fontWeight = 600;
+      style.fontSize = 16;
+    } else if (semanticType === "Explanation") {
+      style.opacity = 0.7;
+      style.fontSize = 13;
+    } else if (semanticType === "Example") {
+      style.opacity = 0.8;
+      style.fontSize = 13;
+    }
+  }
+
+  // Override for line-only nodes (no box)
+  if (!style.hasBox) {
+    style.bg = "transparent";
+    style.border = "transparent";
+    // Keep text color, or ensure it's visible on white/dark bg
+    if (mode === "brainstorm" && level > 0) {
+      // In brainstorm, maybe force standard text color for readability if transparent
+      if (baseColors.text === "#ffffff") {
+        // If original was white text (on dark bg), switch to dark text for transparent bg
+        // But wait, generateBranchColor returns white text for saturated backgrounds.
+        // If we remove bg, we must change text to dark.
+        style.text = baseColors.border; // Use the border color (darker version of hue) for text
+      }
+    }
+    // Similar for Study mode
+    if (mode === "study" && !style.hasBox && baseColors.text === "#ffffff") {
+      style.text = baseColors.border;
+    }
+  }
+
+  return style;
+}
+
+/**
  * MindmapSvgPreview - Custom SVG renderer matching div-based editor design
  *
  * Keyboard shortcuts:
@@ -219,6 +316,19 @@ export function MindmapSvgPreview({
 }: MindmapSvgPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgContainerRef = useRef<HTMLDivElement>(null);
+
+  // Render Mode State
+  const [renderMode, setRenderMode] = useState<"brainstorm" | "study">(
+    "brainstorm"
+  );
+
+  // Process tree to add semantic types
+  const processedTree = useMemo(() => {
+    const t = cloneTree(tree);
+    inferSemanticTypesRecursive(t, 0, null);
+    return t;
+  }, [tree]);
+
   const [layout, setLayout] = useState<NodeLayout | null>(null);
   const [svgSize, setSvgSize] = useState({ width: 800, height: 400 });
 
@@ -250,7 +360,7 @@ export function MindmapSvgPreview({
   // Calculate layout when tree changes
   useEffect(() => {
     // Start with top padding of 40px
-    const newLayout = calculateLayout(tree, 0, 40);
+    const newLayout = calculateLayout(processedTree, 0, 40);
     positionHorizontally(newLayout, 40);
 
     // Calculate SVG size
@@ -315,7 +425,7 @@ export function MindmapSvgPreview({
         pendingEditRef.current = null;
       }
     }
-  }, [tree]);
+  }, [processedTree]);
 
   // Zoom with wheel - use native event for preventDefault to work
   useEffect(() => {
@@ -567,6 +677,9 @@ export function MindmapSvgPreview({
     (e: React.KeyboardEvent) => {
       if (!editingNode) return;
 
+      // Ignore events during IME composition (e.g., Vietnamese Telex)
+      if (e.nativeEvent.isComposing) return;
+
       if (e.key === "Enter" && !e.shiftKey) {
         // Enter: Save and add sibling
         e.preventDefault();
@@ -657,8 +770,8 @@ export function MindmapSvgPreview({
         // Escape: Cancel
         e.preventDefault();
         handleEditCancel();
-      } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-        // Arrow Up/Down: Navigate to previous/next sibling
+      } else if ((e.key === "ArrowUp" || e.key === "ArrowDown") && e.altKey) {
+        // Alt + Arrow Up/Down: Navigate to previous/next sibling
         e.preventDefault();
         if (!layout) return;
 
@@ -696,8 +809,8 @@ export function MindmapSvgPreview({
             setTimeout(() => handleNodeClick(result.siblings[targetIndex]), 50);
           }
         }
-      } else if (e.key === "ArrowLeft") {
-        // Arrow Left: Navigate to parent
+      } else if (e.key === "ArrowLeft" && e.altKey) {
+        // Alt + Arrow Left: Navigate to parent
         e.preventDefault();
         if (editingNode.parentId && layout) {
           const findNode = (l: NodeLayout): NodeLayout | null => {
@@ -714,8 +827,8 @@ export function MindmapSvgPreview({
             setTimeout(() => handleNodeClick(parent), 50);
           }
         }
-      } else if (e.key === "ArrowRight") {
-        // Arrow Right: Navigate to first child
+      } else if (e.key === "ArrowRight" && e.altKey) {
+        // Alt + Arrow Right: Navigate to first child
         e.preventDefault();
         if (!layout) return;
 
@@ -789,7 +902,16 @@ export function MindmapSvgPreview({
   // Render a node and its connections
   const renderNode = (nodeLayout: NodeLayout): React.ReactNode => {
     const { node, x, y, width, height, level, children } = nodeLayout;
-    const colors = getNodeColor(level, nodeLayout.branchIndex);
+    // Get base colors
+    const baseColors = getNodeColor(level, nodeLayout.branchIndex);
+    // Get semantic style
+    const style = getSemanticStyle(
+      node.semanticType,
+      level,
+      renderMode,
+      baseColors
+    );
+
     const isEditing = editingNode?.id === node.id;
     const hasChildren = node.children.length > 0;
     const isCollapsed = node.isCollapsed && hasChildren;
@@ -807,13 +929,35 @@ export function MindmapSvgPreview({
     const descendantCount = countDescendants(node);
 
     return (
-      <g key={node.id}>
+      <g key={node.id} style={{ opacity: style.opacity }}>
         {/* Connection lines to children */}
         {visibleChildren.map((child) => {
+          // Determine styling for child
+          const childBaseColors = getNodeColor(child.level, child.branchIndex);
+          const childStyle = getSemanticStyle(
+            child.node.semanticType,
+            child.level,
+            renderMode,
+            childBaseColors
+          );
+
           const startX = x + width;
           const startY = y + height / 2;
-          const endX = child.x;
-          const endY = child.y + child.height / 2;
+
+          let endX = child.x;
+          let endY = child.y + child.height / 2; // Default for Box
+
+          // If child has NO box (is line style), connect to bottom-left where underline starts
+          // BUT we want it to look seamless, so we target the START of the underline.
+          // The underline runs from (child.x, child.y + height) to (child.x + width, child.y + height)
+          // Actually, let's target the left-middle still, but draw the curve to flatten out?
+          // No, standard is: Parent -> (curve) -> Child Bottom Base.
+
+          if (!childStyle.hasBox) {
+            endY = child.y + child.height; // Bottom
+            // Adjust endX slightly if needed? No, left edge is fine.
+          }
+
           const midX = (startX + endX) / 2;
 
           return (
@@ -821,16 +965,25 @@ export function MindmapSvgPreview({
               key={`line-${node.id}-${child.node.id}`}
               d={`M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`}
               fill="none"
-              stroke={colors.border}
-              strokeWidth="2"
+              stroke={
+                childStyle.hasBox
+                  ? childStyle.border === "transparent"
+                    ? childBaseColors.border
+                    : childStyle.border
+                  : childBaseColors.border
+              }
+              strokeWidth={level === 0 ? 3 : 2}
               opacity="0.6"
             />
           );
         })}
 
-        {/* Node rectangle */}
+        {/* Node rectangle or Underline */}
         <g
-          onClick={() => handleNodeClick(nodeLayout)}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleNodeClick(nodeLayout);
+          }}
           style={{
             cursor: "pointer",
             transformOrigin: `${x + width / 2}px ${y + height / 2}px`,
@@ -838,24 +991,46 @@ export function MindmapSvgPreview({
           }}
           className="mindmap-node hover:scale-110"
         >
+          {/* Transparent Hit Area for reliable clicking */}
           <rect
             x={x}
             y={y}
             width={width}
             height={height}
-            rx={BORDER_RADIUS}
-            ry={BORDER_RADIUS}
-            fill={colors.bg}
-            stroke={colors.border}
-            strokeWidth="2"
-            strokeDasharray={node.isDraft ? "4 2" : "none"}
-            opacity={node.isDraft ? 0.7 : 1}
-            style={{
-              transition:
-                "filter 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease",
-            }}
-            className="hover:brightness-110"
+            fill="transparent"
+            stroke="none"
           />
+
+          {style.hasBox ? (
+            <rect
+              x={x}
+              y={y}
+              width={width}
+              height={height}
+              rx={BORDER_RADIUS}
+              ry={BORDER_RADIUS}
+              fill={style.bg}
+              stroke={style.border}
+              strokeWidth="2"
+              strokeDasharray={node.isDraft || style.dashed ? "4 2" : "none"}
+              opacity={node.isDraft ? 0.7 : 1}
+              style={{
+                transition:
+                  "filter 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease",
+              }}
+              className="hover:brightness-110"
+            />
+          ) : (
+            // Render underline for boxless nodes
+            <path
+              d={`M ${x} ${y + height} L ${x + width} ${y + height}`}
+              stroke={baseColors.border}
+              strokeWidth="2"
+              fill="none"
+              opacity={0.8}
+            />
+          )}
+
           {/* Node text with wrapping */}
           {!isEditing && (
             <foreignObject
@@ -873,11 +1048,12 @@ export function MindmapSvgPreview({
                   alignItems: "center",
                   justifyContent: "center",
                   padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
-                  fontSize: "14px",
-                  fontWeight: 500,
+                  fontSize: `${style.fontSize}px`,
+                  fontWeight: style.fontWeight,
                   fontFamily: "inherit",
-                  color: colors.text,
+                  color: style.text,
                   textAlign: "center",
+                  userSelect: "none",
                   wordBreak: "break-word",
                   lineHeight: "1.3",
                   overflow: "hidden",
@@ -903,8 +1079,8 @@ export function MindmapSvgPreview({
               cx={x + width + 12}
               cy={y + height / 2}
               r={10}
-              fill={colors.bg}
-              stroke={colors.border}
+              fill={baseColors.bg}
+              stroke={baseColors.border}
               strokeWidth="1.5"
               className="hover:brightness-90"
             />
@@ -915,7 +1091,7 @@ export function MindmapSvgPreview({
               dominantBaseline="central"
               fontSize="12"
               fontWeight="bold"
-              fill={colors.text}
+              fill={baseColors.text}
               style={{ pointerEvents: "none" }}
             >
               {isCollapsed ? "+" : "−"}
@@ -927,7 +1103,7 @@ export function MindmapSvgPreview({
                   cx={x + width + 22}
                   cy={y + height / 2 - 8}
                   r={8}
-                  fill={colors.border}
+                  fill={baseColors.border}
                 />
                 <text
                   x={x + width + 22}
@@ -967,7 +1143,7 @@ export function MindmapSvgPreview({
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden ${
+      className={`relative overflow-hidden select-none ${
         isFullscreen ? "h-full" : "min-h-[75vh]"
       } ${className}`}
       style={{
@@ -977,6 +1153,26 @@ export function MindmapSvgPreview({
     >
       {/* Zoom controls */}
       <div className="fixed bottom-4 right-4 flex gap-1 z-50">
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-7 w-auto px-2 fs-xs bg-background/80 backdrop-blur-sm"
+          onClick={() =>
+            setRenderMode((m) => (m === "brainstorm" ? "study" : "brainstorm"))
+          }
+          title={`Switch to ${
+            renderMode === "brainstorm" ? "Study" : "Brainstorm"
+          } Mode`}
+        >
+          {renderMode === "brainstorm" ? (
+            <BrainCircuit className="h-3.5 w-3.5" />
+          ) : (
+            <BookOpen className="h-3.5 w-3.5" />
+          )}
+          <span className="ml-1 text-xs">
+            {renderMode === "brainstorm" ? "Thinking" : "Learning"}
+          </span>
+        </Button>
         <Button
           variant="outline"
           size="icon"
@@ -1009,14 +1205,10 @@ export function MindmapSvgPreview({
         </span>
       </div>
 
-      {/* Hint */}
-      <div className="fixed bottom-4 left-4 flex items-center gap-1.5 text-xs text-muted-foreground bg-background/80 backdrop-blur-sm px-2 py-1 rounded border z-50">
-        <Move className="h-3 w-3" />
-        Click to edit •{" "}
-        <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">Enter</kbd> =
-        sibling •{" "}
-        <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">Tab</kbd> =
-        child • Scroll = zoom
+      <div className="fixed bottom-4 left-4 flex items-center gap-1.5 text-xs text-muted-foreground bg-background/80 backdrop-blur-sm px-2 py-1 rounded border z-50 transition-all max-w-[90vw]">
+        <MindmapHelpModal />
+        <div className="w-px h-3 bg-border mx-1" />
+        <MindmapTips />
       </div>
 
       {/* Edit input overlay */}
@@ -1036,7 +1228,7 @@ export function MindmapSvgPreview({
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={handleEditSave}
-            className="outline-none resize-none"
+            className="outline-none resize-none select-text"
             style={{
               width: Math.max(120, editingNode.width),
               height: editingNode.height,
