@@ -1,55 +1,13 @@
 import { Metadata } from "next";
 import { MindmapViewer } from "./mindmap-viewer";
 import { ExampleCards } from "./example-cards";
+import { SAMPLE_MINDMAPS } from "./types";
 
 export const metadata: Metadata = {
   title: "mindmap",
   description:
     "Create and visualize mindmaps with Mermaid syntax. Copy and paste to Notion or other platforms.",
 };
-
-const SAMPLE_MINDMAPS = [
-  {
-    title: "Project Planning",
-    code: `mindmap
-  root((Project))
-    Planning
-      Requirements
-      Timeline
-      Resources
-    Development
-      Frontend
-      Backend
-      Database
-    Testing
-      Unit Tests
-      Integration
-      UAT
-    Deployment
-      Staging
-      Production`,
-  },
-  {
-    title: "Learning Path",
-    code: `mindmap
-  root((Learning))
-    Programming
-      JavaScript
-        React
-        Node.js
-      Python
-        Django
-        FastAPI
-    DevOps
-      Docker
-      Kubernetes
-      CI/CD
-    Cloud
-      AWS
-      GCP
-      Azure`,
-  },
-];
 
 export default function MindmapPage() {
   return (
