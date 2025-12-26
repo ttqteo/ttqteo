@@ -9,6 +9,7 @@ import {
   Move,
   BrainCircuit,
   BookOpen,
+  Focus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MindmapNode, SemanticType } from "./types";
@@ -90,7 +91,7 @@ interface NodeLayout {
 const NODE_MIN_HEIGHT = 36;
 const NODE_MAX_WIDTH = 200;
 const NODE_PADDING_X = 16;
-const NODE_PADDING_Y = 8;
+const NODE_PADDING_Y = 6;
 const HORIZONTAL_GAP = 60;
 const VERTICAL_GAP = 16;
 const BORDER_RADIUS = 8;
@@ -101,10 +102,10 @@ const LINE_HEIGHT = 20;
  */
 // Calculate node dimensions based on text
 function measureNode(text: string): { width: number; height: number } {
-  // Constants for measurement - more conservative to prevent clipping
-  const AVG_CHAR_WIDTH = 10; // Slightly generous average
-  const SAFE_CHAR_WIDTH = 14; // Even more conservative for wrapping calculation (Vietnamese support)
-  const LINE_HEIGHT_MEASURE = 22; // Slightly more than actual to be safe
+  // Constants for measurement - very conservative for Vietnamese diacritics
+  const AVG_CHAR_WIDTH = 9; // Vietnamese chars with diacritics need more space
+  const SAFE_CHAR_WIDTH = 12; // More conservative for wrapping calculation
+  const LINE_HEIGHT_MEASURE = 10; // Compact line height
 
   // Split by newline first
   const sourceLines = text.split("\n");
@@ -112,6 +113,7 @@ function measureNode(text: string): { width: number; height: number } {
   // 1. Calculate Width based on Average
   let maxContentWidth = 0;
   for (const line of sourceLines) {
+    // Vietnamese text with diacritics may need wider estimation
     maxContentWidth = Math.max(maxContentWidth, line.length * AVG_CHAR_WIDTH);
   }
 
@@ -261,7 +263,7 @@ function getNodeColor(
 function getSemanticStyle(
   type: SemanticType | undefined,
   level: number,
-  mode: "brainstorm" | "study",
+  mode: "brainstorm" | "study" | "classic",
   baseColors: { bg: string; text: string; border: string },
   isDark: boolean
 ) {
@@ -289,6 +291,9 @@ function getSemanticStyle(
     style.border = isDark ? "#b45309" : "#d97706"; // Amber-700 / Amber-600
     style.text = isDark ? "#fcd34d" : "#92400e"; // Amber-300 / Amber-800
     style.fontWeight = 500;
+  } else if (mode === "classic") {
+    // Classic Mode: All nodes have boxes
+    style.hasBox = true;
   } else if (mode === "study") {
     // Study Mode Rules
     if (semanticType === "Concept") {
@@ -371,16 +376,20 @@ export function MindmapSvgPreview({
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
-  // Render mode state (Brainstorm vs Study)
-  const [renderMode, setRenderMode] = useState<"brainstorm" | "study">(
-    "brainstorm"
-  );
+  // Render mode state (Brainstorm vs Study vs Classic)
+  const [renderMode, setRenderMode] = useState<
+    "brainstorm" | "study" | "classic"
+  >("brainstorm");
 
   // Load saved render mode
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedMode = localStorage.getItem("mindmap-render-mode");
-      if (savedMode === "brainstorm" || savedMode === "study") {
+      if (
+        savedMode === "brainstorm" ||
+        savedMode === "study" ||
+        savedMode === "classic"
+      ) {
         setRenderMode(savedMode);
       }
     }
@@ -392,7 +401,10 @@ export function MindmapSvgPreview({
       mode:
         | "brainstorm"
         | "study"
-        | ((prev: "brainstorm" | "study") => "brainstorm" | "study")
+        | "classic"
+        | ((
+            prev: "brainstorm" | "study" | "classic"
+          ) => "brainstorm" | "study" | "classic")
     ) => {
       setRenderMode((prev) => {
         const next = typeof mode === "function" ? mode(prev) : mode;
@@ -560,8 +572,13 @@ export function MindmapSvgPreview({
     const handleWheelNative = (e: WheelEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      const delta = e.deltaY > 0 ? -0.05 : 0.05;
-      setScale((prev) => Math.min(Math.max(0.25, prev + delta), 3));
+      // Use proportional zoom with smaller delta for smooth scrolling
+      // deltaY is typically ~100 for regular scroll, smaller for smooth
+      const zoomSensitivity = 0.003; // Faster zoom
+      const delta = -e.deltaY * zoomSensitivity;
+      // Clamp delta to prevent huge jumps
+      const clampedDelta = Math.max(-0.15, Math.min(0.15, delta));
+      setScale((prev) => Math.min(Math.max(0.25, prev + clampedDelta), 3));
     };
 
     svgContainer.addEventListener("wheel", handleWheelNative, {
@@ -573,8 +590,10 @@ export function MindmapSvgPreview({
   // React handler (backup, may not prevent scroll due to passive)
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.stopPropagation();
-    const delta = e.deltaY > 0 ? -0.05 : 0.05;
-    setScale((prev) => Math.min(Math.max(0.25, prev + delta), 3));
+    const zoomSensitivity = 0.003;
+    const delta = -e.deltaY * zoomSensitivity;
+    const clampedDelta = Math.max(-0.15, Math.min(0.15, delta));
+    setScale((prev) => Math.min(Math.max(0.25, prev + clampedDelta), 3));
   }, []);
 
   // Focus input when editing starts
@@ -1100,21 +1119,16 @@ export function MindmapSvgPreview({
             isDark
           );
 
+          // Start point: if current node has no box, start from bottom-right (underline end)
           const startX = x + width;
-          const startY = y + height / 2;
+          const startY = style.hasBox ? y + height / 2 : y + height;
 
           let endX = child.x;
           let endY = child.y + child.height / 2; // Default for Box
 
           // If child has NO box (is line style), connect to bottom-left where underline starts
-          // BUT we want it to look seamless, so we target the START of the underline.
-          // The underline runs from (child.x, child.y + height) to (child.x + width, child.y + height)
-          // Actually, let's target the left-middle still, but draw the curve to flatten out?
-          // No, standard is: Parent -> (curve) -> Child Bottom Base.
-
           if (!childStyle.hasBox) {
             endY = child.y + child.height; // Bottom
-            // Adjust endX slightly if needed? No, left edge is fine.
           }
 
           const midX = (startX + endX) / 2;
@@ -1145,10 +1159,9 @@ export function MindmapSvgPreview({
           }}
           style={{
             cursor: "pointer",
-            transformOrigin: `${x + width / 2}px ${y + height / 2}px`,
-            transition: "transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+            transition: "filter 0.2s ease, opacity 0.2s ease",
           }}
-          className="mindmap-node hover:scale-110 pointer-events-auto"
+          className="group mindmap-node hover:brightness-110 hover:drop-shadow-lg pointer-events-auto"
         >
           {/* Transparent Hit Area for reliable clicking */}
           <rect
@@ -1180,14 +1193,36 @@ export function MindmapSvgPreview({
               className="hover:brightness-110"
             />
           ) : (
-            // Render underline for boxless nodes
-            <path
-              d={`M ${x} ${y + height} L ${x + width} ${y + height}`}
-              stroke={baseColors.border}
-              strokeWidth="2"
-              fill="none"
-              opacity={0.8}
-            />
+            // Render underline for boxless nodes with hover background
+            <>
+              {/* Hover background - covers full text area */}
+              <rect
+                x={x - 4}
+                y={y}
+                width={width + 8}
+                height={height + 4}
+                rx={4}
+                ry={4}
+                fill={isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)"}
+                opacity={0}
+                style={{
+                  transition: "opacity 0.2s ease",
+                }}
+                className="group-hover:opacity-100"
+              />
+              {/* Underline */}
+              <path
+                d={`M ${x} ${y + height} L ${x + width} ${y + height}`}
+                stroke={baseColors.border}
+                strokeWidth="2"
+                fill="none"
+                opacity={0.8}
+                style={{
+                  transition: "stroke-width 0.2s ease, opacity 0.2s ease",
+                }}
+                className="group-hover:opacity-100"
+              />
+            </>
           )}
 
           {/* Node text with wrapping */}
@@ -1197,7 +1232,7 @@ export function MindmapSvgPreview({
               y={y}
               width={width}
               height={height}
-              style={{ pointerEvents: "none" }}
+              style={{ pointerEvents: "none", overflow: "visible" }}
             >
               <div
                 style={{
@@ -1215,7 +1250,6 @@ export function MindmapSvgPreview({
                   userSelect: "none",
                   wordBreak: "break-word",
                   lineHeight: "1.3",
-                  overflow: "hidden",
                   textShadow: style.textShadow,
                   whiteSpace: "pre-wrap", // Support multiline text
                 }}
@@ -1239,9 +1273,6 @@ export function MindmapSvgPreview({
                 onChange={(e) => {
                   setEditValue(e.target.value);
                   updateAndAddNode(editingNode.id, e.target.value, "none");
-                  // Auto-grow height
-                  e.target.style.height = "auto";
-                  e.target.style.height = e.target.scrollHeight + "px";
                 }}
                 onKeyDown={(e) => {
                   e.stopPropagation(); // Prevent map shortcuts
@@ -1272,7 +1303,7 @@ export function MindmapSvgPreview({
                 }}
                 style={{
                   width: "100%",
-                  minHeight: "100%",
+                  height: "100%",
                   fontSize: `${style.fontSize}px`,
                   padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
                   borderRadius: `${BORDER_RADIUS}px`,
@@ -1285,10 +1316,9 @@ export function MindmapSvgPreview({
                   lineHeight: "1.3",
                   fontWeight: style.fontWeight,
                   fontFamily: "inherit",
+                  boxSizing: "border-box",
                 }}
                 className="shadow-xl focus:outline-none"
-                // Initial height calc
-                rows={1}
               />
             </foreignObject>
           )}
@@ -1417,20 +1447,34 @@ export function MindmapSvgPreview({
           className="h-7 w-auto px-2 fs-xs bg-background/90 backdrop-blur-md shadow-sm border-border/50"
           onClick={() =>
             handleSetRenderMode((m) =>
-              m === "brainstorm" ? "study" : "brainstorm"
+              m === "brainstorm"
+                ? "study"
+                : m === "study"
+                ? "classic"
+                : "brainstorm"
             )
           }
           title={`Switch to ${
-            renderMode === "brainstorm" ? "Study" : "Brainstorm"
+            renderMode === "brainstorm"
+              ? "Study"
+              : renderMode === "study"
+              ? "Classic"
+              : "Brainstorm"
           } Mode`}
         >
           {renderMode === "brainstorm" ? (
             <BrainCircuit className="h-3.5 w-3.5 text-primary" />
-          ) : (
+          ) : renderMode === "study" ? (
             <BookOpen className="h-3.5 w-3.5 text-primary" />
+          ) : (
+            <Move className="h-3.5 w-3.5 text-primary" />
           )}
           <span className="ml-1.5 text-xs font-medium tracking-wider">
-            {renderMode === "brainstorm" ? "Thinking" : "Learning"}
+            {renderMode === "brainstorm"
+              ? "Thinking"
+              : renderMode === "study"
+              ? "Learning"
+              : "Classic"}
           </span>
         </Button>
         <div className="flex border border-border/50 rounded-md overflow-hidden bg-background/90 backdrop-blur-md shadow-sm">
@@ -1455,11 +1499,11 @@ export function MindmapSvgPreview({
           <Button
             variant="ghost"
             size="icon"
-            onClick={resetView}
+            onClick={fitToView}
             className="h-7 w-7 rounded-none hover:bg-accent"
-            title="Reset view"
+            title="Center view"
           >
-            <RotateCcw className="h-3.5 w-3.5" />
+            <Focus className="h-3.5 w-3.5" />
           </Button>
         </div>
         <span className="flex items-center px-1.5 text-[10px] font-mono text-muted-foreground bg-background/90 backdrop-blur-md rounded border border-border/50 shadow-sm min-w-[35px] justify-center">
