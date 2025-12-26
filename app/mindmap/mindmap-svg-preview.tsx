@@ -1289,7 +1289,7 @@ export function MindmapSvgPreview({
                   color: style.text,
                   textAlign: "center",
                   userSelect: "none",
-                  wordBreak: "break-all",
+                  wordBreak: "break-word",
                   lineHeight: "1.3",
                   textShadow: style.textShadow,
                   whiteSpace: "pre-wrap", // Support multiline text
@@ -1355,7 +1355,7 @@ export function MindmapSvgPreview({
                   fontWeight: style.fontWeight,
                   fontFamily: "inherit",
                   boxSizing: "border-box",
-                  wordBreak: "break-all",
+                  wordBreak: "break-word",
                   whiteSpace: "pre-wrap",
                   outline: "none",
                 }}
