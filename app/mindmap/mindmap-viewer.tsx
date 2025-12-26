@@ -357,7 +357,7 @@ export function MindmapViewer({
                     value={mermaidCode}
                     onChange={(e) => handleCodeChange(e.target.value)}
                     onKeyDown={handleCodeKeyDown}
-                    className="font-mono text-xs border-0 rounded-none focus-visible:ring-0 resize-none w-full min-h-[400px]"
+                    className="font-mono text-xs border-0 rounded-none focus-visible:ring-0 resize-none w-full h-[calc(100vh-100px)]"
                     placeholder="Enter your mermaid mindmap syntax..."
                   />
                 </div>
@@ -399,7 +399,7 @@ export function MindmapViewer({
 
                 {/* Preview panel */}
                 {(viewMode === "preview" || viewMode === "split") && (
-                  <div className="overflow-hidden h-full">
+                  <div className="relative h-full">
                     <div className="p-2 border bg-muted/30">
                       <span className="text-xs text-muted-foreground">
                         mindmap

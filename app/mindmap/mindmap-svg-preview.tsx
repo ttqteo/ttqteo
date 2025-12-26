@@ -13,23 +13,40 @@ interface MindmapSvgPreviewProps {
   className?: string;
 }
 
-// Color palette matching the div-based editor
-const LEVEL_COLORS = [
-  { bg: "#3b82f6", text: "#ffffff", border: "#2563eb" }, // blue-500 (Root)
-  { bg: "#fbbf24", text: "#1f2937", border: "#f59e0b" }, // amber-400
-  { bg: "#34d399", text: "#1f2937", border: "#10b981" }, // emerald-400
-  { bg: "#fb7185", text: "#1f2937", border: "#f43f5e" }, // rose-400
-  { bg: "#a78bfa", text: "#ffffff", border: "#8b5cf6" }, // purple-400
-  { bg: "#22d3d8", text: "#1f2937", border: "#06b6d4" }, // cyan-400
-];
+// Color palette using HSL for dynamic generation
+// Root node color (blue)
+const ROOT_COLOR = { bg: "#3b82f6", text: "#ffffff", border: "#2563eb" };
 
-const CHILD_COLORS = [
-  { bg: "#fde68a", text: "#1f2937", border: "#fcd34d" }, // amber-200
-  { bg: "#a7f3d0", text: "#1f2937", border: "#6ee7b7" }, // emerald-200
-  { bg: "#fecdd3", text: "#1f2937", border: "#fda4af" }, // rose-200
-  { bg: "#ddd6fe", text: "#1f2937", border: "#c4b5fd" }, // purple-200
-  { bg: "#a5f3fc", text: "#1f2937", border: "#67e8f9" }, // cyan-200
-];
+/**
+ * Generate branch colors dynamically using HSL
+ * Each branch gets a unique hue, with primary (saturated) and secondary (lighter) variants
+ */
+function generateBranchColor(branchIndex: number): {
+  primary: { bg: string; text: string; border: string };
+  secondary: { bg: string; text: string; border: string };
+} {
+  // Golden angle (~137.5°) for optimal color distribution
+  const hue = (branchIndex * 137.5 + 30) % 360; // Start at 30° (orange) to avoid blue (root)
+
+  // Primary: saturated, medium lightness
+  const primaryBg = `hsl(${hue}, 75%, 55%)`;
+  const primaryBorder = `hsl(${hue}, 75%, 45%)`;
+  const primaryText = hue > 45 && hue < 200 ? "#1f2937" : "#ffffff"; // Dark text for light hues
+
+  // Secondary: less saturated, lighter
+  const secondaryBg = `hsl(${hue}, 80%, 85%)`;
+  const secondaryBorder = `hsl(${hue}, 70%, 75%)`;
+  const secondaryText = "#1f2937";
+
+  return {
+    primary: { bg: primaryBg, text: primaryText, border: primaryBorder },
+    secondary: {
+      bg: secondaryBg,
+      text: secondaryText,
+      border: secondaryBorder,
+    },
+  };
+}
 
 interface NodeLayout {
   node: MindmapNode;
@@ -38,6 +55,7 @@ interface NodeLayout {
   width: number;
   height: number;
   level: number;
+  branchIndex: number; // Which branch from root this node belongs to
   children: NodeLayout[];
   parentId: string | null;
   nextSiblingId: string | null;
@@ -81,7 +99,8 @@ function calculateLayout(
   node: MindmapNode,
   level: number = 0,
   startY: number = 0,
-  parentId: string | null = null
+  parentId: string | null = null,
+  branchIndex: number = 0
 ): NodeLayout {
   const { width, height } = measureNode(node.text);
 
@@ -93,6 +112,7 @@ function calculateLayout(
       width,
       height,
       level,
+      branchIndex,
       children: [],
       parentId,
       nextSiblingId: null,
@@ -105,7 +125,16 @@ function calculateLayout(
 
   for (let i = 0; i < node.children.length; i++) {
     const child = node.children[i];
-    const childLayout = calculateLayout(child, level + 1, currentY, node.id);
+    // For root's children (level 0), each gets its own branch index
+    // For deeper levels, inherit parent's branch index
+    const childBranchIndex = level === 0 ? i : branchIndex;
+    const childLayout = calculateLayout(
+      child,
+      level + 1,
+      currentY,
+      node.id,
+      childBranchIndex
+    );
     childLayouts.push(childLayout);
     currentY = getLayoutBottom(childLayout) + VERTICAL_GAP;
   }
@@ -129,6 +158,7 @@ function calculateLayout(
     width,
     height,
     level,
+    branchIndex,
     children: childLayouts,
     parentId,
     nextSiblingId: null,
@@ -160,19 +190,17 @@ function positionHorizontally(layout: NodeLayout, x: number = 0): void {
 }
 
 /**
- * Get color for a node based on level and whether it has children
+ * Get color for a node based on level and branch index
  */
 function getNodeColor(
   level: number,
-  hasChildren: boolean
-): (typeof LEVEL_COLORS)[0] {
-  if (level === 0) return LEVEL_COLORS[0];
+  branchIndex: number
+): { bg: string; text: string; border: string } {
+  if (level === 0) return ROOT_COLOR;
 
-  const colorIndex = Math.min(level, LEVEL_COLORS.length - 1);
-  if (hasChildren) {
-    return LEVEL_COLORS[colorIndex];
-  }
-  return CHILD_COLORS[colorIndex % CHILD_COLORS.length];
+  const colorFamily = generateBranchColor(branchIndex);
+  // Level 1 uses primary color, deeper levels use secondary
+  return level === 1 ? colorFamily.primary : colorFamily.secondary;
 }
 
 /**
@@ -259,7 +287,7 @@ export function MindmapSvgPreview({
         colors: { bg: string; text: string; border: string };
       } | null => {
         if (l.node.id === pendingEditRef.current) {
-          const colors = getNodeColor(l.level, l.node.children.length > 0);
+          const colors = getNodeColor(l.level, l.branchIndex);
           return {
             id: l.node.id,
             text: l.node.text,
@@ -326,10 +354,7 @@ export function MindmapSvgPreview({
   const handleNodeClick = useCallback(
     (nodeLayout: NodeLayout) => {
       if (onTreeChange) {
-        const colors = getNodeColor(
-          nodeLayout.level,
-          nodeLayout.node.children.length > 0
-        );
+        const colors = getNodeColor(nodeLayout.level, nodeLayout.branchIndex);
         setEditingNode({
           id: nodeLayout.node.id,
           text: nodeLayout.node.text,
@@ -764,7 +789,7 @@ export function MindmapSvgPreview({
   // Render a node and its connections
   const renderNode = (nodeLayout: NodeLayout): React.ReactNode => {
     const { node, x, y, width, height, level, children } = nodeLayout;
-    const colors = getNodeColor(level, node.children.length > 0);
+    const colors = getNodeColor(level, nodeLayout.branchIndex);
     const isEditing = editingNode?.id === node.id;
     const hasChildren = node.children.length > 0;
     const isCollapsed = node.isCollapsed && hasChildren;
@@ -951,7 +976,7 @@ export function MindmapSvgPreview({
       }}
     >
       {/* Zoom controls */}
-      <div className="absolute bottom-2 right-2 flex gap-1 z-10">
+      <div className="fixed bottom-4 right-4 flex gap-1 z-50">
         <Button
           variant="outline"
           size="icon"
@@ -985,7 +1010,7 @@ export function MindmapSvgPreview({
       </div>
 
       {/* Hint */}
-      <div className="absolute bottom-2 left-2 flex items-center gap-1.5 text-xs text-muted-foreground bg-background/80 backdrop-blur-sm px-2 py-1 rounded border z-10">
+      <div className="fixed bottom-4 left-4 flex items-center gap-1.5 text-xs text-muted-foreground bg-background/80 backdrop-blur-sm px-2 py-1 rounded border z-50">
         <Move className="h-3 w-3" />
         Click to edit •{" "}
         <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">Enter</kbd> =
