@@ -23,12 +23,10 @@ export const metadata: Metadata = {
       {
         media: "(prefers-color-scheme: light)",
         url: "/images/logo-dark-circle.png",
-        href: "/images/logo-dark-circle.png",
       },
       {
         media: "(prefers-color-scheme: dark)",
         url: "/images/logo-light-circle.png",
-        href: "/images/logo-light-circle.png",
       },
     ],
   },
