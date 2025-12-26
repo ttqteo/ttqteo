@@ -363,13 +363,13 @@ export function MindmapSvgPreview({
 
       const processTree = (node: MindmapNode): MindmapNode => {
         if (node.id === nodeId) {
-          const updatedNode = { ...node, text: newText };
+          const updatedNode = { ...node, text: newText, isDraft: false };
           if (action === "addChild") {
             return {
               ...updatedNode,
               children: [
                 ...updatedNode.children,
-                { id: newNodeId, text: "...", children: [] },
+                { id: newNodeId, text: "...", children: [], isDraft: true },
               ],
             };
           }
@@ -381,12 +381,13 @@ export function MindmapSvgPreview({
           const childIndex = node.children.findIndex((c) => c.id === nodeId);
           if (childIndex !== -1) {
             const newChildren = node.children.map((c) =>
-              c.id === nodeId ? { ...c, text: newText } : c
+              c.id === nodeId ? { ...c, text: newText, isDraft: false } : c
             );
             newChildren.splice(childIndex + 1, 0, {
               id: newNodeId,
               text: "...",
               children: [],
+              isDraft: true,
             });
             return { ...node, children: newChildren };
           }
@@ -424,6 +425,83 @@ export function MindmapSvgPreview({
       if (updatedTree) {
         onTreeChange(updatedTree);
       }
+    },
+    [tree, onTreeChange]
+  );
+
+  // Toggle collapse state of a node
+  const toggleCollapse = useCallback(
+    (nodeId: string) => {
+      if (!onTreeChange) return;
+
+      const toggleInTree = (node: MindmapNode): MindmapNode => {
+        if (node.id === nodeId) {
+          return { ...node, isCollapsed: !node.isCollapsed };
+        }
+        return { ...node, children: node.children.map(toggleInTree) };
+      };
+
+      onTreeChange(toggleInTree(tree));
+    },
+    [tree, onTreeChange]
+  );
+
+  // Promote node (move to become sibling of parent) - Shift+Tab
+  const promoteNode = useCallback(
+    (nodeId: string) => {
+      if (!onTreeChange) return;
+
+      // Find parent and grandparent
+      const findParentPath = (
+        node: MindmapNode,
+        targetId: string,
+        path: MindmapNode[] = []
+      ): MindmapNode[] | null => {
+        if (node.children.some((c) => c.id === targetId)) {
+          return [...path, node];
+        }
+        for (const child of node.children) {
+          const result = findParentPath(child, targetId, [...path, node]);
+          if (result) return result;
+        }
+        return null;
+      };
+
+      const parentPath = findParentPath(tree, nodeId);
+      if (!parentPath || parentPath.length < 2) {
+        // Node is child of root or not found - cannot promote
+        return;
+      }
+
+      const parent = parentPath[parentPath.length - 1];
+      const grandparent = parentPath[parentPath.length - 2];
+      const nodeToPromote = parent.children.find((c) => c.id === nodeId);
+      if (!nodeToPromote) return;
+
+      // Remove from parent, add as sibling after parent in grandparent
+      const updateTree = (node: MindmapNode): MindmapNode => {
+        if (node.id === grandparent.id) {
+          const parentIndex = node.children.findIndex(
+            (c) => c.id === parent.id
+          );
+          const newChildren = [...node.children];
+          newChildren.splice(parentIndex + 1, 0, nodeToPromote);
+          return {
+            ...node,
+            children: newChildren.map((c) =>
+              c.id === parent.id
+                ? {
+                    ...c,
+                    children: c.children.filter((cc) => cc.id !== nodeId),
+                  }
+                : c
+            ),
+          };
+        }
+        return { ...node, children: node.children.map(updateTree) };
+      };
+
+      onTreeChange(updateTree(tree));
     },
     [tree, onTreeChange]
   );
@@ -509,7 +587,7 @@ export function MindmapSvgPreview({
           setEditingNode(null);
           setEditValue("");
         }
-      } else if (e.key === "Tab") {
+      } else if (e.key === "Tab" && !e.shiftKey) {
         // Tab: Save and add child
         e.preventDefault();
         const textToSave =
@@ -527,10 +605,108 @@ export function MindmapSvgPreview({
         setEditingNode(null);
         setEditValue("");
         updateAndAddNode(editingNode.id, textToSave || "Node", "addChild");
+      } else if (e.key === "Backspace" && editValue === "") {
+        // Backspace on empty text - delete node and focus parent
+        if (editingNode.level > 0) {
+          e.preventDefault();
+          deleteNode(editingNode.id);
+          setEditingNode(null);
+          setEditValue("");
+          // Focus will return to parent via layout update
+        }
+        // Root node: do nothing, cannot delete
+      } else if (e.key === "Tab" && e.shiftKey) {
+        // Shift+Tab: Promote node (become sibling of parent)
+        e.preventDefault();
+        if (editingNode.level > 1) {
+          // Save current text first
+          const textToSave =
+            editValue.trim() ||
+            (editingNode.text !== "..." ? editingNode.text : "Node");
+          updateAndAddNode(editingNode.id, textToSave, "none");
+          promoteNode(editingNode.id);
+        }
+        setEditingNode(null);
+        setEditValue("");
       } else if (e.key === "Escape") {
         // Escape: Cancel
         e.preventDefault();
         handleEditCancel();
+      } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        // Arrow Up/Down: Navigate to previous/next sibling
+        e.preventDefault();
+        if (!layout) return;
+
+        // Find current node and its siblings
+        const findNodeWithSiblings = (
+          l: NodeLayout,
+          parent: NodeLayout | null
+        ): {
+          node: NodeLayout;
+          siblings: NodeLayout[];
+          index: number;
+        } | null => {
+          if (l.node.id === editingNode.id && parent) {
+            const index = parent.children.findIndex(
+              (c) => c.node.id === editingNode.id
+            );
+            return { node: l, siblings: parent.children, index };
+          }
+          for (const child of l.children) {
+            const result = findNodeWithSiblings(child, l);
+            if (result) return result;
+          }
+          return null;
+        };
+
+        const result = findNodeWithSiblings(layout, null);
+        if (result && result.siblings.length > 1) {
+          const targetIndex =
+            e.key === "ArrowUp"
+              ? Math.max(0, result.index - 1)
+              : Math.min(result.siblings.length - 1, result.index + 1);
+
+          if (targetIndex !== result.index) {
+            handleEditSave();
+            setTimeout(() => handleNodeClick(result.siblings[targetIndex]), 50);
+          }
+        }
+      } else if (e.key === "ArrowLeft") {
+        // Arrow Left: Navigate to parent
+        e.preventDefault();
+        if (editingNode.parentId && layout) {
+          const findNode = (l: NodeLayout): NodeLayout | null => {
+            if (l.node.id === editingNode.parentId) return l;
+            for (const child of l.children) {
+              const result = findNode(child);
+              if (result) return result;
+            }
+            return null;
+          };
+          const parent = findNode(layout);
+          if (parent) {
+            handleEditSave();
+            setTimeout(() => handleNodeClick(parent), 50);
+          }
+        }
+      } else if (e.key === "ArrowRight") {
+        // Arrow Right: Navigate to first child
+        e.preventDefault();
+        if (!layout) return;
+
+        const findNode = (l: NodeLayout): NodeLayout | null => {
+          if (l.node.id === editingNode.id) return l;
+          for (const child of l.children) {
+            const result = findNode(child);
+            if (result) return result;
+          }
+          return null;
+        };
+        const current = findNode(layout);
+        if (current && current.children.length > 0) {
+          handleEditSave();
+          setTimeout(() => handleNodeClick(current.children[0]), 50);
+        }
       }
     },
     [
@@ -539,6 +715,8 @@ export function MindmapSvgPreview({
       updateAndAddNode,
       deleteNode,
       handleEditCancel,
+      handleEditSave,
+      promoteNode,
       layout,
       handleNodeClick,
     ]
@@ -588,11 +766,25 @@ export function MindmapSvgPreview({
     const { node, x, y, width, height, level, children } = nodeLayout;
     const colors = getNodeColor(level, node.children.length > 0);
     const isEditing = editingNode?.id === node.id;
+    const hasChildren = node.children.length > 0;
+    const isCollapsed = node.isCollapsed && hasChildren;
+
+    // Only render visible children (not collapsed)
+    const visibleChildren = isCollapsed ? [] : children;
+
+    // Count total descendants for badge
+    const countDescendants = (n: MindmapNode): number => {
+      return n.children.reduce(
+        (acc, child) => acc + 1 + countDescendants(child),
+        0
+      );
+    };
+    const descendantCount = countDescendants(node);
 
     return (
       <g key={node.id}>
         {/* Connection lines to children */}
-        {children.map((child) => {
+        {visibleChildren.map((child) => {
           const startX = x + width;
           const startY = y + height / 2;
           const endX = child.x;
@@ -631,8 +823,11 @@ export function MindmapSvgPreview({
             fill={colors.bg}
             stroke={colors.border}
             strokeWidth="2"
+            strokeDasharray={node.isDraft ? "4 2" : "none"}
+            opacity={node.isDraft ? 0.7 : 1}
             style={{
-              transition: "filter 0.2s ease, stroke-width 0.2s ease",
+              transition:
+                "filter 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease",
             }}
             className="hover:brightness-110"
           />
@@ -669,8 +864,65 @@ export function MindmapSvgPreview({
           )}
         </g>
 
+        {/* Collapse/Expand button */}
+        {hasChildren && (
+          <g
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleCollapse(node.id);
+            }}
+            style={{ cursor: "pointer" }}
+            className="collapse-button"
+          >
+            <circle
+              cx={x + width + 12}
+              cy={y + height / 2}
+              r={10}
+              fill={colors.bg}
+              stroke={colors.border}
+              strokeWidth="1.5"
+              className="hover:brightness-90"
+            />
+            <text
+              x={x + width + 12}
+              y={y + height / 2}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize="12"
+              fontWeight="bold"
+              fill={colors.text}
+              style={{ pointerEvents: "none" }}
+            >
+              {isCollapsed ? "+" : "−"}
+            </text>
+            {/* Badge showing descendant count when collapsed */}
+            {isCollapsed && descendantCount > 0 && (
+              <>
+                <circle
+                  cx={x + width + 22}
+                  cy={y + height / 2 - 8}
+                  r={8}
+                  fill={colors.border}
+                />
+                <text
+                  x={x + width + 22}
+                  y={y + height / 2 - 8}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize="9"
+                  fontWeight="bold"
+                  fill="white"
+                  style={{ pointerEvents: "none" }}
+                >
+                  {descendantCount}
+                </text>
+              </>
+            )}
+          </g>
+        )}
+
         {/* Render children */}
-        {children.map(renderNode)}
+        {visibleChildren.map(renderNode)}
       </g>
     );
   };
@@ -699,7 +951,7 @@ export function MindmapSvgPreview({
       }}
     >
       {/* Zoom controls */}
-      <div className="absolute top-2 left-2 flex gap-1 z-10">
+      <div className="absolute bottom-2 right-2 flex gap-1 z-10">
         <Button
           variant="outline"
           size="icon"
@@ -759,16 +1011,24 @@ export function MindmapSvgPreview({
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={handleEditSave}
-            className="px-3 py-2 border-2 rounded-lg shadow-lg text-sm font-medium outline-none resize-none"
+            className="outline-none resize-none"
             style={{
-              width: Math.max(180, editingNode.width + 30),
-              minHeight: Math.max(NODE_MIN_HEIGHT, editingNode.height),
-              maxHeight: 150,
+              width: Math.max(120, editingNode.width),
+              height: editingNode.height,
+              padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
               backgroundColor: editingNode.colors.bg,
               color: editingNode.colors.text,
-              borderColor: editingNode.colors.border,
+              border: `2px solid ${editingNode.colors.border}`,
+              borderRadius: `${BORDER_RADIUS}px`,
+              boxShadow:
+                "0 4px 20px rgba(0,0,0,0.15), 0 0 0 3px rgba(59,130,246,0.3)",
+              fontSize: "14px",
+              fontWeight: 500,
+              fontFamily: "inherit",
+              textAlign: "center",
+              lineHeight: "1.3",
+              overflow: "hidden",
             }}
-            rows={Math.max(1, Math.ceil(editValue.length / 20))}
           />
         </div>
       )}

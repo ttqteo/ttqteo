@@ -6,6 +6,8 @@ export interface MindmapNode {
   id: string;
   text: string;
   children: MindmapNode[];
+  isDraft?: boolean; // true = uncommitted draft node
+  isCollapsed?: boolean; // true = children are hidden
 }
 
 /**
