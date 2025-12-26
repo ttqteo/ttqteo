@@ -12,10 +12,6 @@ export const metadata: Metadata = {
 export default function MindmapPage() {
   return (
     <div className="w-full mx-auto flex flex-col gap-6 sm:min-h-[78vh] min-h-[76vh] pt-2">
-      <div className="mb-4">
-        <h1 className="text-4xl sm:text-5xl font-semibold mb-2">Mindmap</h1>
-      </div>
-
       <MindmapViewer />
 
       <div className="mt-8">

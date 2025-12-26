@@ -64,7 +64,7 @@ export function MindmapHelpModal() {
             return (
               <code
                 key={`${index}-${codeIndex}`}
-                className="px-1.5 py-0.5 rounded bg-muted font-mono text-xs"
+                className="px-1.5 py-0.5 rounded bg-muted font-mono text-xs text-foreground dark:text-primary-foreground dark:bg-primary/20"
               >
                 {codePart.slice(1, -1)}
               </code>
@@ -206,7 +206,7 @@ export function MindmapHelpModal() {
         elements.push(
           <li
             key={i}
-            className="ml-6 list-disc mb-2 text-muted-foreground leading-relaxed"
+            className="ml-6 list-disc mb-2 text-foreground dark:text-zinc-100 leading-relaxed"
           >
             {processInline(line.trim().slice(2))}
           </li>
@@ -225,7 +225,10 @@ export function MindmapHelpModal() {
       // Plain paragraphs
       if (line.trim() !== "") {
         elements.push(
-          <p key={i} className="mb-4 leading-relaxed text-muted-foreground">
+          <p
+            key={i}
+            className="mb-4 leading-relaxed text-foreground dark:text-zinc-100"
+          >
             {processInline(line)}
           </p>
         );
@@ -252,8 +255,8 @@ export function MindmapHelpModal() {
       <DialogContent className="max-w-4xl w-[90vw] h-[80vh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="px-6 py-4 border-b">
           <DialogTitle className="flex items-center gap-2">
-            <Info className="h-5 w-5 text-blue-500" />
-            Hướng dẫn Mindmap Ngữ Nghĩa
+            <Info className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+            <span className="text-foreground">Hướng dẫn Mindmap Ngữ Nghĩa</span>
           </DialogTitle>
         </DialogHeader>
 

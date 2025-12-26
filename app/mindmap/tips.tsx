@@ -36,13 +36,17 @@ export function MindmapTips() {
         return (
           <kbd
             key={i}
-            className="px-1 py-0.5 bg-muted rounded text-[10px] font-sans font-medium text-primary shadow-sm border border-primary/20 mx-0.5"
+            className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-sans font-medium text-foreground dark:text-white dark:bg-zinc-800 shadow-sm border border-border dark:border-zinc-700 mx-0.5"
           >
             {part.slice(2, -2)}
           </kbd>
         );
       }
-      return <span key={i}>{part}</span>;
+      return (
+        <span key={i} className="text-foreground dark:text-zinc-100 italic">
+          {part}
+        </span>
+      );
     });
   };
 

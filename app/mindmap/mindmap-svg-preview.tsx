@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useTheme } from "next-themes";
 import {
   ZoomIn,
   ZoomOut,
@@ -34,22 +35,34 @@ const ROOT_COLOR = { bg: "#3b82f6", text: "#ffffff", border: "#2563eb" };
  * Generate branch colors dynamically using HSL
  * Each branch gets a unique hue, with primary (saturated) and secondary (lighter) variants
  */
-function generateBranchColor(branchIndex: number): {
+function generateBranchColor(
+  branchIndex: number,
+  isDark: boolean
+): {
   primary: { bg: string; text: string; border: string };
   secondary: { bg: string; text: string; border: string };
 } {
   // Golden angle (~137.5°) for optimal color distribution
-  const hue = (branchIndex * 137.5 + 30) % 360; // Start at 30° (orange) to avoid blue (root)
+  const hue = (branchIndex * 137.5 + 30) % 360;
 
   // Primary: saturated, medium lightness
   const primaryBg = `hsl(${hue}, 75%, 55%)`;
   const primaryBorder = `hsl(${hue}, 75%, 45%)`;
-  const primaryText = hue > 45 && hue < 200 ? "#1f2937" : "#ffffff"; // Dark text for light hues
+  // Dark mode: always white text for primary nodes if they are saturated
+  const primaryText = isDark
+    ? "#ffffff"
+    : hue > 45 && hue < 200
+    ? "#1f2937"
+    : "#ffffff";
 
-  // Secondary: less saturated, lighter
-  const secondaryBg = `hsl(${hue}, 80%, 85%)`;
-  const secondaryBorder = `hsl(${hue}, 70%, 75%)`;
-  const secondaryText = "#1f2937";
+  // Secondary: less saturated
+  const secondaryBg = isDark
+    ? `hsl(${hue}, 40%, 15%)`
+    : `hsl(${hue}, 80%, 85%)`;
+  const secondaryBorder = isDark
+    ? `hsl(${hue}, 50%, 25%)`
+    : `hsl(${hue}, 70%, 75%)`;
+  const secondaryText = isDark ? "#f9fafb" : "#1f2937"; // High contrast white for dark mode secondary
 
   return {
     primary: { bg: primaryBg, text: primaryText, border: primaryBorder },
@@ -207,11 +220,12 @@ function positionHorizontally(layout: NodeLayout, x: number = 0): void {
  */
 function getNodeColor(
   level: number,
-  branchIndex: number
+  branchIndex: number,
+  isDark: boolean
 ): { bg: string; text: string; border: string } {
   if (level === 0) return ROOT_COLOR;
 
-  const colorFamily = generateBranchColor(branchIndex);
+  const colorFamily = generateBranchColor(branchIndex, isDark);
   // Level 1 uses primary color, deeper levels use secondary
   return level === 1 ? colorFamily.primary : colorFamily.secondary;
 }
@@ -223,7 +237,8 @@ function getSemanticStyle(
   type: SemanticType | undefined,
   level: number,
   mode: "brainstorm" | "study",
-  baseColors: { bg: string; text: string; border: string }
+  baseColors: { bg: string; text: string; border: string },
+  isDark: boolean
 ) {
   // Default to Idea if undefined
   const semanticType = type || "Idea";
@@ -244,9 +259,9 @@ function getSemanticStyle(
     style.fontWeight = 700;
   } else if (semanticType === "Warning") {
     style.hasBox = true;
-    style.bg = "#fef3c7"; // Amber-100
-    style.border = "#d97706"; // Amber-600
-    style.text = "#92400e"; // Amber-800
+    style.bg = isDark ? "#451a03" : "#fef3c7"; // Amber-950 / Amber-100
+    style.border = isDark ? "#b45309" : "#d97706"; // Amber-700 / Amber-600
+    style.text = isDark ? "#fcd34d" : "#92400e"; // Amber-300 / Amber-800
     style.fontWeight = 500;
   } else if (mode === "study") {
     // Study Mode Rules
@@ -256,11 +271,11 @@ function getSemanticStyle(
       style.fontSize = 16;
     } else if (semanticType === "Explanation") {
       style.fontSize = 12;
-      style.text = "#6b7280"; // Gray-500
+      style.text = isDark ? "#9ca3af" : "#6b7280"; // Gray-400 / Gray-500
     } else if (semanticType === "Example") {
       style.fontSize = 12;
       style.dashed = true;
-      style.text = "#4b5563"; // Gray-600
+      style.text = isDark ? "#d1d5db" : "#4b5563"; // Gray-300 / Gray-600
     }
   } else {
     // Brainstorm Mode Rules
@@ -271,9 +286,11 @@ function getSemanticStyle(
     } else if (semanticType === "Explanation") {
       style.opacity = 0.7;
       style.fontSize = 13;
+      style.text = isDark ? "#9ca3af" : style.text;
     } else if (semanticType === "Example") {
       style.opacity = 0.8;
       style.fontSize = 13;
+      style.text = isDark ? "#d1d5db" : style.text;
     }
   }
 
@@ -316,6 +333,9 @@ export function MindmapSvgPreview({
 }: MindmapSvgPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgContainerRef = useRef<HTMLDivElement>(null);
+
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
 
   // Render Mode State
   const [renderMode, setRenderMode] = useState<"brainstorm" | "study">(
@@ -397,7 +417,7 @@ export function MindmapSvgPreview({
         colors: { bg: string; text: string; border: string };
       } | null => {
         if (l.node.id === pendingEditRef.current) {
-          const colors = getNodeColor(l.level, l.branchIndex);
+          const colors = getNodeColor(l.level, l.branchIndex, isDark);
           return {
             id: l.node.id,
             text: l.node.text,
@@ -425,7 +445,38 @@ export function MindmapSvgPreview({
         pendingEditRef.current = null;
       }
     }
-  }, [processedTree]);
+  }, [processedTree, isDark]);
+
+  // Fit view to container
+  const fitToView = useCallback(() => {
+    if (!layout || !containerRef.current) return;
+    const { offsetWidth, offsetHeight } = containerRef.current;
+    if (offsetWidth === 0 || offsetHeight === 0) return;
+
+    const contentWidth = svgSize.width;
+    const contentHeight = svgSize.height;
+
+    // Calculate scale to fit with padding
+    const padding = 60;
+    const scaleX = (offsetWidth - padding * 2) / contentWidth;
+    const scaleY = (offsetHeight - padding * 2) / contentHeight;
+    const newScale = Math.min(Math.max(0.3, Math.min(scaleX, scaleY)), 1.2);
+
+    setScale(newScale);
+    setPosition({
+      x: (offsetWidth - contentWidth * newScale) / 2,
+      y: (offsetHeight - contentHeight * newScale) / 2,
+    });
+  }, [layout, svgSize]);
+
+  // Auto-fit on initial load, layout change, or fullscreen toggle
+  useEffect(() => {
+    if (layout) {
+      // Delay slightly to ensure container dimensions are stable
+      const timer = setTimeout(fitToView, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [layout, isFullscreen, fitToView]);
 
   // Zoom with wheel - use native event for preventDefault to work
   useEffect(() => {
@@ -464,7 +515,11 @@ export function MindmapSvgPreview({
   const handleNodeClick = useCallback(
     (nodeLayout: NodeLayout) => {
       if (onTreeChange) {
-        const colors = getNodeColor(nodeLayout.level, nodeLayout.branchIndex);
+        const colors = getNodeColor(
+          nodeLayout.level,
+          nodeLayout.branchIndex,
+          isDark
+        );
         setEditingNode({
           id: nodeLayout.node.id,
           text: nodeLayout.node.text,
@@ -482,7 +537,7 @@ export function MindmapSvgPreview({
         );
       }
     },
-    [onTreeChange]
+    [onTreeChange, isDark]
   );
 
   // Update node text and optionally add child/sibling
@@ -903,13 +958,14 @@ export function MindmapSvgPreview({
   const renderNode = (nodeLayout: NodeLayout): React.ReactNode => {
     const { node, x, y, width, height, level, children } = nodeLayout;
     // Get base colors
-    const baseColors = getNodeColor(level, nodeLayout.branchIndex);
+    const baseColors = getNodeColor(level, nodeLayout.branchIndex, isDark);
     // Get semantic style
     const style = getSemanticStyle(
       node.semanticType,
       level,
       renderMode,
-      baseColors
+      baseColors,
+      isDark
     );
 
     const isEditing = editingNode?.id === node.id;
@@ -933,12 +989,17 @@ export function MindmapSvgPreview({
         {/* Connection lines to children */}
         {visibleChildren.map((child) => {
           // Determine styling for child
-          const childBaseColors = getNodeColor(child.level, child.branchIndex);
+          const childBaseColors = getNodeColor(
+            child.level,
+            child.branchIndex,
+            isDark
+          );
           const childStyle = getSemanticStyle(
             child.node.semanticType,
             child.level,
             renderMode,
-            childBaseColors
+            childBaseColors,
+            isDark
           );
 
           const startX = x + width;
@@ -1130,11 +1191,7 @@ export function MindmapSvgPreview({
 
   if (!layout) {
     return (
-      <div
-        className={`flex items-center justify-center ${
-          isFullscreen ? "h-full" : "min-h-[75vh]"
-        } ${className}`}
-      >
+      <div className={`flex items-center justify-center h-full ${className}`}>
         <div className="animate-pulse text-muted-foreground">Loading...</div>
       </div>
     );
@@ -1143,20 +1200,53 @@ export function MindmapSvgPreview({
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden select-none ${
-        isFullscreen ? "h-full" : "min-h-[75vh]"
-      } ${className}`}
+      className={`${
+        className || "relative h-full w-full"
+      } select-none transition-colors duration-300 overflow-hidden ${
+        !isFullscreen ? "rounded-xl border border-border/40 shadow-sm" : ""
+      }`}
       style={{
         touchAction: "none",
         overscrollBehavior: "contain",
+        backgroundColor: isDark
+          ? "rgba(10, 10, 10, 0.4)"
+          : "rgba(255, 255, 255, 0.6)",
       }}
     >
-      {/* Zoom controls */}
-      <div className="fixed bottom-4 right-4 flex gap-1 z-50">
+      {/* 1. Underlying SVG content - sits behind everything */}
+      <div className="absolute inset-0 z-0">
+        <div
+          ref={svgContainerRef}
+          className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing outline-none overflow-hidden"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+          <svg
+            width={svgSize.width}
+            height={svgSize.height}
+            className="pointer-events-none select-none"
+            style={{
+              transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+              transformOrigin: "top left",
+              transition: isDragging
+                ? "none"
+                : "transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+            }}
+          >
+            {layout && renderNode(layout)}
+          </svg>
+        </div>
+      </div>
+
+      {/* 2. Toolbars - MUST stay on top */}
+      {/* Zoom controls (Bottom Right) */}
+      <div className="absolute bottom-4 right-4 flex gap-1 z-[100] pointer-events-auto">
         <Button
           variant="outline"
           size="icon"
-          className="h-7 w-auto px-2 fs-xs bg-background/80 backdrop-blur-sm"
+          className="h-7 w-auto px-2 fs-xs bg-background/90 backdrop-blur-md shadow-sm border-border/50"
           onClick={() =>
             setRenderMode((m) => (m === "brainstorm" ? "study" : "brainstorm"))
           }
@@ -1165,56 +1255,59 @@ export function MindmapSvgPreview({
           } Mode`}
         >
           {renderMode === "brainstorm" ? (
-            <BrainCircuit className="h-3.5 w-3.5" />
+            <BrainCircuit className="h-3.5 w-3.5 text-primary" />
           ) : (
-            <BookOpen className="h-3.5 w-3.5" />
+            <BookOpen className="h-3.5 w-3.5 text-primary" />
           )}
-          <span className="ml-1 text-xs">
-            {renderMode === "brainstorm" ? "Thinking" : "Learning"}
+          <span className="ml-1 text-[10px] font-medium uppercase tracking-wider">
+            {renderMode === "brainstorm" ? "Brainstorm" : "Study"}
           </span>
         </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={zoomIn}
-          className="h-7 w-7 bg-background/80 backdrop-blur-sm"
-          title="Zoom in"
-        >
-          <ZoomIn className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={zoomOut}
-          className="h-7 w-7 bg-background/80 backdrop-blur-sm"
-          title="Zoom out"
-        >
-          <ZoomOut className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={resetView}
-          className="h-7 w-7 bg-background/80 backdrop-blur-sm"
-          title="Reset view"
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-        </Button>
-        <span className="flex items-center px-2 text-xs text-muted-foreground bg-background/80 backdrop-blur-sm rounded border">
+        <div className="flex border border-border/50 rounded-md overflow-hidden bg-background/90 backdrop-blur-md shadow-sm">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={zoomIn}
+            className="h-7 w-7 rounded-none border-r border-border/50 hover:bg-accent"
+            title="Zoom in"
+          >
+            <ZoomIn className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={zoomOut}
+            className="h-7 w-7 rounded-none border-r border-border/50 hover:bg-accent"
+            title="Zoom out"
+          >
+            <ZoomOut className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={resetView}
+            className="h-7 w-7 rounded-none hover:bg-accent"
+            title="Reset view"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+        <span className="flex items-center px-1.5 text-[10px] font-mono text-muted-foreground bg-background/90 backdrop-blur-md rounded border border-border/50 shadow-sm min-w-[35px] justify-center">
           {Math.round(scale * 100)}%
         </span>
       </div>
 
-      <div className="fixed bottom-4 left-4 flex items-center gap-1.5 text-xs text-muted-foreground bg-background/80 backdrop-blur-sm px-2 py-1 rounded border z-50 transition-all max-w-[90vw]">
+      {/* Help & Tips (Bottom Left) */}
+      <div className="absolute bottom-4 left-4 flex items-center gap-1.5 text-xs text-foreground bg-background/90 backdrop-blur-md px-2 py-0.5 rounded border border-border/50 z-[100] shadow-sm pointer-events-auto transition-all max-w-[80vw]">
         <MindmapHelpModal />
-        <div className="w-px h-3 bg-border mx-1" />
+        <div className="w-px h-3 bg-border/50 mx-1" />
         <MindmapTips />
       </div>
 
-      {/* Edit input overlay */}
+      {/* 3. Edit input overlay (Topmost) */}
       {editingNode && (
         <div
-          className="absolute z-50 pointer-events-auto"
+          className="absolute z-[110] pointer-events-auto"
           style={{
             left: editingNode.x * scale + position.x,
             top: editingNode.y * scale + position.y,
@@ -1228,7 +1321,7 @@ export function MindmapSvgPreview({
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={handleEditSave}
-            className="outline-none resize-none select-text"
+            className="outline-none resize-none select-text border-2 shadow-2xl"
             style={{
               width: Math.max(120, editingNode.width),
               height: editingNode.height,
@@ -1237,8 +1330,6 @@ export function MindmapSvgPreview({
               color: editingNode.colors.text,
               border: `2px solid ${editingNode.colors.border}`,
               borderRadius: `${BORDER_RADIUS}px`,
-              boxShadow:
-                "0 4px 20px rgba(0,0,0,0.15), 0 0 0 3px rgba(59,130,246,0.3)",
               fontSize: "14px",
               fontWeight: 500,
               fontFamily: "inherit",
@@ -1249,31 +1340,6 @@ export function MindmapSvgPreview({
           />
         </div>
       )}
-
-      {/* SVG container with pan/zoom */}
-      <div
-        ref={svgContainerRef}
-        className={`overflow-hidden border border-t-0 ${
-          isFullscreen ? "h-full" : "min-h-[75vh]"
-        } ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
-        onWheel={handleWheel}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-      >
-        <svg
-          width={svgSize.width * scale}
-          height={svgSize.height * scale}
-          viewBox={`0 0 ${svgSize.width} ${svgSize.height}`}
-          style={{
-            transform: `translate(${position.x}px, ${position.y}px)`,
-            transition: isDragging ? "none" : "transform 0.1s ease-out",
-          }}
-        >
-          {renderNode(layout)}
-        </svg>
-      </div>
     </div>
   );
 }

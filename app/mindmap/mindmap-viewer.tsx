@@ -206,7 +206,7 @@ export function MindmapViewer({
     >
       <div
         className={`relative border-none bg-background flex flex-col ${
-          isFullscreen ? "h-screen" : ""
+          isFullscreen ? "h-screen" : "h-[80vh] min-h-[500px]"
         }`}
       >
         {/* Toolbar */}
@@ -360,8 +360,8 @@ export function MindmapViewer({
           {/* Main content area */}
           <div
             className={`flex-1 ${
-              isFullscreen ? "h-full" : "min-h-[400px]"
-            } overflow-auto relative`}
+              isFullscreen ? "h-full overflow-hidden" : "h-full overflow-hidden"
+            } relative`}
           >
             {isLoading ? (
               <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
@@ -373,7 +373,7 @@ export function MindmapViewer({
                 </div>
               </div>
             ) : (
-              <div className="h-full">
+              <div className="flex flex-col h-full overflow-hidden">
                 {/* Editor panel */}
                 {viewMode === "editor" && (
                   <div className="overflow-auto p-6">
@@ -387,18 +387,20 @@ export function MindmapViewer({
 
                 {/* Preview panel */}
                 {viewMode === "preview" && (
-                  <div className="relative h-full">
-                    <div className="p-2 border bg-muted/30">
+                  <div className="flex-1 relative flex flex-col min-h-0">
+                    <div className="flex-none p-2 border-b bg-muted/30">
                       <span className="text-xs text-muted-foreground">
                         mindmap
                       </span>
                     </div>
-                    <MindmapSvgPreview
-                      tree={tree}
-                      onTreeChange={setTree}
-                      isFullscreen={isFullscreen}
-                      className="h-[calc(100%-2.5rem)]"
-                    />
+                    <div className="flex-1 relative overflow-hidden">
+                      <MindmapSvgPreview
+                        tree={tree}
+                        onTreeChange={setTree}
+                        isFullscreen={isFullscreen}
+                        className="absolute inset-0"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
