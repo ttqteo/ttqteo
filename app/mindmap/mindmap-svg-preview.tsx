@@ -346,9 +346,38 @@ export function MindmapSvgPreview({
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
-  // Render Mode State
+  // Render mode state (Brainstorm vs Study)
   const [renderMode, setRenderMode] = useState<"brainstorm" | "study">(
     "brainstorm"
+  );
+
+  // Load saved render mode
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedMode = localStorage.getItem("mindmap-render-mode");
+      if (savedMode === "brainstorm" || savedMode === "study") {
+        setRenderMode(savedMode);
+      }
+    }
+  }, []);
+
+  // Save render mode (wrapped setter or effect)
+  const handleSetRenderMode = useCallback(
+    (
+      mode:
+        | "brainstorm"
+        | "study"
+        | ((prev: "brainstorm" | "study") => "brainstorm" | "study")
+    ) => {
+      setRenderMode((prev) => {
+        const next = typeof mode === "function" ? mode(prev) : mode;
+        if (typeof window !== "undefined") {
+          localStorage.setItem("mindmap-render-mode", next);
+        }
+        return next;
+      });
+    },
+    []
   );
 
   // Process tree to add semantic types
@@ -1145,7 +1174,7 @@ export function MindmapSvgPreview({
               toggleCollapse(node.id);
             }}
             style={{ cursor: "pointer" }}
-            className="collapse-button"
+            className="collapse-button pointer-events-auto"
           >
             <circle
               cx={x + width + 12}
@@ -1259,7 +1288,9 @@ export function MindmapSvgPreview({
           size="icon"
           className="h-7 w-auto px-2 fs-xs bg-background/90 backdrop-blur-md shadow-sm border-border/50"
           onClick={() =>
-            setRenderMode((m) => (m === "brainstorm" ? "study" : "brainstorm"))
+            handleSetRenderMode((m) =>
+              m === "brainstorm" ? "study" : "brainstorm"
+            )
           }
           title={`Switch to ${
             renderMode === "brainstorm" ? "Study" : "Brainstorm"

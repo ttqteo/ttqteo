@@ -1,5 +1,6 @@
 import { isAdmin } from "@/lib/supabase-server";
-import { PencilIcon, HomeIcon, LogOutIcon } from "lucide-react";
+import { LayoutDashboardIcon, LogOutIcon, PencilIcon } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 interface AdminToolbarProps {
@@ -17,9 +18,23 @@ export async function AdminToolbar({ editPostId }: AdminToolbarProps) {
         <div className="flex items-center gap-4">
           <Link
             href="/admin"
+            className="flex items-center gap-2 hover:text-zinc-300 transition-colors bg-zinc-800/50 py-1 px-2 rounded-full border border-zinc-700/50"
+          >
+            <Image
+              src="/images/logo.png"
+              width={16}
+              height={16}
+              alt="ttqteo"
+              className="rounded-full"
+            />
+            <span className="font-semibold">ttqteo</span>
+          </Link>
+          <div className="w-px h-4 bg-zinc-700 mx-1" />
+          <Link
+            href="/admin"
             className="flex items-center gap-1.5 hover:text-zinc-300 transition-colors"
           >
-            <HomeIcon className="w-3.5 h-3.5" />
+            <LayoutDashboardIcon className="w-3.5 h-3.5" />
             <span>dashboard</span>
           </Link>
           {editPostId && (

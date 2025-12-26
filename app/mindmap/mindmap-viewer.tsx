@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import Image from "next/image";
 import {
   Check,
   Copy,
@@ -54,7 +55,26 @@ export function MindmapViewer({
   const [tree, setTree] = useState<MindmapNode>(initialTree);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false); // Default to false to ensure Navbar is visible initially
+
+  // Persist fullscreen state
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("mindmap-fullscreen");
+      if (saved !== null) {
+        setIsFullscreen(saved === "true");
+      } else {
+        // Default to fullscreen for new users if desired, or keep false
+        setIsFullscreen(true);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("mindmap-fullscreen", String(isFullscreen));
+    }
+  }, [isFullscreen]);
   const [showCodePopup, setShowCodePopup] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
@@ -429,11 +449,20 @@ export function MindmapViewer({
                 {/* Preview panel */}
                 {viewMode === "preview" && (
                   <div className="flex-1 relative flex flex-col min-h-0">
-                    <div className="flex-none p-2 border-b bg-muted/30">
-                      <span className="text-xs text-muted-foreground">
-                        mindmap
-                      </span>
-                    </div>
+                    {/* Brand Logo Overlay - Transparent Background */}
+                    {isFullscreen && (
+                      <div className="absolute top-3 left-4 z-10 pointer-events-none select-none opacity-80 hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-2">
+                          <Image
+                            src="/images/logo.png"
+                            width={24}
+                            height={24}
+                            alt="ttqteo"
+                            className="rounded-full shadow-sm"
+                          />
+                        </div>
+                      </div>
+                    )}
                     <div className="flex-1 relative overflow-hidden">
                       <MindmapSvgPreview
                         tree={tree}

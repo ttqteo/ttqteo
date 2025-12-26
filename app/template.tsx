@@ -10,7 +10,7 @@ export default async function Template({ children }: PropsWithChildren) {
   const admin = await isAdmin();
 
   return (
-    <div className={`min-h-screen flex flex-col ${admin ? "pt-8" : ""}`}>
+    <div className={`min-h-screen flex flex-col ${admin ? "pt-10" : ""}`}>
       <div className="focus-mode-hidden">
         <AdminToolbar />
       </div>

@@ -30,7 +30,7 @@ export async function Navbar() {
 
   return (
     <nav
-      className={`w-full border-b h-16 sticky z-50 bg-background ${
+      className={`w-full border-b h-14 sticky z-50 bg-background ${
         admin ? "top-8" : "top-0"
       }`}
     >
@@ -57,10 +57,12 @@ export function Logo() {
         src="/images/logo.png"
         width={32}
         height={32}
-        alt="logo"
+        alt="ttqteo"
         className="rounded-full"
       />
-      <h2 className="text-lg font-bold hidden sm:block">ttqteo</h2>
+      <h2 className="text-lg font-bold hidden sm:block tracking-tight text-foreground">
+        ttqteo
+      </h2>
     </Link>
   );
 }
