@@ -8,7 +8,8 @@ export type SemanticType =
   | "Idea"
   | "Explanation"
   | "Example"
-  | "Warning";
+  | "Warning"
+  | "Section";
 
 export interface MindmapNode {
   id: string;

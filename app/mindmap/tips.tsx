@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 const TIPS = [
   "Click vào node để sửa • **Alt + Arrows** = di chuyển • **Enter** = sibling • **Tab** = child",
   "Dùng **Alt + Arrows** để điều hướng nhanh giữa các node cùng cấp hoặc cha/con.",
-  "Gõ **!** hoặc **⚠️** ở đầu văn bản để biến node thành cảnh báo (Warning).",
+  "Gõ **!** ở đầu văn bản để biến node thành cảnh báo (Warning).",
   "Các từ khóa **'ví dụ'**, **'lưu ý'**, **'ghi chú'**... sẽ tự động đổi style node.",
   "Chế độ **Learning** (Học tập) hiển thị node theo dạng khối học thuật.",
   "Chế độ **Thinking** lược bỏ khung để bạn tập trung vào luồng suy nghĩ.",

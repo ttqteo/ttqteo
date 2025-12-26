@@ -246,9 +246,10 @@ function getSemanticStyle(
   const style = {
     hasBox: false,
     fontSize: 14,
-    fontWeight: 400,
+    fontWeight: 500,
     opacity: 1,
     dashed: false,
+    textShadow: "none",
     ...baseColors, // Inherit base colors by default
   };
 
@@ -279,16 +280,23 @@ function getSemanticStyle(
     }
   } else {
     // Brainstorm Mode Rules
-    if (semanticType === "Concept") {
+    // Special Section Styling
+    if (semanticType === "Section") {
+      style.text = isDark ? "#fbbf24" : "#b45309"; // Amber for sections
+      style.fontWeight = 700;
+      style.fontSize = 11; // Moved from original position
+    } else if (semanticType === "Concept") {
+      // Original brainstorm concept rule
       style.hasBox = false; // key diff: no box for concepts
       style.fontWeight = 600;
       style.fontSize = 16;
     } else if (semanticType === "Explanation") {
-      style.opacity = 0.7;
+      // Original brainstorm explanation rule
+      style.opacity = 0.9;
       style.fontSize = 13;
       style.text = isDark ? "#9ca3af" : style.text;
     } else if (semanticType === "Example") {
-      style.opacity = 0.8;
+      style.opacity = 0.9;
       style.fontSize = 13;
       style.text = isDark ? "#d1d5db" : style.text;
     }
@@ -311,6 +319,7 @@ function getSemanticStyle(
     // Similar for Study mode
     if (mode === "study" && !style.hasBox && baseColors.text === "#ffffff") {
       style.text = baseColors.border;
+      style.fontWeight = 600;
     }
   }
 
@@ -1050,7 +1059,7 @@ export function MindmapSvgPreview({
             transformOrigin: `${x + width / 2}px ${y + height / 2}px`,
             transition: "transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
           }}
-          className="mindmap-node hover:scale-110"
+          className="mindmap-node hover:scale-110 pointer-events-auto"
         >
           {/* Transparent Hit Area for reliable clicking */}
           <rect
@@ -1118,7 +1127,9 @@ export function MindmapSvgPreview({
                   wordBreak: "break-word",
                   lineHeight: "1.3",
                   overflow: "hidden",
+                  textShadow: style.textShadow,
                 }}
+                className="pointer-events-none"
               >
                 {node.text === "..." ? ".." : node.text}
               </div>
@@ -1259,8 +1270,8 @@ export function MindmapSvgPreview({
           ) : (
             <BookOpen className="h-3.5 w-3.5 text-primary" />
           )}
-          <span className="ml-1 text-[10px] font-medium uppercase tracking-wider">
-            {renderMode === "brainstorm" ? "Brainstorm" : "Study"}
+          <span className="ml-1.5 text-xs font-medium tracking-wider">
+            {renderMode === "brainstorm" ? "Thinking" : "Learning"}
           </span>
         </Button>
         <div className="flex border border-border/50 rounded-md overflow-hidden bg-background/90 backdrop-blur-md shadow-sm">

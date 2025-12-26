@@ -141,14 +141,25 @@ export function inferSemanticType(
   // 1. Root is always Root
   if (depth === 0) return "Root";
 
-  // 2. Check node content for warning indicators (highest priority)
+  // 2. Check node content for self-contained types (highest priority)
+  const textLower = node.text.toLowerCase();
+
   if (
-    node.text.startsWith("⚠️") ||
     node.text.startsWith("!") ||
-    node.text.toLowerCase().includes("lưu ý") ||
-    node.text.toLowerCase().includes("warning")
+    textLower.includes("warning") ||
+    textLower.startsWith("cảnh báo")
   ) {
     return "Warning";
+  }
+
+  // Check if this node ITSELF is a section header
+  if (
+    ["ghi chú", "notes", "detail", "lưu ý"].some((k) =>
+      textLower.includes(k)
+    ) ||
+    ["ví dụ", "examples", "ex", "vd"].some((k) => textLower.includes(k))
+  ) {
+    return "Section";
   }
 
   // 3. Check special branch overrides from parent
@@ -172,7 +183,6 @@ export function inferSemanticType(
       "lưu ý",
       "caution",
       "cảnh báo",
-      "⚠️",
       "warning",
     ])
   ) {

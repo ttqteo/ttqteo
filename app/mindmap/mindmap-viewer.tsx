@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useRef, useCallback, KeyboardEvent, useEffect } from "react";
+import {
+  useState,
+  useRef,
+  useCallback,
+  KeyboardEvent,
+  useEffect,
+  useMemo,
+} from "react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -54,8 +61,19 @@ export function MindmapViewer({
   const [viewMode, setViewMode] = useState<ViewMode>("preview");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Code editor local state
+  const [localCode, setLocalCode] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+
   // Generate Mermaid code from tree
-  const mermaidCode = treeToMermaid(tree);
+  const mermaidCode = useMemo(() => treeToMermaid(tree), [tree]);
+
+  // Sync local code with tree when tree changes externally (and not typing)
+  useEffect(() => {
+    if (!isTyping) {
+      setLocalCode(mermaidCode);
+    }
+  }, [mermaidCode, isTyping]);
 
   // Initial load from localStorage
   useEffect(() => {
@@ -103,11 +121,27 @@ export function MindmapViewer({
   }, [mermaidCode]);
 
   const handleCodeChange = useCallback((newCode: string) => {
+    setLocalCode(newCode);
+    setIsTyping(true);
+
+    // Attempt parsing
     const parsed = parseMermaidToTree(newCode);
     if (parsed) {
       setTree(parsed);
+      // If valid, we can consider typing "done" for sync purposes after a delay,
+      // but actually, we should just let the user type.
+      // The issue is if setTree triggers a re-render that updates mermaidCode,
+      // and that effect overwrites localCode.
+      // We blocking overwrite via !isTyping flag.
     }
   }, []);
+
+  // Reset typing flag when popup closes or on blur
+  useEffect(() => {
+    if (!showCodePopup) {
+      setIsTyping(false);
+    }
+  }, [showCodePopup]);
 
   const handleCodeKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -302,12 +336,17 @@ export function MindmapViewer({
           {/* Code Sidebar */}
           {showCodePopup && (
             <div
-              className="border-r bg-background flex flex-col animate-in slide-in-from-left duration-200 relative"
-              style={{ width: sidebarWidth, minWidth: 200, maxWidth: 600 }}
+              className="absolute top-16 left-4 z-40 border rounded-lg shadow-xl bg-background flex flex-col animate-in fade-in zoom-in-95 duration-200"
+              style={{
+                width: sidebarWidth,
+                height: "calc(80vh - 100px)",
+                minWidth: 300,
+                maxWidth: 800,
+              }}
             >
               {/* Resize handle */}
               <div
-                className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 transition-colors z-10"
+                className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-primary/50 transition-colors z-[60] opacity-0 hover:opacity-100"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   setIsResizing(true);
@@ -316,7 +355,7 @@ export function MindmapViewer({
 
                   const handleMouseMove = (e: MouseEvent) => {
                     const newWidth = startWidth + (e.clientX - startX);
-                    setSidebarWidth(Math.min(600, Math.max(200, newWidth)));
+                    setSidebarWidth(Math.min(800, Math.max(300, newWidth)));
                   };
 
                   const handleMouseUp = () => {
@@ -329,28 +368,30 @@ export function MindmapViewer({
                   document.addEventListener("mouseup", handleMouseUp);
                 }}
               />
-              <div className="flex-1 overflow-auto p-3">
-                <div className="border rounded-lg bg-background overflow-hidden">
-                  <div className="bg-muted/50 px-3 py-1.5 border-b flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground font-mono">
-                      mermaid
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setShowCodePopup(false)}
-                      className="h-5 w-5 hover:bg-muted"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
+              <div className="flex-1 overflow-hidden flex flex-col">
+                <div className="bg-muted/50 px-3 py-2 border-b flex items-center justify-between">
+                  <span className="text-xs font-semibold text-foreground flex items-center gap-2">
+                    <Code className="h-3 w-3" /> Mermaid Source
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowCodePopup(false)}
+                    className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="flex-1 overflow-hidden relative">
                   <Textarea
                     ref={textareaRef}
-                    value={mermaidCode}
+                    value={localCode}
                     onChange={(e) => handleCodeChange(e.target.value)}
+                    onBlur={() => setIsTyping(false)}
                     onKeyDown={handleCodeKeyDown}
-                    className="font-mono text-xs border-0 rounded-none focus-visible:ring-0 resize-none w-full h-[calc(100vh-100px)]"
+                    className="absolute inset-0 w-full h-full font-mono text-xs border-0 rounded-none focus-visible:ring-0 resize-none p-3 leading-relaxed"
                     placeholder="Enter your mermaid mindmap syntax..."
+                    spellCheck={false}
                   />
                 </div>
               </div>
