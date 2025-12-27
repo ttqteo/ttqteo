@@ -103,9 +103,9 @@ const LINE_HEIGHT = 20;
 // Calculate node dimensions based on text
 function measureNode(text: string): { width: number; height: number } {
   // Constants for measurement - very conservative for Vietnamese diacritics
-  const AVG_CHAR_WIDTH = 9; // Vietnamese chars with diacritics need more space
+  const AVG_CHAR_WIDTH = 12; // Vietnamese chars with diacritics need more space
   const SAFE_CHAR_WIDTH = 12; // More conservative for wrapping calculation
-  const LINE_HEIGHT_MEASURE = 10; // Compact line height
+  const LINE_HEIGHT_MEASURE = 18; // Match CSS lineHeight
 
   // Split by newline first
   const sourceLines = text.split("\n");
@@ -573,7 +573,8 @@ export function MindmapSvgPreview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFullscreen]);
 
-  // Zoom with wheel - use native event for preventDefault to work
+  // Zoom/Pan with wheel - use native event for preventDefault to work
+  // Ctrl+wheel = zoom, 2-finger scroll (no Ctrl) = pan
   useEffect(() => {
     const svgContainer = svgContainerRef.current;
     if (!svgContainer) return;
@@ -581,13 +582,20 @@ export function MindmapSvgPreview({
     const handleWheelNative = (e: WheelEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      // Use proportional zoom with smaller delta for smooth scrolling
-      // deltaY is typically ~100 for regular scroll, smaller for smooth
-      const zoomSensitivity = 0.003; // Faster zoom
-      const delta = -e.deltaY * zoomSensitivity;
-      // Clamp delta to prevent huge jumps
-      const clampedDelta = Math.max(-0.15, Math.min(0.15, delta));
-      setScale((prev) => Math.min(Math.max(0.25, prev + clampedDelta), 3));
+
+      if (e.ctrlKey || e.metaKey) {
+        // Pinch to zoom (Ctrl/Cmd + wheel)
+        const zoomSensitivity = 0.003;
+        const delta = -e.deltaY * zoomSensitivity;
+        const clampedDelta = Math.max(-0.15, Math.min(0.15, delta));
+        setScale((prev) => Math.min(Math.max(0.25, prev + clampedDelta), 3));
+      } else {
+        // 2-finger pan (no modifier)
+        setPosition((prev) => ({
+          x: prev.x - e.deltaX,
+          y: prev.y - e.deltaY,
+        }));
+      }
     };
 
     svgContainer.addEventListener("wheel", handleWheelNative, {
@@ -599,10 +607,17 @@ export function MindmapSvgPreview({
   // React handler (backup, may not prevent scroll due to passive)
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.stopPropagation();
-    const zoomSensitivity = 0.003;
-    const delta = -e.deltaY * zoomSensitivity;
-    const clampedDelta = Math.max(-0.15, Math.min(0.15, delta));
-    setScale((prev) => Math.min(Math.max(0.25, prev + clampedDelta), 3));
+    if (e.ctrlKey || e.metaKey) {
+      const zoomSensitivity = 0.003;
+      const delta = -e.deltaY * zoomSensitivity;
+      const clampedDelta = Math.max(-0.15, Math.min(0.15, delta));
+      setScale((prev) => Math.min(Math.max(0.25, prev + clampedDelta), 3));
+    } else {
+      setPosition((prev) => ({
+        x: prev.x - e.deltaX,
+        y: prev.y - e.deltaY,
+      }));
+    }
   }, []);
 
   // Focus input when editing starts
@@ -862,7 +877,7 @@ export function MindmapSvgPreview({
       if (e.nativeEvent.isComposing) return;
 
       if (e.key === "Enter" && !e.shiftKey) {
-        // Enter: Save and add sibling
+        // Enter: Save and add new sibling below
         e.preventDefault();
         const textToSave =
           editValue.trim() ||
@@ -876,27 +891,8 @@ export function MindmapSvgPreview({
           return;
         }
 
-        if (editingNode.nextSiblingId && layout) {
-          // Has next sibling - save and move to it
-          updateAndAddNode(editingNode.id, textToSave, "none");
-          setEditingNode(null);
-          setEditValue("");
-
-          // Find and edit next sibling
-          const findSibling = (l: NodeLayout): NodeLayout | null => {
-            if (l.node.id === editingNode.nextSiblingId) return l;
-            for (const child of l.children) {
-              const found = findSibling(child);
-              if (found) return found;
-            }
-            return null;
-          };
-          const sibling = findSibling(layout);
-          if (sibling) {
-            setTimeout(() => handleNodeClick(sibling), 50);
-          }
-        } else if (editingNode.level > 0) {
-          // No next sibling and not root - save and add new sibling
+        if (editingNode.level > 0) {
+          // Not root - save and add new sibling below
           setEditingNode(null);
           setEditValue("");
           updateAndAddNode(editingNode.id, textToSave, "addSibling");
@@ -1127,6 +1123,16 @@ export function MindmapSvgPreview({
     );
 
     const isEditing = editingNode?.id === node.id;
+
+    // Recalculate dimensions if editing (to handle dynamic text changes)
+    let finalWidth = width;
+    let finalHeight = height;
+    if (isEditing && editValue) {
+      const editDimensions = measureNode(editValue);
+      finalWidth = Math.max(width, editDimensions.width);
+      finalHeight = Math.max(height, editDimensions.height);
+    }
+
     const hasChildren = node.children.length > 0;
     const isCollapsed = node.isCollapsed && hasChildren;
 
@@ -1208,18 +1214,32 @@ export function MindmapSvgPreview({
           <rect
             x={x}
             y={y}
-            width={width}
-            height={height}
+            width={finalWidth}
+            height={finalHeight}
             fill="transparent"
             stroke="none"
           />
-
-          {style.hasBox ? (
+          {/* Always render solid background when editing to prevent overlap */}
+          {isEditing && (
             <rect
               x={x}
               y={y}
-              width={width}
-              height={height}
+              width={finalWidth}
+              height={finalHeight}
+              rx={BORDER_RADIUS}
+              ry={BORDER_RADIUS}
+              fill={isDark ? "#1a1a1a" : "#ffffff"}
+              stroke={style.border}
+              strokeWidth="2"
+            />
+          )}
+
+          {style.hasBox && !isEditing ? (
+            <rect
+              x={x}
+              y={y}
+              width={finalWidth}
+              height={finalHeight}
               rx={BORDER_RADIUS}
               ry={BORDER_RADIUS}
               fill={style.bg}
@@ -1233,7 +1253,7 @@ export function MindmapSvgPreview({
               }}
               className="hover:brightness-110"
             />
-          ) : (
+          ) : !isEditing ? (
             // Render underline for boxless nodes with hover background
             <>
               {/* Hover background - covers full text area */}
@@ -1264,15 +1284,15 @@ export function MindmapSvgPreview({
                 className="group-hover:opacity-100"
               />
             </>
-          )}
+          ) : null}
 
-          {/* Node text with wrapping */}
+          {/* Node text - only show when NOT editing (overlay handles editing) */}
           {!isEditing && (
             <foreignObject
               x={x}
               y={y}
-              width={width}
-              height={height}
+              width={finalWidth}
+              height={finalHeight}
               style={{ pointerEvents: "none", overflow: "visible" }}
             >
               <div
@@ -1289,79 +1309,14 @@ export function MindmapSvgPreview({
                   color: style.text,
                   textAlign: "center",
                   userSelect: "none",
-                  wordBreak: "break-word",
                   lineHeight: "1.3",
                   textShadow: style.textShadow,
-                  whiteSpace: "pre-wrap", // Support multiline text
+                  whiteSpace: "pre-wrap",
+                  boxSizing: "border-box",
                 }}
                 className="pointer-events-none"
               >
                 {node.text === "..." ? ".." : node.text}
-              </div>
-            </foreignObject>
-          )}
-          {isEditing && (
-            <foreignObject
-              x={x}
-              y={y}
-              width={width}
-              height={height}
-              style={{ pointerEvents: "auto" }}
-            >
-              <div
-                ref={inputRef as any}
-                contentEditable
-                suppressContentEditableWarning
-                onInput={(e) => {
-                  const text = (e.target as HTMLDivElement).innerText;
-                  setEditValue(text);
-                  updateAndAddNode(editingNode.id, text, "none");
-                }}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    setEditingNode(null);
-                  }
-                  if (e.key === "Escape") {
-                    setEditingNode(null);
-                  }
-                  if (e.key === "Tab") {
-                    e.preventDefault();
-                    updateAndAddNode(
-                      editingNode.id,
-                      editValue,
-                      e.shiftKey ? "addSibling" : "addChild"
-                    );
-                    setEditingNode(null);
-                  }
-                }}
-                onBlur={() => setEditingNode(null)}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: `${style.fontSize}px`,
-                  padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
-                  borderRadius: `${BORDER_RADIUS}px`,
-                  textAlign: "center",
-                  overflow: "hidden",
-                  backgroundColor: style.bg,
-                  color: style.text,
-                  border: `2px solid ${style.border}`,
-                  lineHeight: "1.3",
-                  fontWeight: style.fontWeight,
-                  fontFamily: "inherit",
-                  boxSizing: "border-box",
-                  wordBreak: "break-word",
-                  whiteSpace: "pre-wrap",
-                  outline: "none",
-                }}
-                className="shadow-xl"
-              >
-                {editValue}
               </div>
             </foreignObject>
           )}
@@ -1471,15 +1426,214 @@ export function MindmapSvgPreview({
             style={{
               transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
               transformOrigin: "top left",
-              transition: isDragging
-                ? "none"
-                : "transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+              transition: "transform 0.05s ease-out",
             }}
           >
             {layout && renderNode(layout)}
           </svg>
         </div>
       </div>
+
+      {/* Editing node overlay - rendered separately to be on top */}
+      {editingNode && layout && (
+        <div
+          className="absolute inset-0 pointer-events-none overflow-hidden"
+          style={{ zIndex: 50 }}
+        >
+          <div
+            style={{
+              transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+              transformOrigin: "top left",
+            }}
+          >
+            {(() => {
+              // Find editing node layout
+              const findNodeLayout = (nl: NodeLayout): NodeLayout | null => {
+                if (nl.node.id === editingNode.id) return nl;
+                for (const child of nl.children) {
+                  const found = findNodeLayout(child);
+                  if (found) return found;
+                }
+                return null;
+              };
+              const nodeLayout = findNodeLayout(layout);
+              if (!nodeLayout) return null;
+
+              const { node, x, y, width, height, level } = nodeLayout;
+              const baseColors = getNodeColor(
+                level,
+                nodeLayout.branchIndex,
+                isDark
+              );
+              const style = getSemanticStyle(
+                node.semanticType,
+                level,
+                renderMode,
+                baseColors,
+                isDark
+              );
+              const editDimensions = measureNode(editValue || "");
+              const finalWidth = Math.max(width, editDimensions.width);
+              const finalHeight = Math.max(height, editDimensions.height);
+
+              return (
+                <svg
+                  width={finalWidth + x + 50}
+                  height={finalHeight + y + 50}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    pointerEvents: "none",
+                  }}
+                >
+                  {/* Solid background */}
+                  <rect
+                    x={x}
+                    y={y}
+                    width={finalWidth}
+                    height={finalHeight}
+                    rx={BORDER_RADIUS}
+                    fill={isDark ? "#1f2937" : "#ffffff"}
+                    stroke={style.border}
+                    strokeWidth="2"
+                  />
+                  {/* Text display */}
+                  <foreignObject
+                    x={x}
+                    y={y}
+                    width={finalWidth}
+                    height={finalHeight}
+                  >
+                    <div
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
+                        fontSize: `${style.fontSize}px`,
+                        fontWeight: style.fontWeight,
+                        color: style.text,
+                        textAlign: "center",
+                        lineHeight: "1.3",
+                        whiteSpace: "pre-wrap",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      {editValue || "\u00A0"}
+                    </div>
+                  </foreignObject>
+                  {/* Invisible textarea for input */}
+                  <foreignObject
+                    x={x}
+                    y={y}
+                    width={finalWidth}
+                    height={finalHeight}
+                    style={{ pointerEvents: "auto" }}
+                  >
+                    <textarea
+                      ref={inputRef as any}
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                        if (e.nativeEvent.isComposing) return;
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          const textToSave =
+                            editValue.trim() ||
+                            (editingNode.text !== "..."
+                              ? editingNode.text
+                              : "");
+                          if (!textToSave && editingNode.level > 0) {
+                            deleteNode(editingNode.id);
+                            setEditingNode(null);
+                            setEditValue("");
+                            return;
+                          }
+                          if (editingNode.level > 0) {
+                            setEditingNode(null);
+                            setEditValue("");
+                            updateAndAddNode(
+                              editingNode.id,
+                              textToSave,
+                              "addSibling"
+                            );
+                          } else {
+                            updateAndAddNode(
+                              editingNode.id,
+                              textToSave,
+                              "none"
+                            );
+                            setEditingNode(null);
+                            setEditValue("");
+                          }
+                        }
+                        if (e.key === "Escape") {
+                          // Delete placeholder nodes when canceling
+                          if (
+                            editingNode.text === "..." &&
+                            editingNode.level > 0
+                          ) {
+                            deleteNode(editingNode.id);
+                          }
+                          setEditingNode(null);
+                          setEditValue("");
+                        }
+                        if (e.key === "Tab") {
+                          e.preventDefault();
+                          const textToSave =
+                            editValue.trim() ||
+                            (editingNode.text !== "..."
+                              ? editingNode.text
+                              : "");
+                          setEditingNode(null);
+                          setEditValue("");
+                          updateAndAddNode(
+                            editingNode.id,
+                            textToSave,
+                            e.shiftKey ? "addSibling" : "addChild"
+                          );
+                        }
+                      }}
+                      onBlur={() => {
+                        const textToSave = editValue.trim();
+                        if (!textToSave && editingNode.level > 0) {
+                          // Delete node if empty and not root
+                          deleteNode(editingNode.id);
+                        } else if (textToSave) {
+                          // Save the text
+                          updateAndAddNode(editingNode.id, textToSave, "none");
+                        }
+                        setEditingNode(null);
+                        setEditValue("");
+                      }}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        fontSize: `${style.fontSize}px`,
+                        padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
+                        textAlign: "center",
+                        lineHeight: "1.3",
+                        fontWeight: style.fontWeight,
+                        boxSizing: "border-box",
+                        resize: "none",
+                        border: "none",
+                        background: "transparent",
+                        color: "transparent",
+                        caretColor: style.text,
+                        outline: "none",
+                      }}
+                    />
+                  </foreignObject>
+                </svg>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* 2. Toolbars - MUST stay on top */}
       {/* Zoom controls (Bottom Right) */}
