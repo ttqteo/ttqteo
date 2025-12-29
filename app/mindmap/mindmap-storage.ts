@@ -11,10 +11,51 @@ const STORAGE_KEY = "mindmap-storage";
 const OLD_STORAGE_KEY = "mindmap-tree";
 
 /**
- * Generate a unique ID for mindmaps
+ * Generate a unique ID for mindmaps (UUID compatible with Supabase)
  */
 export function generateMindmapId(): string {
+  if (typeof window !== "undefined" && window.crypto?.randomUUID) {
+    return window.crypto.randomUUID();
+  }
   return `mindmap-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Generate a random 10-character sync code
+ */
+export function generateSyncCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Removed ambiguous chars like O, I, 1, 0
+  let result = "";
+  for (let i = 0; i < 10; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+/**
+ * Merge cloud mindmaps into local storage
+ */
+export function mergeMindmaps(
+  storage: MindmapStorage,
+  cloudMindmaps: MindmapItem[]
+): MindmapStorage {
+  const localMap = new Map(storage.mindmaps.map((m) => [m.id, m]));
+
+  cloudMindmaps.forEach((cloud) => {
+    const local = localMap.get(cloud.id);
+    if (!local || cloud.updatedAt > local.updatedAt) {
+      localMap.set(cloud.id, cloud);
+    }
+  });
+
+  const mergedMindmaps = Array.from(localMap.values()).sort(
+    (a, b) => b.updatedAt - a.updatedAt
+  );
+
+  return {
+    ...storage,
+    mindmaps: mergedMindmaps,
+  };
 }
 
 /**
@@ -220,8 +261,17 @@ export function switchMindmap(
 }
 
 /**
- * Update render mode for specific mindmap
+ * Update sync code for storage
  */
+export function updateMindmapSyncCode(
+  storage: MindmapStorage,
+  syncCode?: string
+): MindmapStorage {
+  return {
+    ...storage,
+    syncCode,
+  };
+}
 export function updateMindmapMode(
   storage: MindmapStorage,
   mindmapId: string,

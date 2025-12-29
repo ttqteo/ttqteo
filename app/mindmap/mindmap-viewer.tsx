@@ -33,6 +33,9 @@ import {
   Layers,
   Eye,
   PanelLeft,
+  Cloud,
+  CloudOff,
+  CloudUpload,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useFocusMode } from "@/components/contexts/focus-mode-context";
@@ -51,7 +54,13 @@ import {
   renameMindmap,
   switchMindmap,
   updateMindmapMode,
+  mergeMindmaps,
+  updateMindmapSyncCode,
+  generateSyncCode,
 } from "./mindmap-storage";
+import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { getMindmaps, upsertMindmap, deleteMindmapSync } from "./actions";
+import { User } from "@supabase/supabase-js";
 
 type ViewMode = "editor" | "preview";
 
@@ -62,6 +71,11 @@ export function MindmapViewer() {
   const [copied, setCopied] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [syncStatus, setSyncStatus] = useState<
+    "idle" | "syncing" | "synced" | "error"
+  >("idle");
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   // Persist states
   useEffect(() => {
@@ -120,24 +134,85 @@ export function MindmapViewer() {
     }
   }, [mermaidCode, isTyping]);
 
-  // Initial load from localStorage
+  // Initial load from localStorage and Supabase
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const loaded = loadMindmapStorage();
-      setStorage(loaded);
-      const timer = setTimeout(() => setIsLoading(false), 300);
-      return () => clearTimeout(timer);
-    } else {
-      setIsLoading(false);
-    }
-  }, []);
+    const init = async () => {
+      if (typeof window === "undefined") return;
 
-  // Save storage to localStorage on every change
+      // 1. Load from localStorage first for immediate UI
+      const localLoaded = loadMindmapStorage();
+      setStorage(localLoaded);
+      setIsLoading(false);
+
+      // 2. Check Auth
+      const {
+        data: { user: supabaseUser },
+      } = await supabase.auth.getUser();
+      setUser(supabaseUser);
+
+      if (supabaseUser) {
+        // 3a. Fetch from Cloud using Auth
+        setSyncStatus("syncing");
+        const cloudMindmaps = await getMindmaps();
+        if (cloudMindmaps.length > 0) {
+          setStorage((prev) => {
+            if (!prev) return prev;
+            return mergeMindmaps(prev, cloudMindmaps);
+          });
+        }
+        setSyncStatus("synced");
+      } else if (localLoaded.syncCode) {
+        // 3b. Fetch from Cloud using Sync Code
+        setSyncStatus("syncing");
+        const cloudMindmaps = await getMindmaps(localLoaded.syncCode);
+        if (cloudMindmaps.length > 0) {
+          setStorage((prev) => {
+            if (!prev) return prev;
+            return mergeMindmaps(prev, cloudMindmaps);
+          });
+        }
+        setSyncStatus("synced");
+      }
+    };
+
+    init();
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
+
+  // Save storage to localStorage and Cloud (Supabase)
   useEffect(() => {
-    if (typeof window !== "undefined" && !isLoading && storage) {
-      saveMindmapStorage(storage);
+    if (typeof window === "undefined" || isLoading || !storage) return;
+
+    // Always save to localStorage
+    saveMindmapStorage(storage);
+
+    // Sync to Supabase if logged in or has syncCode
+    if (user || storage.syncCode) {
+      const timeoutId = setTimeout(async () => {
+        setSyncStatus("syncing");
+        try {
+          const current = getCurrentMindmap(storage);
+          if (current) {
+            await upsertMindmap(current, user ? undefined : storage.syncCode);
+          }
+          setSyncStatus("synced");
+        } catch (error) {
+          console.error("Sync error:", error);
+          setSyncStatus("error");
+        }
+      }, 2000); // 2s debounce
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [storage, isLoading]);
+  }, [storage, isLoading, user]);
 
   const { setFocusMode } = useFocusMode();
 
@@ -145,6 +220,18 @@ export function MindmapViewer() {
   useEffect(() => {
     setFocusMode(isFullscreen);
   }, [isFullscreen, setFocusMode]);
+
+  // Sync document title with active mindmap name
+  useEffect(() => {
+    if (typeof window !== "undefined" && currentMindmap?.name) {
+      const baseTitle = "Mindmap";
+      document.title = `${baseTitle} | ${currentMindmap.name}`;
+
+      return () => {
+        document.title = baseTitle;
+      };
+    }
+  }, [currentMindmap?.name]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -281,9 +368,25 @@ export function MindmapViewer() {
     setStorage((prev) => (prev ? renameMindmap(prev, id, name) : prev));
   }, []);
 
-  const handleDeleteMindmap = useCallback((id: string) => {
-    setStorage((prev) => (prev ? deleteMindmap(prev, id) : prev));
+  const handleDeleteMindmap = useCallback(
+    async (id: string) => {
+      setStorage((prev) => (prev ? deleteMindmap(prev, id) : prev));
+      if (user || (storage && storage.syncCode)) {
+        await deleteMindmapSync(id, user ? undefined : storage?.syncCode);
+      }
+    },
+    [user, storage]
+  );
+
+  const handleSetSyncCode = useCallback((code?: string) => {
+    setStorage((prev) => (prev ? updateMindmapSyncCode(prev, code) : prev));
   }, []);
+
+  const handleGenerateSyncCode = useCallback(() => {
+    const code = generateSyncCode();
+    handleSetSyncCode(code);
+    return code;
+  }, [handleSetSyncCode]);
 
   const handleModeChange = useCallback(
     (mode: "brainstorm" | "study" | "classic") => {
@@ -320,6 +423,9 @@ export function MindmapViewer() {
             onDelete={handleDeleteMindmap}
             isOpen={isSidebarOpen}
             onClose={() => setIsSidebarOpen(false)}
+            syncCode={storage.syncCode}
+            onSetSyncCode={handleSetSyncCode}
+            onGenerateSyncCode={handleGenerateSyncCode}
           />
         )}
 
@@ -333,15 +439,24 @@ export function MindmapViewer() {
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               title="Toggle Sidebar"
               className={`h-8 w-8 bg-background/80 backdrop-blur-sm transition-colors ${
-                isSidebarOpen ? "text-primary border-primary" : ""
+                isSidebarOpen ? "text-primary" : ""
               }`}
             >
               <PanelLeft className="h-4 w-4" />
             </Button>
 
+            {/* Active Mindmap Name */}
+            {currentMindmap && (
+              <div className="flex items-center h-8 backdrop-blur-sm rounded-md select-none max-w-[200px] sm:max-w-[300px]">
+                <span className="text-sm font-medium truncate text-foreground/90">
+                  / {currentMindmap.name} /
+                </span>
+              </div>
+            )}
+
             {/* Brand Logo - Inline with toggle */}
             {isFullscreen && (
-              <div className="pointer-events-none select-none opacity-80 hover:opacity-100 transition-opacity">
+              <div className="select-none opacity-80 hover:opacity-100 transition-opacity">
                 <div className="flex items-center gap-2">
                   <Image
                     src="/images/logo.png"
@@ -350,6 +465,28 @@ export function MindmapViewer() {
                     alt="ttqteo"
                     className="rounded-full shadow-sm"
                   />
+                  {(user || storage?.syncCode) && (
+                    <div className="flex items-center gap-1.5 ml-1 px-2 py-0.5 bg-background/50 backdrop-blur-sm rounded-full border border-border/50">
+                      {syncStatus === "syncing" ? (
+                        <CloudUpload className="h-3 w-3 animate-pulse text-primary" />
+                      ) : syncStatus === "synced" ? (
+                        <Cloud className="h-3 w-3 text-green-500" />
+                      ) : syncStatus === "error" ? (
+                        <CloudOff className="h-3 w-3 text-destructive" />
+                      ) : (
+                        <Cloud className="h-3 w-3 text-muted-foreground" />
+                      )}
+                      <span className="text-[10px] font-medium text-sm text-muted-foreground tracking-tight">
+                        {syncStatus === "syncing"
+                          ? "syncing"
+                          : syncStatus === "synced"
+                          ? "saved"
+                          : syncStatus === "error"
+                          ? "offline"
+                          : "cloud"}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

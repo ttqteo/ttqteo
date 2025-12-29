@@ -25,6 +25,10 @@ import {
   Brain,
   GraduationCap,
   Layout,
+  Cloud,
+  Copy,
+  RefreshCw,
+  Link,
 } from "lucide-react";
 import { MindmapItem } from "./types";
 import {
@@ -43,6 +47,9 @@ interface MindmapSidebarProps {
   onDelete: (id: string) => void;
   isOpen: boolean;
   onClose: () => void;
+  syncCode?: string;
+  onSetSyncCode: (code?: string) => void;
+  onGenerateSyncCode: () => string;
 }
 
 export function MindmapSidebar({
@@ -54,10 +61,16 @@ export function MindmapSidebar({
   onDelete,
   isOpen,
   onClose,
+  syncCode,
+  onSetSyncCode,
+  onGenerateSyncCode,
 }: MindmapSidebarProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
+  const [inputCode, setInputCode] = useState("");
+  const [showConnect, setShowConnect] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -235,6 +248,131 @@ export function MindmapSidebar({
                   Older
                 </h3>
                 {groupedMindmaps.older.map(renderItem)}
+              </div>
+            )}
+          </div>
+
+          {/* Cloud Sync Section */}
+          <div className="mt-auto border-t p-4 bg-muted/20">
+            <div className="flex items-center justify-between mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              <div className="flex items-center gap-1.5">
+                <Cloud className="h-3 w-3" />
+                Cloud Sync
+              </div>
+            </div>
+
+            {syncCode ? (
+              <div className="space-y-3">
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] text-muted-foreground">
+                    Your Sync Code:
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <code className="flex-1 bg-background border px-2 py-1 rounded font-mono text-sm tracking-widest text-primary font-bold">
+                      {syncCode}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => {
+                        navigator.clipboard.writeText(syncCode);
+                        setIsCopied(true);
+                        setTimeout(() => setIsCopied(false), 2000);
+                      }}
+                    >
+                      {isCopied ? (
+                        <Check className="h-3 w-3 text-green-500" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-muted-foreground leading-tight">
+                  Use this code on other devices to sync your mindmaps.
+                </p>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full h-7 text-[10px] text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => {
+                    if (
+                      confirm(
+                        "Disconnecting will stop cloud sync on this device. Local data persists. Continue?"
+                      )
+                    ) {
+                      onSetSyncCode(undefined);
+                    }
+                  }}
+                >
+                  Disconnect Cloud Sync
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {!showConnect ? (
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="w-full text-xs gap-2"
+                      onClick={onGenerateSyncCode}
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Enable Cloud Sync
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs gap-2"
+                      onClick={() => setShowConnect(true)}
+                    >
+                      <Link className="h-3 w-3" />
+                      Connect Device
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Enter 10-char code"
+                      className="w-full bg-background border rounded px-2 py-1.5 text-xs font-mono tracking-widest uppercase focus:ring-1 focus:ring-primary outline-none"
+                      value={inputCode}
+                      onChange={(e) =>
+                        setInputCode(e.target.value.toUpperCase())
+                      }
+                      maxLength={10}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="flex-1 h-8 text-xs"
+                        disabled={inputCode.length !== 10}
+                        onClick={() => {
+                          onSetSyncCode(inputCode);
+                          setInputCode("");
+                          setShowConnect(false);
+                        }}
+                      >
+                        Sync
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs px-2"
+                        onClick={() => setShowConnect(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                <p className="text-[10px] text-muted-foreground leading-tight">
+                  Sync your mindmaps across devices without creating an account.
+                </p>
               </div>
             )}
           </div>

@@ -38,6 +38,7 @@ export interface MindmapItem {
 export interface MindmapStorage {
   currentId: string; // Active mindmap ID
   mindmaps: MindmapItem[]; // All mindmaps
+  syncCode?: string; // 10-character code for anonymous sync
 }
 
 /**
