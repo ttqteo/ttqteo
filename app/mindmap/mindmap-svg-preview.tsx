@@ -695,13 +695,18 @@ export function MindmapSvgPreview({
   useEffect(() => {
     if (editingNode && inputRef.current) {
       inputRef.current.focus();
-      // Select all text for contenteditable div
-      const range = document.createRange();
-      range.selectNodeContents(inputRef.current);
-      const selection = window.getSelection();
-      if (selection) {
-        selection.removeAllRanges();
-        selection.addRange(range);
+      // selection for textarea
+      if (inputRef.current instanceof HTMLTextAreaElement) {
+        inputRef.current.select();
+      } else {
+        // selection for contenteditable div
+        const range = document.createRange();
+        range.selectNodeContents(inputRef.current);
+        const selection = window.getSelection();
+        if (selection) {
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
       }
     }
   }, [editingNode]);
@@ -1651,7 +1656,7 @@ export function MindmapSvgPreview({
                     pointerEvents: "none",
                   }}
                 >
-                  {/* Contenteditable div for editing */}
+                  {/* Textarea for editing */}
                   <foreignObject
                     x={x}
                     y={y}
@@ -1659,74 +1664,14 @@ export function MindmapSvgPreview({
                     height={finalHeight}
                     style={{ pointerEvents: "auto" }}
                   >
-                    <div
+                    <textarea
+                      key={editingNode.id}
                       ref={inputRef as any}
-                      contentEditable
-                      suppressContentEditableWarning
-                      onInput={(e) => {
-                        const text = e.currentTarget.textContent || "";
-                        setEditValue(text);
-                      }}
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
                       onKeyDown={(e) => {
                         e.stopPropagation();
-                        if (e.nativeEvent.isComposing) return;
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          const textToSave =
-                            editValue.trim() ||
-                            (editingNode.text !== "..."
-                              ? editingNode.text
-                              : "");
-                          if (!textToSave && editingNode.level > 0) {
-                            deleteNode(editingNode.id);
-                            setEditingNode(null);
-                            setEditValue("");
-                            return;
-                          }
-                          if (editingNode.level > 0) {
-                            setEditingNode(null);
-                            setEditValue("");
-                            updateAndAddNode(
-                              editingNode.id,
-                              textToSave,
-                              "addSibling"
-                            );
-                          } else {
-                            updateAndAddNode(
-                              editingNode.id,
-                              textToSave,
-                              "none"
-                            );
-                            setEditingNode(null);
-                            setEditValue("");
-                          }
-                        }
-                        if (e.key === "Escape") {
-                          // Delete placeholder nodes when canceling
-                          if (
-                            editingNode.text === "..." &&
-                            editingNode.level > 0
-                          ) {
-                            deleteNode(editingNode.id);
-                          }
-                          setEditingNode(null);
-                          setEditValue("");
-                        }
-                        if (e.key === "Tab") {
-                          e.preventDefault();
-                          const textToSave =
-                            editValue.trim() ||
-                            (editingNode.text !== "..."
-                              ? editingNode.text
-                              : "");
-                          setEditingNode(null);
-                          setEditValue("");
-                          updateAndAddNode(
-                            editingNode.id,
-                            textToSave,
-                            e.shiftKey ? "addSibling" : "addChild"
-                          );
-                        }
+                        handleKeyDown(e);
                       }}
                       onBlur={() => {
                         const textToSave = editValue.trim();
@@ -1743,9 +1688,6 @@ export function MindmapSvgPreview({
                       style={{
                         width: "100%",
                         height: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
                         fontSize: `${style.fontSize}px`,
                         padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
                         textAlign: "center",
@@ -1762,10 +1704,10 @@ export function MindmapSvgPreview({
                         cursor: "text",
                         border: `2px solid ${baseColors.border}`,
                         borderRadius: `${BORDER_RADIUS}px`,
+                        resize: "none",
+                        overflow: "hidden",
                       }}
-                    >
-                      {editValue}
-                    </div>
+                    />
                   </foreignObject>
                 </svg>
               );
