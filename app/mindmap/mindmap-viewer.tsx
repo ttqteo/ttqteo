@@ -224,12 +224,8 @@ export function MindmapViewer() {
   // Sync document title with active mindmap name
   useEffect(() => {
     if (typeof window !== "undefined" && currentMindmap?.name) {
-      const baseTitle = "Mindmap";
-      document.title = `${baseTitle} | ${currentMindmap.name}`;
-
-      return () => {
-        document.title = baseTitle;
-      };
+      const baseTitle = "mindmap";
+      document.title = `${baseTitle} • ${currentMindmap.name.toLowerCase()}`;
     }
   }, [currentMindmap?.name]);
 
