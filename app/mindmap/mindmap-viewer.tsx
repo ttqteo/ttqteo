@@ -134,6 +134,29 @@ export function MindmapViewer() {
     }
   }, [mermaidCode, isTyping]);
 
+  // Function to fetch and merge cloud mindmaps
+  const fetchCloudMindmaps = useCallback(
+    async (code?: string) => {
+      if (!user && !code) return;
+
+      setSyncStatus("syncing");
+      try {
+        const cloudMindmaps = await getMindmaps(code);
+        if (cloudMindmaps.length > 0) {
+          setStorage((prev) => {
+            if (!prev) return prev;
+            return mergeMindmaps(prev, cloudMindmaps);
+          });
+        }
+        setSyncStatus("synced");
+      } catch (error) {
+        console.error("Fetch error:", error);
+        setSyncStatus("error");
+      }
+    },
+    [user]
+  );
+
   // Initial load from localStorage and Supabase
   useEffect(() => {
     const init = async () => {
@@ -150,29 +173,8 @@ export function MindmapViewer() {
       } = await supabase.auth.getUser();
       setUser(supabaseUser);
 
-      if (supabaseUser) {
-        // 3a. Fetch from Cloud using Auth
-        setSyncStatus("syncing");
-        const cloudMindmaps = await getMindmaps();
-        if (cloudMindmaps.length > 0) {
-          setStorage((prev) => {
-            if (!prev) return prev;
-            return mergeMindmaps(prev, cloudMindmaps);
-          });
-        }
-        setSyncStatus("synced");
-      } else if (localLoaded.syncCode) {
-        // 3b. Fetch from Cloud using Sync Code
-        setSyncStatus("syncing");
-        const cloudMindmaps = await getMindmaps(localLoaded.syncCode);
-        if (cloudMindmaps.length > 0) {
-          setStorage((prev) => {
-            if (!prev) return prev;
-            return mergeMindmaps(prev, cloudMindmaps);
-          });
-        }
-        setSyncStatus("synced");
-      }
+      // 3. Initial Cloud Sync
+      await fetchCloudMindmaps(localLoaded.syncCode);
     };
 
     init();
@@ -185,7 +187,14 @@ export function MindmapViewer() {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase]);
+  }, [supabase, fetchCloudMindmaps]);
+
+  // Sync when syncCode changes (and user is not logged in)
+  useEffect(() => {
+    if (!isLoading && storage?.syncCode && !user) {
+      fetchCloudMindmaps(storage.syncCode);
+    }
+  }, [storage?.syncCode, user, isLoading, fetchCloudMindmaps]);
 
   // Save storage to localStorage and Cloud (Supabase)
   useEffect(() => {
@@ -201,7 +210,8 @@ export function MindmapViewer() {
         try {
           const current = getCurrentMindmap(storage);
           if (current) {
-            await upsertMindmap(current, user ? undefined : storage.syncCode);
+            // Always pass syncCode if we have it, so it saves to the correct record
+            await upsertMindmap(current, storage.syncCode);
           }
           setSyncStatus("synced");
         } catch (error) {
@@ -422,6 +432,7 @@ export function MindmapViewer() {
             syncCode={storage.syncCode}
             onSetSyncCode={handleSetSyncCode}
             onGenerateSyncCode={handleGenerateSyncCode}
+            onRefresh={() => fetchCloudMindmaps(storage?.syncCode)}
           />
         )}
 
@@ -462,7 +473,11 @@ export function MindmapViewer() {
                     className="rounded-full shadow-sm"
                   />
                   {(user || storage?.syncCode) && (
-                    <div className="flex items-center gap-1.5 ml-1 px-2 py-0.5 bg-background/50 backdrop-blur-sm rounded-full border border-border/50">
+                    <div
+                      className="flex items-center gap-1.5 ml-1 px-2 py-0.5 bg-background/50 backdrop-blur-sm rounded-full border border-border/50 cursor-pointer hover:bg-background/80 transition-colors"
+                      onClick={() => fetchCloudMindmaps(storage?.syncCode)}
+                      title="Sync Now"
+                    >
                       {syncStatus === "syncing" ? (
                         <CloudUpload className="h-3 w-3 animate-pulse text-primary" />
                       ) : syncStatus === "synced" ? (

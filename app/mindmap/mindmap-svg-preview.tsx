@@ -19,8 +19,6 @@ import {
   inferSemanticTypesRecursive,
   cloneTree,
 } from "./mermaid-converter";
-import { MindmapHelpModal } from "./help-modal";
-import { MindmapTips } from "./tips";
 
 interface MindmapSvgPreviewProps {
   tree: MindmapNode;
@@ -1849,12 +1847,7 @@ export function MindmapSvgPreview({
         </span>
       </div>
 
-      {/* Help & Tips (Bottom Left) */}
-      <div className="absolute bottom-4 left-4 flex items-center gap-1.5 text-xs text-foreground bg-background/90 backdrop-blur-md px-2 py-0.5 rounded border border-border/50 z-[100] shadow-sm pointer-events-auto transition-all max-w-[80vw]">
-        <MindmapHelpModal />
-        <div className="w-px h-3 bg-border/50 mx-1" />
-        <MindmapTips />
-      </div>
+      {/* Help & Tips removed from here - moved to sidebar */}
 
       {/* Mini Map (Bottom Right) */}
       {showMiniMap && layout && (

@@ -19,7 +19,9 @@ export async function getMindmaps(shareCode?: string) {
     .eq("is_deleted", false)
     .order("updated_at", { ascending: false });
 
-  if (user) {
+  if (user && shareCode) {
+    query = query.or(`user_id.eq.${user.id},share_code.eq.${shareCode}`);
+  } else if (user) {
     query = query.eq("user_id", user.id);
   } else if (shareCode) {
     query = query.eq("share_code", shareCode);

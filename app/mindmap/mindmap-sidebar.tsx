@@ -37,6 +37,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { SidebarTips } from "./sidebar-tips";
 
 interface MindmapSidebarProps {
   mindmaps: MindmapItem[];
@@ -50,6 +51,7 @@ interface MindmapSidebarProps {
   syncCode?: string;
   onSetSyncCode: (code?: string) => void;
   onGenerateSyncCode: () => string;
+  onRefresh: () => void;
 }
 
 export function MindmapSidebar({
@@ -64,6 +66,7 @@ export function MindmapSidebar({
   syncCode,
   onSetSyncCode,
   onGenerateSyncCode,
+  onRefresh,
 }: MindmapSidebarProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -224,7 +227,7 @@ export function MindmapSidebar({
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => onAdd(`New Mindmap ${mindmaps.length + 1}`)}
+              onClick={() => onAdd(`new mindmap ${mindmaps.length + 1}`)}
               title="Create new mindmap"
             >
               <SquarePen className="h-5 w-5" />
@@ -252,21 +255,39 @@ export function MindmapSidebar({
             )}
           </div>
 
+          <div className="border-t border-border/50">
+            <SidebarTips />
+          </div>
+
           {/* Cloud Sync Section */}
           <div className="mt-auto border-t p-4 bg-muted/20">
-            <div className="flex items-center justify-between mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            <div className="flex items-center justify-between mb-3 text-sm font-semibold text-muted-foreground tracking-wider">
               <div className="flex items-center gap-1.5">
                 <Cloud className="h-3 w-3" />
-                Cloud Sync
+                cloud sync
               </div>
             </div>
 
             {syncCode ? (
               <div className="space-y-3">
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] text-muted-foreground">
-                    Your Sync Code:
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      your sync code:
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 hover:text-primary transition-colors -mr-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRefresh();
+                      }}
+                      title="Sync Now"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                    </Button>
+                  </div>
                   <div className="flex items-center gap-1">
                     <code className="flex-1 bg-background border px-2 py-1 rounded font-mono text-sm tracking-widest text-primary font-bold">
                       {syncCode}
@@ -290,14 +311,14 @@ export function MindmapSidebar({
                   </div>
                 </div>
 
-                <p className="text-[10px] text-muted-foreground leading-tight">
-                  Use this code on other devices to sync your mindmaps.
+                <p className="text-sm text-muted-foreground leading-tight">
+                  use this code on other devices to sync your mindmaps.
                 </p>
 
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full h-7 text-[10px] text-destructive hover:text-destructive hover:bg-destructive/10"
+                  className="w-full h-7 text-sm text-destructive hover:text-destructive hover:bg-destructive/10"
                   onClick={() => {
                     if (
                       confirm(
@@ -322,7 +343,7 @@ export function MindmapSidebar({
                       onClick={onGenerateSyncCode}
                     >
                       <RefreshCw className="h-3 w-3" />
-                      Enable Cloud Sync
+                      enable cloud sync
                     </Button>
                     <Button
                       variant="outline"
@@ -331,7 +352,7 @@ export function MindmapSidebar({
                       onClick={() => setShowConnect(true)}
                     >
                       <Link className="h-3 w-3" />
-                      Connect Device
+                      connect device
                     </Button>
                   </div>
                 ) : (
@@ -357,7 +378,7 @@ export function MindmapSidebar({
                           setShowConnect(false);
                         }}
                       >
-                        Sync
+                        sync
                       </Button>
                       <Button
                         variant="ghost"
@@ -365,13 +386,13 @@ export function MindmapSidebar({
                         className="h-8 text-xs px-2"
                         onClick={() => setShowConnect(false)}
                       >
-                        Cancel
+                        cancel
                       </Button>
                     </div>
                   </div>
                 )}
                 <p className="text-[10px] text-muted-foreground leading-tight">
-                  Sync your mindmaps across devices without creating an account.
+                  sync your mindmaps across devices without creating an account.
                 </p>
               </div>
             )}
