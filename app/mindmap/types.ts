@@ -21,6 +21,25 @@ export interface MindmapNode {
 }
 
 /**
+ * A single mindmap with metadata
+ */
+export interface MindmapItem {
+  id: string; // UUID
+  name: string; // Display name
+  tree: MindmapNode; // Mindmap data
+  createdAt: number; // Timestamp
+  updatedAt: number; // Timestamp
+}
+
+/**
+ * Storage format for multiple mindmaps
+ */
+export interface MindmapStorage {
+  currentId: string; // Active mindmap ID
+  mindmaps: MindmapItem[]; // All mindmaps
+}
+
+/**
  * Default mindmap with a single root node
  */
 export const DEFAULT_MINDMAP: MindmapNode = {

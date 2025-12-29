@@ -174,7 +174,7 @@ function calculateLayout(
 ): NodeLayout {
   const { width, height } = measureNode(node.text);
 
-  if (node.children.length === 0) {
+  if (node.children.length === 0 || node.isCollapsed) {
     return {
       node,
       x: 0,
@@ -239,7 +239,7 @@ function calculateLayout(
  * Get the bottom Y coordinate of a layout including all children
  */
 function getLayoutBottom(layout: NodeLayout): number {
-  if (layout.children.length === 0) {
+  if (layout.children.length === 0 || layout.node.isCollapsed) {
     return layout.y + layout.height;
   }
   return Math.max(
@@ -449,6 +449,7 @@ export function MindmapSvgPreview({
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
   // Mini map state
   const [showMiniMap, setShowMiniMap] = useState(true);
@@ -604,8 +605,29 @@ export function MindmapSvgPreview({
         // Pinch to zoom (Ctrl/Cmd + wheel)
         const zoomSensitivity = 0.003;
         const delta = -e.deltaY * zoomSensitivity;
-        const clampedDelta = Math.max(-0.15, Math.min(0.15, delta));
-        setScale((prev) => Math.min(Math.max(0.25, prev + clampedDelta), 3));
+        const clampedDelta = Math.max(-0.2, Math.min(0.2, delta));
+
+        const rect = svgContainer.getBoundingClientRect();
+        const mX = e.clientX - rect.left;
+        const mY = e.clientY - rect.top;
+
+        setScale((prev) => {
+          const newScale = Math.min(
+            Math.max(0.25, prev + prev * clampedDelta),
+            3
+          );
+          const actualDelta = newScale - prev;
+          if (Math.abs(actualDelta) < 0.001) return prev;
+
+          const scaleRatio = newScale / prev;
+
+          setPosition((pos) => ({
+            x: mX - (mX - pos.x) * scaleRatio,
+            y: mY - (mY - pos.y) * scaleRatio,
+          }));
+
+          return newScale;
+        });
       } else {
         // 2-finger pan (no modifier)
         setPosition((prev) => ({
@@ -627,8 +649,31 @@ export function MindmapSvgPreview({
     if (e.ctrlKey || e.metaKey) {
       const zoomSensitivity = 0.003;
       const delta = -e.deltaY * zoomSensitivity;
-      const clampedDelta = Math.max(-0.15, Math.min(0.15, delta));
-      setScale((prev) => Math.min(Math.max(0.25, prev + clampedDelta), 3));
+      const clampedDelta = Math.max(-0.2, Math.min(0.2, delta));
+
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const mX = e.clientX - rect.left;
+      const mY = e.clientY - rect.top;
+
+      setScale((prev) => {
+        const newScale = Math.min(
+          Math.max(0.25, prev + prev * clampedDelta),
+          3
+        );
+        const actualDelta = newScale - prev;
+        if (Math.abs(actualDelta) < 0.001) return prev;
+
+        const scaleRatio = newScale / prev;
+
+        setPosition((pos) => ({
+          x: mX - (mX - pos.x) * scaleRatio,
+          y: mY - (mY - pos.y) * scaleRatio,
+        }));
+
+        return newScale;
+      });
     } else {
       setPosition((prev) => ({
         x: prev.x - e.deltaX,
@@ -1073,6 +1118,16 @@ export function MindmapSvgPreview({
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
+      // Track mouse position relative to container
+      const container = containerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        setMousePosition({
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        });
+      }
+
       if (isDragging) {
         setPosition({
           x: e.clientX - dragStart.x,
@@ -1093,12 +1148,34 @@ export function MindmapSvgPreview({
   }, []);
 
   const zoomIn = useCallback(() => {
-    setScale((prev) => Math.min(prev + 0.25, 3));
-  }, []);
+    setScale((prev) => {
+      const newScale = Math.min(prev + 0.25, 3);
+      const scaleRatio = newScale / prev;
+
+      // Adjust position to keep mouse point stationary
+      setPosition((pos) => ({
+        x: mousePosition.x - (mousePosition.x - pos.x) * scaleRatio,
+        y: mousePosition.y - (mousePosition.y - pos.y) * scaleRatio,
+      }));
+
+      return newScale;
+    });
+  }, [mousePosition]);
 
   const zoomOut = useCallback(() => {
-    setScale((prev) => Math.max(prev - 0.25, 0.25));
-  }, []);
+    setScale((prev) => {
+      const newScale = Math.max(prev - 0.25, 0.25);
+      const scaleRatio = newScale / prev;
+
+      // Adjust position to keep mouse point stationary
+      setPosition((pos) => ({
+        x: mousePosition.x - (mousePosition.x - pos.x) * scaleRatio,
+        y: mousePosition.y - (mousePosition.y - pos.y) * scaleRatio,
+      }));
+
+      return newScale;
+    });
+  }, [mousePosition]);
 
   // Mini map click handler - navigate to clicked position
   const handleMiniMapClick = useCallback(
@@ -1173,7 +1250,16 @@ export function MindmapSvgPreview({
     const descendantCount = countDescendants(node);
 
     return (
-      <g key={node.id} style={{ opacity: style.opacity }}>
+      <g
+        key={node.id}
+        style={{
+          opacity: style.opacity,
+          transition: isDragging
+            ? "none"
+            : "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease",
+          transform: `translate(0, 0)`, // Placeholder to enable transform transitions
+        }}
+      >
         {/* Connection lines to children */}
         {visibleChildren.map((child) => {
           // Determine styling for child
@@ -1218,6 +1304,11 @@ export function MindmapSvgPreview({
               }
               strokeWidth={level === 0 ? 3 : 2}
               opacity="0.6"
+              style={{
+                transition: isDragging
+                  ? "none"
+                  : "d 0.3s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s ease",
+              }}
             />
           );
         })}
@@ -1489,7 +1580,8 @@ export function MindmapSvgPreview({
             style={{
               transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
               transformOrigin: "top left",
-              transition: "transform 0.05s ease-out",
+              // Remove transition during zoom/pan to prevent lag behind cursor
+              transition: isDragging ? "none" : "transform 0.1s ease-out",
             }}
           >
             {layout && renderNode(layout)}

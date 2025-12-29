@@ -32,40 +32,49 @@ import {
   Loader2,
   Layers,
   Eye,
+  PanelLeft,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useFocusMode } from "@/components/contexts/focus-mode-context";
-import { MindmapNode, DEFAULT_MINDMAP } from "./types";
+import { MindmapNode, MindmapStorage } from "./types";
 import { treeToMermaid, parseMermaidToTree } from "./mermaid-converter";
 import { MindmapSvgPreview } from "./mindmap-svg-preview";
 import { MindmapEditor } from "./mindmap-editor";
-
-interface MindmapViewerProps {
-  initialTree?: MindmapNode;
-}
+import { MindmapSidebar } from "./mindmap-sidebar";
+import {
+  loadMindmapStorage,
+  saveMindmapStorage,
+  getCurrentMindmap,
+  updateMindmapTree,
+  addMindmap,
+  deleteMindmap,
+  renameMindmap,
+  switchMindmap,
+} from "./mindmap-storage";
 
 type ViewMode = "editor" | "preview";
 
-export function MindmapViewer({
-  initialTree = DEFAULT_MINDMAP,
-}: MindmapViewerProps) {
-  const STORAGE_KEY = "mindmap-tree";
-
-  // Initialize tree from localStorage or use initialTree
-  const [tree, setTree] = useState<MindmapNode>(initialTree);
+export function MindmapViewer() {
+  // Storage state for multiple mindmaps
+  const [storage, setStorage] = useState<MindmapStorage | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false); // Default to false to ensure Navbar is visible initially
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // Persist fullscreen state
+  // Persist states
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("mindmap-fullscreen");
-      if (saved !== null) {
-        setIsFullscreen(saved === "true");
+      const savedFullscreen = localStorage.getItem("mindmap-fullscreen");
+      if (savedFullscreen !== null) {
+        setIsFullscreen(savedFullscreen === "true");
       } else {
-        // Default to fullscreen for new users if desired, or keep false
-        setIsFullscreen(true);
+        setIsFullscreen(false);
+      }
+
+      const savedSidebar = localStorage.getItem("mindmap-sidebar-open");
+      if (savedSidebar !== null) {
+        setIsSidebarOpen(savedSidebar === "true");
       }
     }
   }, []);
@@ -75,6 +84,13 @@ export function MindmapViewer({
       localStorage.setItem("mindmap-fullscreen", String(isFullscreen));
     }
   }, [isFullscreen]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("mindmap-sidebar-open", String(isSidebarOpen));
+    }
+  }, [isSidebarOpen]);
+
   const [showCodePopup, setShowCodePopup] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
@@ -84,6 +100,14 @@ export function MindmapViewer({
   // Code editor local state
   const [localCode, setLocalCode] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+
+  // Get current mindmap tree
+  const currentMindmap = storage ? getCurrentMindmap(storage) : null;
+  const tree = currentMindmap?.tree || {
+    id: "root",
+    text: "...",
+    children: [],
+  };
 
   // Generate Mermaid code from tree
   const mermaidCode = useMemo(() => treeToMermaid(tree), [tree]);
@@ -98,17 +122,8 @@ export function MindmapViewer({
   // Initial load from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (parsed && parsed.id && parsed.text) {
-            setTree(parsed);
-          }
-        } catch {
-          // Invalid JSON, use default
-        }
-      }
+      const loaded = loadMindmapStorage();
+      setStorage(loaded);
       const timer = setTimeout(() => setIsLoading(false), 300);
       return () => clearTimeout(timer);
     } else {
@@ -116,12 +131,12 @@ export function MindmapViewer({
     }
   }, []);
 
-  // Save tree to localStorage on every change
+  // Save storage to localStorage on every change
   useEffect(() => {
-    if (typeof window !== "undefined" && !isLoading) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tree));
+    if (typeof window !== "undefined" && !isLoading && storage) {
+      saveMindmapStorage(storage);
     }
-  }, [tree, isLoading]);
+  }, [storage, isLoading]);
 
   const { setFocusMode } = useFocusMode();
 
@@ -140,21 +155,26 @@ export function MindmapViewer({
     }
   }, [mermaidCode]);
 
-  const handleCodeChange = useCallback((newCode: string) => {
-    setLocalCode(newCode);
-    setIsTyping(true);
-
-    // Attempt parsing
-    const parsed = parseMermaidToTree(newCode);
-    if (parsed) {
-      setTree(parsed);
-      // If valid, we can consider typing "done" for sync purposes after a delay,
-      // but actually, we should just let the user type.
-      // The issue is if setTree triggers a re-render that updates mermaidCode,
-      // and that effect overwrites localCode.
-      // We blocking overwrite via !isTyping flag.
-    }
+  // Handle tree change for current mindmap
+  const handleTreeChange = useCallback((newTree: MindmapNode) => {
+    setStorage((prev) => {
+      if (!prev) return prev;
+      return updateMindmapTree(prev, prev.currentId, newTree);
+    });
   }, []);
+
+  const handleCodeChange = useCallback(
+    (newCode: string) => {
+      setLocalCode(newCode);
+      setIsTyping(true);
+
+      const parsed = parseMermaidToTree(newCode);
+      if (parsed) {
+        handleTreeChange(parsed);
+      }
+    },
+    [handleTreeChange]
+  );
 
   // Reset typing flag when popup closes or on blur
   useEffect(() => {
@@ -165,7 +185,6 @@ export function MindmapViewer({
 
   const handleCodeKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      // Ignore events during IME composition
       if (e.nativeEvent.isComposing) return;
 
       const textarea = textareaRef.current;
@@ -241,11 +260,28 @@ export function MindmapViewer({
   );
 
   const resetTree = useCallback(() => {
-    setTree({
+    handleTreeChange({
       id: "root",
       text: "...",
       children: [],
     });
+  }, [handleTreeChange]);
+
+  // Storage handlers
+  const handleSelectMindmap = useCallback((id: string) => {
+    setStorage((prev) => (prev ? switchMindmap(prev, id) : prev));
+  }, []);
+
+  const handleAddMindmap = useCallback((name: string) => {
+    setStorage((prev) => (prev ? addMindmap(prev, name) : prev));
+  }, []);
+
+  const handleRenameMindmap = useCallback((id: string, name: string) => {
+    setStorage((prev) => (prev ? renameMindmap(prev, id, name) : prev));
+  }, []);
+
+  const handleDeleteMindmap = useCallback((id: string) => {
+    setStorage((prev) => (prev ? deleteMindmap(prev, id) : prev));
   }, []);
 
   return (
@@ -259,226 +295,259 @@ export function MindmapViewer({
     `}
     >
       <div
-        className={`relative border-none bg-background flex flex-col ${
+        className={`relative border rounded-xl overflow-hidden bg-background flex ${
           isFullscreen ? "h-screen" : "h-[80vh] min-h-[500px]"
         }`}
       >
-        {/* Toolbar */}
-        <div className="absolute top-4 right-4 flex gap-2 z-20">
-          {/* View mode toggle */}
-          <div className="flex border rounded-md overflow-hidden bg-background/80 backdrop-blur-sm">
+        {/* Sidebar for multiple mindmaps */}
+        {!isLoading && storage && (
+          <MindmapSidebar
+            mindmaps={storage.mindmaps}
+            currentId={storage.currentId}
+            onSelect={handleSelectMindmap}
+            onAdd={handleAddMindmap}
+            onRename={handleRenameMindmap}
+            onDelete={handleDeleteMindmap}
+            isOpen={isSidebarOpen}
+            onClose={() => setIsSidebarOpen(false)}
+          />
+        )}
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col relative overflow-hidden">
+          {/* Toolbar Left */}
+          <div className="absolute top-4 left-4 z-20 flex gap-4 items-center">
             <Button
-              variant={viewMode === "editor" ? "default" : "ghost"}
+              variant="outline"
               size="icon"
-              onClick={() => setViewMode("editor")}
-              title="Editor only"
-              className="h-8 w-8 rounded-none"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              title="Toggle Sidebar"
+              className={`h-8 w-8 bg-background/80 backdrop-blur-sm transition-colors ${
+                isSidebarOpen ? "text-primary border-primary" : ""
+              }`}
             >
-              <Layers className="h-4 w-4" />
+              <PanelLeft className="h-4 w-4" />
             </Button>
 
-            <Button
-              variant={viewMode === "preview" ? "default" : "ghost"}
-              size="icon"
-              onClick={() => setViewMode("preview")}
-              title="Preview only"
-              className="h-8 w-8 rounded-none border-l"
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleCopy}
-            title={copied ? "Copied!" : "Copy Mermaid Code"}
-            className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-          >
-            {copied ? (
-              <Check className="h-4 w-4 text-green-500" />
-            ) : (
-              <Copy className="h-4 w-4" />
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setShowCodePopup(!showCodePopup)}
-            title="Edit Mermaid Source"
-            className={`h-8 w-8 bg-background/80 backdrop-blur-sm ${
-              showCodePopup ? "text-primary border-primary" : ""
-            }`}
-          >
-            <Code className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-            className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-          >
-            {isFullscreen ? (
-              <Minimize2 className="h-4 w-4" />
-            ) : (
-              <Maximize2 className="h-4 w-4" />
-            )}
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                title="Reset Mindmap"
-                className="h-8 w-8 bg-background/80 backdrop-blur-sm text-destructive hover:text-destructive"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Reset Mindmap?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will reset the mindmap to its default state. All your
-                  changes will be lost.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={resetTree}>Reset</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-
-        <div className="flex flex-1 overflow-hidden">
-          {/* Code Sidebar */}
-          {showCodePopup && (
-            <div
-              className="absolute top-16 left-4 z-40 border rounded-lg shadow-xl bg-background flex flex-col animate-in fade-in zoom-in-95 duration-200"
-              style={{
-                width: sidebarWidth,
-                height: "calc(80vh - 100px)",
-                minWidth: 300,
-                maxWidth: 800,
-              }}
-            >
-              {/* Resize handle */}
-              <div
-                className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-primary/50 transition-colors z-[60] opacity-0 hover:opacity-100"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  setIsResizing(true);
-                  const startX = e.clientX;
-                  const startWidth = sidebarWidth;
-
-                  const handleMouseMove = (e: MouseEvent) => {
-                    const newWidth = startWidth + (e.clientX - startX);
-                    setSidebarWidth(Math.min(800, Math.max(300, newWidth)));
-                  };
-
-                  const handleMouseUp = () => {
-                    setIsResizing(false);
-                    document.removeEventListener("mousemove", handleMouseMove);
-                    document.removeEventListener("mouseup", handleMouseUp);
-                  };
-
-                  document.addEventListener("mousemove", handleMouseMove);
-                  document.addEventListener("mouseup", handleMouseUp);
-                }}
-              />
-              <div className="flex-1 overflow-hidden flex flex-col">
-                <div className="bg-muted/50 px-3 py-2 border-b flex items-center justify-between">
-                  <span className="text-xs font-semibold text-foreground flex items-center gap-2">
-                    <Code className="h-3 w-3" /> Mermaid Source
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setShowCodePopup(false)}
-                    className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-                <div className="flex-1 overflow-hidden relative">
-                  <Textarea
-                    ref={textareaRef}
-                    value={localCode}
-                    onChange={(e) => handleCodeChange(e.target.value)}
-                    onBlur={() => setIsTyping(false)}
-                    onKeyDown={handleCodeKeyDown}
-                    className="absolute inset-0 w-full h-full font-mono text-xs border-0 rounded-none focus-visible:ring-0 resize-none p-3 leading-relaxed break-all"
-                    style={{
-                      overflowWrap: "break-word",
-                      wordBreak: "break-all",
-                    }}
-                    placeholder="Enter your mermaid mindmap syntax..."
-                    spellCheck={false}
+            {/* Brand Logo - Inline with toggle */}
+            {isFullscreen && (
+              <div className="pointer-events-none select-none opacity-80 hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-2">
+                  <Image
+                    src="/images/logo.png"
+                    width={24}
+                    height={24}
+                    alt="ttqteo"
+                    className="rounded-full shadow-sm"
                   />
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* Main content area */}
-          <div
-            className={`flex-1 ${
-              isFullscreen ? "h-full overflow-hidden" : "h-full overflow-hidden"
-            } relative`}
-          >
-            {isLoading ? (
-              <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
-                <div className="flex flex-col items-center gap-2">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground animate-pulse">
-                    Loading mindmap...
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col h-full overflow-hidden">
-                {/* Editor panel */}
-                {viewMode === "editor" && (
-                  <div className="overflow-auto p-6">
-                    <MindmapEditor
-                      tree={tree}
-                      onTreeChange={setTree}
-                      className="min-h-full"
+          <div className="absolute top-4 right-4 flex gap-2 z-20">
+            {/* View mode toggle */}
+            <div className="flex border rounded-md overflow-hidden bg-background/80 backdrop-blur-sm">
+              <Button
+                variant={viewMode === "editor" ? "default" : "ghost"}
+                size="icon"
+                onClick={() => setViewMode("editor")}
+                title="Editor only"
+                className="h-8 w-8 rounded-none"
+              >
+                <Layers className="h-4 w-4" />
+              </Button>
+
+              <Button
+                variant={viewMode === "preview" ? "default" : "ghost"}
+                size="icon"
+                onClick={() => setViewMode("preview")}
+                title="Preview only"
+                className="h-8 w-8 rounded-none border-l"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleCopy}
+              title={copied ? "Copied!" : "Copy Mermaid Code"}
+              className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+            >
+              {copied ? (
+                <Check className="h-4 w-4 text-green-500" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowCodePopup(!showCodePopup)}
+              title="Edit Mermaid Source"
+              className={`h-8 w-8 bg-background/80 backdrop-blur-sm ${
+                showCodePopup ? "text-primary border-primary" : ""
+              }`}
+            >
+              <Code className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+              className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-4 w-4" />
+              ) : (
+                <Maximize2 className="h-4 w-4" />
+              )}
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  title="Reset Mindmap"
+                  className="h-8 w-8 bg-background/80 backdrop-blur-sm text-destructive hover:text-destructive"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reset Mindmap?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will reset the mindmap to its default state. All your
+                    changes will be lost.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={resetTree}>
+                    Reset
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+
+          <div className="flex-1 flex overflow-hidden">
+            {/* Code Sidebar (Popup) */}
+            {showCodePopup && (
+              <div
+                className="absolute top-16 right-4 z-40 border rounded-lg shadow-xl bg-background flex flex-col animate-in fade-in zoom-in-95 duration-200"
+                style={{
+                  width: sidebarWidth,
+                  height: "calc(100% - 80px)",
+                  minWidth: 300,
+                  maxWidth: 800,
+                }}
+              >
+                {/* Resize handle */}
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-primary/50 transition-colors z-[60] opacity-0 hover:opacity-100"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setIsResizing(true);
+                    const startX = e.clientX;
+                    const startWidth = sidebarWidth;
+
+                    const handleMouseMove = (e: MouseEvent) => {
+                      const newWidth = startWidth - (e.clientX - startX);
+                      setSidebarWidth(Math.min(800, Math.max(300, newWidth)));
+                    };
+
+                    const handleMouseUp = () => {
+                      setIsResizing(false);
+                      document.removeEventListener(
+                        "mousemove",
+                        handleMouseMove
+                      );
+                      document.removeEventListener("mouseup", handleMouseUp);
+                    };
+
+                    document.addEventListener("mousemove", handleMouseMove);
+                    document.addEventListener("mouseup", handleMouseUp);
+                  }}
+                />
+                <div className="flex-1 overflow-hidden flex flex-col">
+                  <div className="bg-muted/50 px-3 py-2 border-b flex items-center justify-between">
+                    <span className="text-xs font-semibold text-foreground flex items-center gap-2">
+                      <Code className="h-3 w-3" /> Mermaid Source
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowCodePopup(false)}
+                      className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="flex-1 overflow-hidden relative">
+                    <Textarea
+                      ref={textareaRef}
+                      value={localCode}
+                      onChange={(e) => handleCodeChange(e.target.value)}
+                      onBlur={() => setIsTyping(false)}
+                      onKeyDown={handleCodeKeyDown}
+                      className="absolute inset-0 w-full h-full font-mono text-xs border-0 rounded-none focus-visible:ring-0 resize-none p-3 leading-relaxed break-all"
+                      style={{
+                        overflowWrap: "break-word",
+                        wordBreak: "break-all",
+                      }}
+                      placeholder="Enter your mermaid mindmap syntax..."
+                      spellCheck={false}
                     />
                   </div>
-                )}
-
-                {/* Preview panel */}
-                {viewMode === "preview" && (
-                  <div className="flex-1 relative flex flex-col min-h-0">
-                    {/* Brand Logo Overlay - Transparent Background */}
-                    {isFullscreen && (
-                      <div className="absolute top-3 left-4 z-10 pointer-events-none select-none opacity-80 hover:opacity-100 transition-opacity">
-                        <div className="flex items-center gap-2">
-                          <Image
-                            src="/images/logo.png"
-                            width={24}
-                            height={24}
-                            alt="ttqteo"
-                            className="rounded-full shadow-sm"
-                          />
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex-1 relative overflow-hidden">
-                      <MindmapSvgPreview
-                        tree={tree}
-                        onTreeChange={setTree}
-                        isFullscreen={isFullscreen}
-                        className="absolute inset-0"
-                      />
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
             )}
+
+            {/* Main Content */}
+            <div className="flex-1 relative">
+              {isLoading ? (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground animate-pulse">
+                      Loading mindmap...
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col h-full overflow-hidden">
+                  {/* Editor panel */}
+                  {viewMode === "editor" && (
+                    <div className="overflow-auto p-6 sm:p-10">
+                      <MindmapEditor
+                        tree={tree}
+                        onTreeChange={handleTreeChange}
+                        className="min-h-full"
+                      />
+                    </div>
+                  )}
+
+                  {/* Preview panel */}
+                  {viewMode === "preview" && (
+                    <div className="flex-1 relative flex flex-col min-h-0">
+                      <div className="flex-1 relative overflow-hidden">
+                        <MindmapSvgPreview
+                          tree={tree}
+                          onTreeChange={handleTreeChange}
+                          isFullscreen={isFullscreen}
+                          className="absolute inset-0"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
