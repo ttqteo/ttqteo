@@ -624,7 +624,14 @@ export function MindmapSvgPreview({
   useEffect(() => {
     if (editingNode && inputRef.current) {
       inputRef.current.focus();
-      inputRef.current.select();
+      // Select all text for contenteditable div
+      const range = document.createRange();
+      range.selectNodeContents(inputRef.current);
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
     }
   }, [editingNode]);
 
@@ -1311,7 +1318,8 @@ export function MindmapSvgPreview({
                   userSelect: "none",
                   lineHeight: "1.3",
                   textShadow: style.textShadow,
-                  whiteSpace: "pre-wrap",
+                  wordBreak: "normal",
+                  overflowWrap: "anywhere",
                   boxSizing: "border-box",
                 }}
                 className="pointer-events-none"
@@ -1487,45 +1495,7 @@ export function MindmapSvgPreview({
                     pointerEvents: "none",
                   }}
                 >
-                  {/* Solid background */}
-                  <rect
-                    x={x}
-                    y={y}
-                    width={finalWidth}
-                    height={finalHeight}
-                    rx={BORDER_RADIUS}
-                    fill={isDark ? "#1f2937" : "#ffffff"}
-                    stroke={style.border}
-                    strokeWidth="2"
-                  />
-                  {/* Text display */}
-                  <foreignObject
-                    x={x}
-                    y={y}
-                    width={finalWidth}
-                    height={finalHeight}
-                  >
-                    <div
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
-                        fontSize: `${style.fontSize}px`,
-                        fontWeight: style.fontWeight,
-                        color: style.text,
-                        textAlign: "center",
-                        lineHeight: "1.3",
-                        whiteSpace: "pre-wrap",
-                        boxSizing: "border-box",
-                      }}
-                    >
-                      {editValue || "\u00A0"}
-                    </div>
-                  </foreignObject>
-                  {/* Invisible textarea for input */}
+                  {/* Contenteditable div for editing */}
                   <foreignObject
                     x={x}
                     y={y}
@@ -1533,10 +1503,14 @@ export function MindmapSvgPreview({
                     height={finalHeight}
                     style={{ pointerEvents: "auto" }}
                   >
-                    <textarea
+                    <div
                       ref={inputRef as any}
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
+                      contentEditable
+                      suppressContentEditableWarning
+                      onInput={(e) => {
+                        const text = e.currentTarget.textContent || "";
+                        setEditValue(text);
+                      }}
                       onKeyDown={(e) => {
                         e.stopPropagation();
                         if (e.nativeEvent.isComposing) return;
@@ -1613,20 +1587,29 @@ export function MindmapSvgPreview({
                       style={{
                         width: "100%",
                         height: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                         fontSize: `${style.fontSize}px`,
                         padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
                         textAlign: "center",
                         lineHeight: "1.3",
                         fontWeight: style.fontWeight,
+                        fontFamily: "inherit",
                         boxSizing: "border-box",
-                        resize: "none",
-                        border: "none",
                         background: "transparent",
-                        color: "transparent",
-                        caretColor: style.text,
+                        color: style.text,
                         outline: "none",
+                        caretColor: style.text,
+                        wordBreak: "normal",
+                        overflowWrap: "anywhere",
+                        cursor: "text",
+                        border: `2px solid ${baseColors.border}`,
+                        borderRadius: `${BORDER_RADIUS}px`,
                       }}
-                    />
+                    >
+                      {editValue}
+                    </div>
                   </foreignObject>
                 </svg>
               );
@@ -1856,43 +1839,6 @@ export function MindmapSvgPreview({
             <rect x="7" y="7" width="6" height="6" rx="1" />
           </svg>
         </button>
-      )}
-
-      {/* 3. Edit input overlay (Topmost) */}
-      {editingNode && (
-        <div
-          className="absolute z-[110] pointer-events-auto"
-          style={{
-            left: editingNode.x * scale + position.x,
-            top: editingNode.y * scale + position.y,
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
-          }}
-        >
-          <textarea
-            ref={inputRef}
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onBlur={handleEditSave}
-            className="outline-none resize-none select-text border-2 shadow-2xl"
-            style={{
-              width: Math.max(120, editingNode.width),
-              height: editingNode.height,
-              padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
-              backgroundColor: editingNode.colors.bg,
-              color: editingNode.colors.text,
-              border: `2px solid ${editingNode.colors.border}`,
-              borderRadius: `${BORDER_RADIUS}px`,
-              fontSize: "14px",
-              fontWeight: 500,
-              fontFamily: "inherit",
-              textAlign: "center",
-              lineHeight: "1.3",
-              overflow: "hidden",
-            }}
-          />
-        </div>
       )}
     </div>
   );
