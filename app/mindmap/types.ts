@@ -29,6 +29,7 @@ export interface MindmapItem {
   tree: MindmapNode; // Mindmap data
   createdAt: number; // Timestamp
   updatedAt: number; // Timestamp
+  renderMode?: "brainstorm" | "study" | "classic";
 }
 
 /**

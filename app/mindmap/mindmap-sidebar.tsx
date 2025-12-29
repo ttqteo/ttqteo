@@ -22,6 +22,9 @@ import {
   Trash2,
   FileText,
   SquarePen,
+  Brain,
+  GraduationCap,
+  Layout,
 } from "lucide-react";
 import { MindmapItem } from "./types";
 import {
@@ -100,11 +103,25 @@ export function MindmapSidebar({
       `}
       onClick={() => onSelect(mindmap.id)}
     >
-      <FileText
-        className={`h-4 w-4 shrink-0 ${
-          mindmap.id === currentId ? "text-primary" : "text-muted-foreground"
-        }`}
-      />
+      {mindmap.renderMode === "study" ? (
+        <GraduationCap
+          className={`h-4 w-4 shrink-0 ${
+            mindmap.id === currentId ? "text-primary" : "text-muted-foreground"
+          }`}
+        />
+      ) : mindmap.renderMode === "classic" ? (
+        <Layout
+          className={`h-4 w-4 shrink-0 ${
+            mindmap.id === currentId ? "text-primary" : "text-muted-foreground"
+          }`}
+        />
+      ) : (
+        <Brain
+          className={`h-4 w-4 shrink-0 ${
+            mindmap.id === currentId ? "text-primary" : "text-muted-foreground"
+          }`}
+        />
+      )}
 
       {editingId === mindmap.id ? (
         <form

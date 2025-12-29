@@ -6,9 +6,9 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
-  Move,
-  BrainCircuit,
-  BookOpen,
+  Layout,
+  Brain,
+  GraduationCap,
   Focus,
   ExternalLinkIcon,
 } from "lucide-react";
@@ -27,6 +27,8 @@ interface MindmapSvgPreviewProps {
   onTreeChange?: (newTree: MindmapNode) => void;
   isFullscreen?: boolean;
   className?: string;
+  renderMode?: "brainstorm" | "study" | "classic";
+  onModeChange?: (mode: "brainstorm" | "study" | "classic") => void;
 }
 
 // Color palette using HSL for dynamic generation
@@ -386,6 +388,8 @@ export function MindmapSvgPreview({
   onTreeChange,
   isFullscreen = false,
   className = "",
+  renderMode: controlledRenderMode,
+  onModeChange,
 }: MindmapSvgPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgContainerRef = useRef<HTMLDivElement>(null);
@@ -394,9 +398,12 @@ export function MindmapSvgPreview({
   const isDark = resolvedTheme === "dark";
 
   // Render mode state (Brainstorm vs Study vs Classic)
-  const [renderMode, setRenderMode] = useState<
+  const [localRenderMode, setLocalRenderMode] = useState<
     "brainstorm" | "study" | "classic"
   >("brainstorm");
+
+  const renderMode = controlledRenderMode || localRenderMode;
+  const setRenderMode = onModeChange || setLocalRenderMode;
 
   // Load saved render mode
   useEffect(() => {
@@ -423,15 +430,19 @@ export function MindmapSvgPreview({
             prev: "brainstorm" | "study" | "classic"
           ) => "brainstorm" | "study" | "classic")
     ) => {
-      setRenderMode((prev) => {
-        const next = typeof mode === "function" ? mode(prev) : mode;
-        if (typeof window !== "undefined") {
-          localStorage.setItem("mindmap-render-mode", next);
-        }
-        return next;
-      });
+      const next = typeof mode === "function" ? mode(renderMode) : mode;
+
+      if (onModeChange) {
+        onModeChange(next);
+      } else {
+        setLocalRenderMode(next);
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("mindmap-render-mode", next);
+      }
     },
-    []
+    [renderMode, onModeChange]
   );
 
   // Process tree to add semantic types
@@ -1790,11 +1801,11 @@ export function MindmapSvgPreview({
           } Mode`}
         >
           {renderMode === "brainstorm" ? (
-            <BrainCircuit className="h-3.5 w-3.5 text-primary" />
+            <Brain className="h-3.5 w-3.5 text-primary" />
           ) : renderMode === "study" ? (
-            <BookOpen className="h-3.5 w-3.5 text-primary" />
+            <GraduationCap className="h-3.5 w-3.5 text-primary" />
           ) : (
-            <Move className="h-3.5 w-3.5 text-primary" />
+            <Layout className="h-3.5 w-3.5 text-primary" />
           )}
           <span className="ml-1.5 text-xs font-medium tracking-wider">
             {renderMode === "brainstorm"

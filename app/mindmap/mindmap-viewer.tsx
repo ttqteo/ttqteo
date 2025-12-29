@@ -50,6 +50,7 @@ import {
   deleteMindmap,
   renameMindmap,
   switchMindmap,
+  updateMindmapMode,
 } from "./mindmap-storage";
 
 type ViewMode = "editor" | "preview";
@@ -284,6 +285,15 @@ export function MindmapViewer() {
     setStorage((prev) => (prev ? deleteMindmap(prev, id) : prev));
   }, []);
 
+  const handleModeChange = useCallback(
+    (mode: "brainstorm" | "study" | "classic") => {
+      setStorage((prev) =>
+        prev ? updateMindmapMode(prev, prev.currentId, mode) : prev
+      );
+    },
+    []
+  );
+
   return (
     <div
       className={`
@@ -347,7 +357,7 @@ export function MindmapViewer() {
 
           <div className="absolute top-4 right-4 flex gap-2 z-20">
             {/* View mode toggle */}
-            <div className="flex border rounded-md overflow-hidden bg-background/80 backdrop-blur-sm">
+            {/* <div className="flex border rounded-md overflow-hidden bg-background/80 backdrop-blur-sm">
               <Button
                 variant={viewMode === "editor" ? "default" : "ghost"}
                 size="icon"
@@ -367,7 +377,7 @@ export function MindmapViewer() {
               >
                 <Eye className="h-4 w-4" />
               </Button>
-            </div>
+            </div> */}
 
             <Button
               variant="outline"
@@ -541,6 +551,10 @@ export function MindmapViewer() {
                           onTreeChange={handleTreeChange}
                           isFullscreen={isFullscreen}
                           className="absolute inset-0"
+                          renderMode={
+                            currentMindmap?.renderMode || "brainstorm"
+                          }
+                          onModeChange={handleModeChange}
                         />
                       </div>
                     </div>

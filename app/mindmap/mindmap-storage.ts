@@ -22,7 +22,8 @@ export function generateMindmapId(): string {
  */
 export function createMindmapItem(
   name: string,
-  tree?: MindmapNode
+  tree?: MindmapNode,
+  renderMode?: "brainstorm" | "study" | "classic"
 ): MindmapItem {
   const now = Date.now();
   return {
@@ -31,6 +32,7 @@ export function createMindmapItem(
     tree: tree || { ...DEFAULT_MINDMAP, id: "root" },
     createdAt: now,
     updatedAt: now,
+    renderMode: renderMode || "brainstorm",
   };
 }
 
@@ -214,5 +216,21 @@ export function switchMindmap(
   return {
     ...storage,
     currentId: mindmapId,
+  };
+}
+
+/**
+ * Update render mode for specific mindmap
+ */
+export function updateMindmapMode(
+  storage: MindmapStorage,
+  mindmapId: string,
+  renderMode: "brainstorm" | "study" | "classic"
+): MindmapStorage {
+  return {
+    ...storage,
+    mindmaps: storage.mindmaps.map((m) =>
+      m.id === mindmapId ? { ...m, renderMode, updatedAt: Date.now() } : m
+    ),
   };
 }
