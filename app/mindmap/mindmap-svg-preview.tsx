@@ -10,6 +10,7 @@ import {
   BrainCircuit,
   BookOpen,
   Focus,
+  ExternalLinkIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MindmapNode, SemanticType } from "./types";
@@ -98,11 +99,27 @@ const BORDER_RADIUS = 8;
 const LINE_HEIGHT = 20;
 
 /**
+ * Check if text is a valid URL
+ */
+function isUrl(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    try {
+      new URL(trimmed);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
  * Calculate node dimensions based on text
  */
 // Calculate node dimensions based on text
 function measureNode(text: string): { width: number; height: number } {
-  // Constants for measurement - very conservative for Vietnamese diacritics
+  // Constants for measurement - very conservative for Vietnamese dicritics
   const AVG_CHAR_WIDTH = 12; // Vietnamese chars with diacritics need more space
   const SAFE_CHAR_WIDTH = 12; // More conservative for wrapping calculation
   const LINE_HEIGHT_MEASURE = 18; // Match CSS lineHeight
@@ -1300,7 +1317,10 @@ export function MindmapSvgPreview({
               y={y}
               width={finalWidth}
               height={finalHeight}
-              style={{ pointerEvents: "none", overflow: "visible" }}
+              style={{
+                pointerEvents: isUrl(node.text) ? "auto" : "none",
+                overflow: "visible",
+              }}
             >
               <div
                 style={{
@@ -1322,10 +1342,45 @@ export function MindmapSvgPreview({
                   overflowWrap: "anywhere",
                   boxSizing: "border-box",
                 }}
-                className="pointer-events-none"
+                className={isUrl(node.text) ? "" : "pointer-events-none"}
               >
-                {node.text === "..." ? ".." : node.text}
+                {node.text === "..." ? (
+                  ".."
+                ) : isUrl(node.text) ? (
+                  <span className="h-auto p-0 underline">{node.text}</span>
+                ) : (
+                  node.text
+                )}
               </div>
+            </foreignObject>
+          )}
+
+          {/* External link button - show on hover for URL nodes */}
+          {!isEditing && isUrl(node.text) && (
+            <foreignObject
+              x={x + finalWidth - 28}
+              y={y - 8}
+              width="32"
+              height="32"
+              style={{ pointerEvents: "auto", overflow: "visible" }}
+              className="external-link-button opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <Button
+                variant="link"
+                size="icon"
+                className="w-8 h-8 rounded-full"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(
+                    node.text.trim(),
+                    "_blank",
+                    "noopener,noreferrer"
+                  );
+                }}
+                title="Open link in new tab"
+              >
+                <ExternalLinkIcon size={14} />
+              </Button>
             </foreignObject>
           )}
         </g>
