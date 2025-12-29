@@ -62,6 +62,7 @@ export async function upsertMindmap(mindmap: MindmapItem, shareCode?: string) {
     render_mode: mindmap.renderMode,
     updated_at: new Date(mindmap.updatedAt).toISOString(),
     created_at: new Date(mindmap.createdAt).toISOString(),
+    is_deleted: false,
   });
 
   if (error) {

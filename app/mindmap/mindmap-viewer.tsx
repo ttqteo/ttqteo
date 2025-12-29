@@ -76,6 +76,7 @@ export function MindmapViewer() {
     "idle" | "syncing" | "synced" | "error"
   >("idle");
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const lastSyncedRef = useRef<Record<string, number>>({});
 
   // Persist states
   useEffect(() => {
@@ -143,6 +144,11 @@ export function MindmapViewer() {
       try {
         const cloudMindmaps = await getMindmaps(code);
         if (cloudMindmaps.length > 0) {
+          // Update lastSyncedRef so we don't sync back immediately
+          cloudMindmaps.forEach((m) => {
+            lastSyncedRef.current[m.id] = m.updatedAt;
+          });
+
           setStorage((prev) => {
             if (!prev) return prev;
             return mergeMindmaps(prev, cloudMindmaps);
@@ -208,10 +214,18 @@ export function MindmapViewer() {
       const timeoutId = setTimeout(async () => {
         setSyncStatus("syncing");
         try {
-          const current = getCurrentMindmap(storage);
-          if (current) {
-            // Always pass syncCode if we have it, so it saves to the correct record
-            await upsertMindmap(current, storage.syncCode);
+          // Find all mindmaps that need syncing (updatedAt > lastSynced)
+          const toSync = storage.mindmaps.filter(
+            (m) => m.updatedAt > (lastSyncedRef.current[m.id] || 0)
+          );
+
+          if (toSync.length > 0) {
+            await Promise.all(
+              toSync.map(async (m) => {
+                await upsertMindmap(m, storage.syncCode);
+                lastSyncedRef.current[m.id] = m.updatedAt;
+              })
+            );
           }
           setSyncStatus("synced");
         } catch (error) {
