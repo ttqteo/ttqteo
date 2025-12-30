@@ -75,6 +75,7 @@ export function MindmapSidebar({
   const [inputCode, setInputCode] = useState("");
   const [showConnect, setShowConnect] = useState(false);
   const [isCloudSyncExpanded, setIsCloudSyncExpanded] = useState(true);
+  const [hasLoadedSyncState, setHasLoadedSyncState] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -83,6 +84,27 @@ export function MindmapSidebar({
       editInputRef.current.select();
     }
   }, [editingId]);
+
+  // Load Cloud Sync expanded state
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("mindmap-sync-expanded");
+      if (saved !== null) {
+        setIsCloudSyncExpanded(saved === "true");
+      }
+      setHasLoadedSyncState(true);
+    }
+  }, []);
+
+  // Save Cloud Sync expanded state
+  useEffect(() => {
+    if (typeof window !== "undefined" && hasLoadedSyncState) {
+      localStorage.setItem(
+        "mindmap-sync-expanded",
+        String(isCloudSyncExpanded)
+      );
+    }
+  }, [isCloudSyncExpanded, hasLoadedSyncState]);
 
   const handleRename = useCallback(() => {
     if (editingId && editName.trim()) {
@@ -225,14 +247,26 @@ export function MindmapSidebar({
             <h2 className="font-semibold text-lg flex items-center gap-2">
               mindmaps
             </h2>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onAdd(`new mindmap ${mindmaps.length + 1}`)}
-              title="Create new mindmap"
-            >
-              <SquarePen className="h-5 w-5" />
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors"
+                onClick={() => onAdd(`new mindmap ${mindmaps.length + 1}`)}
+                title="Create new mindmap"
+              >
+                <SquarePen className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden h-8 w-8 text-muted-foreground hover:text-destructive transition-colors"
+                onClick={onClose}
+                title="Close sidebar"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
 
           {/* Sidebar Content */}
@@ -424,16 +458,6 @@ export function MindmapSidebar({
               )}
             </div>
           </div>
-
-          {/* Mobile close button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden absolute top-2 -right-12 bg-background border shadow-md"
-            onClick={onClose}
-          >
-            <X className="h-5 w-5" />
-          </Button>
         </div>
       </div>
 

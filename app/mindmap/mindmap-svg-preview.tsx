@@ -1264,7 +1264,7 @@ export function MindmapSvgPreview({
       if (e.nativeEvent.isComposing) return;
 
       if (e.key === "Enter" && !e.shiftKey) {
-        // Enter: Save and add new sibling below
+        // Enter: Save and add new sibling below (unless Ctrl/Cmd is pressed)
         e.preventDefault();
         const textToSave =
           editValue.trim() ||
@@ -1278,16 +1278,19 @@ export function MindmapSvgPreview({
           return;
         }
 
-        if (editingNode.level > 0) {
+        const isCtrlDown = e.ctrlKey || e.metaKey;
+
+        if (isCtrlDown) {
+          // Ctrl+Enter: Just save and close
+          handleEditSave();
+        } else if (editingNode.level > 0) {
           // Not root - save and add new sibling below
           setEditingNode(null);
           setEditValue("");
           updateAndAddNode(editingNode.id, textToSave, "addSibling");
         } else {
           // Root node - just save
-          updateAndAddNode(editingNode.id, textToSave, "none");
-          setEditingNode(null);
-          setEditValue("");
+          handleEditSave();
         }
       } else if (e.key === "Tab" && !e.shiftKey) {
         // Tab: Save and add child
@@ -2052,15 +2055,20 @@ export function MindmapSvgPreview({
                       onChange={(e) => setEditValue(e.target.value)}
                       onKeyDown={(e) => {
                         e.stopPropagation();
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          handleEditSave();
-                        } else if (e.key === "Escape") {
-                          handleEditCancel();
-                        } else {
+                        // Delegate to handleKeyDown for structured shortcuts (Tab, Enter, etc)
+                        // This allows Enter/Tab to be handled consistently
+                        if (
+                          e.key === "Tab" ||
+                          e.key === "Enter" ||
+                          e.key === "Backspace" ||
+                          e.key === "Escape" ||
+                          e.altKey
+                        ) {
                           handleKeyDown(e);
                         }
                       }}
+                      spellCheck={false}
+                      autoCorrect="off"
                       onBlur={(e) => {
                         setTimeout(() => {
                           if (
@@ -2155,6 +2163,8 @@ export function MindmapSvgPreview({
                             }
                           }}
                           placeholder="Add deeper context here..."
+                          spellCheck={false}
+                          autoCorrect="off"
                           className="w-full h-[60px] bg-muted/20 hover:bg-muted/30 focus:bg-muted/40 rounded-lg p-2 text-xs outline-none transition-all resize-none overflow-y-auto leading-tight text-foreground placeholder:text-muted-foreground/30 custom-scrollbar"
                         />
                         <div className="flex items-center justify-between pt-0.5 px-0.5">
