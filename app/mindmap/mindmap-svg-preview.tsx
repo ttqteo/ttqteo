@@ -114,12 +114,12 @@ interface NodeLayout {
   nextSiblingId: string | null;
 }
 
-const NODE_MIN_HEIGHT = 36;
-const NODE_MAX_WIDTH = 200;
-const NODE_PADDING_X = 16;
-const NODE_PADDING_Y = 6;
+const NODE_MIN_HEIGHT = 28; // Reduced
+const NODE_MAX_WIDTH = 220; // Slightly wider to compensate for less padding waste
+const NODE_PADDING_X = 12; // Reduced from 16
+const NODE_PADDING_Y = 4; // Reduced from 6
 const HORIZONTAL_GAP = 60;
-const VERTICAL_GAP = 16;
+const VERTICAL_GAP = 12; // Reduced from 16
 const BORDER_RADIUS = 8;
 const LINE_HEIGHT = 20;
 
@@ -139,15 +139,15 @@ function isUrl(text: string): boolean {
   return false;
 }
 
-/**
- * Calculate node dimensions based on text
- */
-// Calculate node dimensions based on text
-function measureNode(text: string): { width: number; height: number } {
-  // Constants for measurement - very conservative for Vietnamese dicritics
-  const AVG_CHAR_WIDTH = 12; // Vietnamese chars with diacritics need more space
-  const SAFE_CHAR_WIDTH = 12; // More conservative for wrapping calculation
-  const LINE_HEIGHT_MEASURE = 18; // Match CSS lineHeight
+// Calculate node dimensions based on text and font size
+function measureNode(
+  text: string,
+  fontSize: number = 14
+): { width: number; height: number } {
+  // Vietnamese characters with diacritics are "tall" and "wide"
+  const AVG_CHAR_WIDTH = fontSize * 0.65;
+  const SAFE_CHAR_WIDTH = fontSize * 0.65;
+  const LINE_HEIGHT_MEASURE = fontSize * 1.45; // Generous factor for Vietnamese diacritics
 
   // Split by newline first
   const sourceLines = text.split("\n");
@@ -155,13 +155,12 @@ function measureNode(text: string): { width: number; height: number } {
   // 1. Calculate Width based on Average
   let maxContentWidth = 0;
   for (const line of sourceLines) {
-    // Vietnamese text with diacritics may need wider estimation
     maxContentWidth = Math.max(maxContentWidth, line.length * AVG_CHAR_WIDTH);
   }
 
   const width = Math.min(
     NODE_MAX_WIDTH,
-    Math.max(60, maxContentWidth + NODE_PADDING_X * 2)
+    Math.max(64, maxContentWidth + NODE_PADDING_X * 2)
   );
 
   // 2. Calculate Height based on Final Width
@@ -173,15 +172,13 @@ function measureNode(text: string): { width: number; height: number } {
 
   let totalLines = 0;
   for (const line of sourceLines) {
-    // Math.ceil(line.length / charsPerLine) is an estimate.
-    // We use a very conservative SAFE_CHAR_WIDTH to account for word wrapping waste.
     const wrappedLines = Math.ceil(line.length / charsPerLine) || 1;
     totalLines += wrappedLines;
   }
 
   const height = Math.max(
     NODE_MIN_HEIGHT,
-    totalLines * LINE_HEIGHT_MEASURE + NODE_PADDING_Y * 2 + 4 // Added 4px safety buffer
+    totalLines * LINE_HEIGHT_MEASURE + NODE_PADDING_Y * 2 + 8 // Increased safety buffer
   );
 
   return { width, height };
@@ -198,7 +195,13 @@ function calculateLayout(
   treeIndex: number = 0,
   branchIndex: number = 0
 ): NodeLayout {
-  const { width, height } = measureNode(node.text);
+  // Determine font size for measurement
+  let fontSize = 14;
+  if (node.semanticType === "Root") fontSize = 18;
+  else if (node.semanticType === "Concept") fontSize = 16;
+  else if (node.semanticType === "Section") fontSize = 13;
+
+  const { width, height } = measureNode(node.text, fontSize);
 
   if (node.children.length === 0 || node.isCollapsed) {
     return {
@@ -2007,7 +2010,10 @@ export function MindmapSvgPreview({
                 baseColors,
                 isDark
               );
-              const editDimensions = measureNode(editValue || "");
+              const editDimensions = measureNode(
+                editValue || "",
+                style.fontSize
+              );
               const finalWidth = Math.max(width, editDimensions.width);
               const finalHeight = Math.max(height, editDimensions.height);
 
@@ -2068,7 +2074,7 @@ export function MindmapSvgPreview({
                       onClick={() => setIsNoteVisible(true)}
                       style={{
                         width: "100%",
-                        height: "auto",
+                        height: "100%", // Fit container exactly
                         maxHeight: "100%",
                         fontSize: `${style.fontSize}px`,
                         padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
@@ -2086,6 +2092,8 @@ export function MindmapSvgPreview({
                         resize: "none",
                         border: "none",
                         display: "block",
+                        overflow: "hidden", // Hide redundant scrollbars
+                        boxSizing: "border-box", // Ensure padding doesn't cause overflow
                       }}
                     />
                   </div>
@@ -2096,25 +2104,25 @@ export function MindmapSvgPreview({
                       style={{
                         position: "absolute",
                         left: x + finalWidth / 2,
-                        top: y + finalHeight + 12,
-                        width: 280,
+                        top: y + finalHeight + 8, // Closer to node
+                        width: 260, // Slightly narrower
                         transform: "translateX(-50%)",
                         pointerEvents: "auto",
                       }}
                     >
-                      <div className="flex flex-col gap-2 p-3 bg-background/95 backdrop-blur-xl border border-primary/20 rounded-xl shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                      <div className="flex flex-col gap-1.5 p-2 bg-background/95 backdrop-blur-xl border border-primary/20 rounded-xl shadow-2xl animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div className="flex items-center justify-between px-1">
+                          <div className="flex items-center gap-1.5">
                             <div className="bg-primary/10 p-1 rounded-md">
-                              <MessageSquare className="h-3.5 w-3.5 text-primary" />
+                              <MessageSquare className="h-3 w-3 text-primary" />
                             </div>
-                            <span className="text-[11px] font-bold text-foreground/70 uppercase tracking-wider">
+                            <span className="text-[10px] font-bold text-foreground/70 uppercase tracking-wider">
                               Note
                             </span>
                           </div>
                           <Badge
                             variant="secondary"
-                            className="h-4 px-1.5 text-[9px] opacity-70 font-mono tracking-tighter"
+                            className="h-3.5 px-1 text-[8px] opacity-70 font-mono tracking-tighter"
                           >
                             ALT + N
                           </Badge>
@@ -2147,35 +2155,35 @@ export function MindmapSvgPreview({
                             }
                           }}
                           placeholder="Add deeper context here..."
-                          className="w-full h-[90px] bg-muted/20 hover:bg-muted/30 focus:bg-muted/40 rounded-lg p-2.5 text-xs outline-none transition-all resize-none overflow-y-auto leading-relaxed text-foreground placeholder:text-muted-foreground/30 custom-scrollbar"
+                          className="w-full h-[60px] bg-muted/20 hover:bg-muted/30 focus:bg-muted/40 rounded-lg p-2 text-xs outline-none transition-all resize-none overflow-y-auto leading-tight text-foreground placeholder:text-muted-foreground/30 custom-scrollbar"
                         />
-                        <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center justify-between pt-0.5 px-0.5">
                           <div className="flex flex-col">
-                            <span className="text-[9px] text-muted-foreground/50 italic leading-none mb-1">
+                            <span className="text-[8px] text-muted-foreground/50 italic leading-none mb-0.5">
                               Alt+Enter to save
                             </span>
-                            <span className="text-[9px] text-muted-foreground/30 font-mono uppercase tracking-tighter leading-none">
+                            <span className="text-[8px] text-muted-foreground/30 font-mono uppercase tracking-tighter leading-none">
                               Alt+T for Title
                             </span>
                           </div>
-                          <div className="flex gap-1.5">
+                          <div className="flex gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors"
+                              className="h-6 w-6 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors"
                               onClick={() => deleteNode(editingNode.id)}
                               title="Delete"
                             >
-                              <Trash className="h-3.5 w-3.5" />
+                              <Trash className="h-3 w-3" />
                             </Button>
                             <Button
                               variant="default"
                               size="icon"
-                              className="h-7 w-7 rounded-md shadow-sm"
+                              className="h-6 w-6 rounded-md shadow-sm"
                               onClick={handleEditSave}
                               title="Save"
                             >
-                              <Check className="h-4 w-4" />
+                              <Check className="h-3.5 w-3.5" />
                             </Button>
                           </div>
                         </div>
