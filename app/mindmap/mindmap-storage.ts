@@ -213,6 +213,7 @@ export function addMindmap(
 ): MindmapStorage {
   const newMindmap = createMindmapItem(name);
   return {
+    ...storage,
     currentId: newMindmap.id,
     mindmaps: [...storage.mindmaps, newMindmap],
   };
@@ -241,6 +242,7 @@ export function deleteMindmap(
     mindmapId === storage.currentId ? remaining[0].id : storage.currentId;
 
   return {
+    ...storage,
     currentId: newCurrentId,
     mindmaps: remaining,
   };
