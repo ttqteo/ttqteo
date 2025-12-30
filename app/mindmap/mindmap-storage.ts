@@ -63,14 +63,14 @@ export function mergeMindmaps(
  */
 export function createMindmapItem(
   name: string,
-  tree?: MindmapNode,
+  trees?: MindmapNode[],
   renderMode?: "brainstorm" | "study" | "classic"
 ): MindmapItem {
   const now = Date.now();
   return {
     id: generateMindmapId(),
     name,
-    tree: tree || { ...DEFAULT_MINDMAP, id: "root" },
+    trees: trees || [{ ...DEFAULT_MINDMAP, id: "root" }],
     createdAt: now,
     updatedAt: now,
     renderMode: renderMode || "brainstorm",
@@ -100,7 +100,7 @@ function migrateFromOldFormat(): MindmapStorage | null {
   try {
     const tree = JSON.parse(oldData) as MindmapNode;
     if (tree && tree.id && tree.text) {
-      const migratedMindmap = createMindmapItem("Mindmap 1", tree);
+      const migratedMindmap = createMindmapItem("Mindmap 1", [tree]);
       // Remove old storage
       localStorage.removeItem(OLD_STORAGE_KEY);
       return {
@@ -133,6 +133,24 @@ export function loadMindmapStorage(): MindmapStorage {
         Array.isArray(parsed.mindmaps) &&
         parsed.mindmaps.length > 0
       ) {
+        // Migration: Convert 'tree' to 'trees' for existing items
+        let needsSave = false;
+        const migratedMindmaps = parsed.mindmaps.map((m: any) => {
+          if (!m.trees && m.tree) {
+            needsSave = true;
+            const migrated = { ...m, trees: [m.tree] };
+            delete (migrated as any).tree;
+            return migrated;
+          }
+          return m;
+        });
+
+        if (needsSave) {
+          const migratedStorage = { ...parsed, mindmaps: migratedMindmaps };
+          saveMindmapStorage(migratedStorage);
+          return migratedStorage;
+        }
+
         return parsed;
       }
     } catch {
@@ -171,17 +189,17 @@ export function getCurrentMindmap(
 }
 
 /**
- * Update tree for specific mindmap
+ * Update trees for specific mindmap
  */
-export function updateMindmapTree(
+export function updateMindmapTrees(
   storage: MindmapStorage,
   mindmapId: string,
-  tree: MindmapNode
+  trees: MindmapNode[]
 ): MindmapStorage {
   return {
     ...storage,
     mindmaps: storage.mindmaps.map((m) =>
-      m.id === mindmapId ? { ...m, tree, updatedAt: Date.now() } : m
+      m.id === mindmapId ? { ...m, trees, updatedAt: Date.now() } : m
     ),
   };
 }
@@ -304,19 +322,19 @@ export function updateMindmapConfig(
 }
 
 /**
- * Update both tree and config
+ * Update both trees and config
  */
 export function updateMindmapFull(
   storage: MindmapStorage,
   mindmapId: string,
-  tree: MindmapNode,
+  trees: MindmapNode[],
   config: Record<string, any> | null
 ): MindmapStorage {
   return {
     ...storage,
     mindmaps: storage.mindmaps.map((m) =>
       m.id === mindmapId
-        ? { ...m, tree, config: config || undefined, updatedAt: Date.now() }
+        ? { ...m, trees, config: config || undefined, updatedAt: Date.now() }
         : m
     ),
   };

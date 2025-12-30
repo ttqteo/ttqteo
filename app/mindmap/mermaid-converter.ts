@@ -1,21 +1,13 @@
 import { MindmapNode } from "./types";
 
 /**
- * Converts a MindmapNode tree to Mermaid mindmap syntax
+ * Converts multiple MindmapNode trees to Mermaid mindmap syntax
  *
- * @param node - The root node of the mindmap
+ * @param trees - The root nodes of the mindmaps
  * @returns Mermaid mindmap code as string
- *
- * @example
- * const node = { id: "1", text: "Root", children: [{ id: "2", text: "Child", children: [] }] };
- * const code = treeToMermaid(node);
- * // Returns:
- * // mindmap
- * //   root((Root))
- * //     Child
  */
-export function treeToMermaid(
-  node: MindmapNode,
+export function treesToMermaid(
+  trees: MindmapNode[],
   config?: Record<string, any>
 ): string {
   let result = "";
@@ -38,13 +30,16 @@ export function treeToMermaid(
   }
 
   result += "mindmap\n";
-  result += `  root((${escapeText(node.text)}))\n`;
-  if (node.note) {
-    result += `  %% note: ${node.note.replace(/\n/g, "\\n")}\n`;
-  }
 
-  for (const child of node.children) {
-    result += nodeToMermaid(child, 2);
+  for (const tree of trees) {
+    result += `  root((${escapeText(tree.text)}))\n`;
+    if (tree.note) {
+      result += `  %% note: ${tree.note.replace(/\n/g, "\\n")}\n`;
+    }
+
+    for (const child of tree.children) {
+      result += nodeToMermaid(child, 2);
+    }
   }
 
   return result;
@@ -82,13 +77,13 @@ function escapeText(text: string): string {
 }
 
 /**
- * Parses Mermaid mindmap syntax back to a MindmapNode tree
+ * Parses Mermaid mindmap syntax back to multiple MindmapNode trees
  *
  * @param code - Mermaid mindmap code string
- * @returns Parsed MindmapNode tree or null if invalid
+ * @returns Parsed MindmapNode trees or null if invalid
  */
-export function parseMermaidToTree(code: string): {
-  tree: MindmapNode | null;
+export function parseMermaidToTrees(code: string): {
+  trees: MindmapNode[];
   config: Record<string, any> | null;
 } {
   const lines = code.split("\n");
@@ -141,12 +136,23 @@ export function parseMermaidToTree(code: string): {
       ? lines.slice(mindmapStartIndex)
       : lines.filter((line) => line.trim() !== "");
 
-  if (mindmapLines.length === 0) return { tree: null, config };
+  if (mindmapLines.length === 0) return { trees: [], config };
 
-  let rootNode: MindmapNode | null = null;
+  const roots: MindmapNode[] = [];
   const nodeStack: { node: MindmapNode; indent: number }[] = [];
   let idCounter = 0;
   let lastNode: MindmapNode | null = null;
+
+  // Find minimum indentation that isn't 'mindmap' keyword
+  let minIndent = Infinity;
+  for (const line of mindmapLines) {
+    const trimmed = line.trim();
+    if (trimmed === "mindmap" || trimmed === "" || trimmed.startsWith("%%"))
+      continue;
+    const indentMatch = line.match(/^(\s*)/);
+    const indent = indentMatch ? indentMatch[1].length : 0;
+    if (indent < minIndent) minIndent = indent;
+  }
 
   for (const line of mindmapLines) {
     const trimmed = line.trim();
@@ -181,8 +187,9 @@ export function parseMermaidToTree(code: string): {
       children: [],
     };
 
-    if (!rootNode) {
-      rootNode = newNode;
+    if (indent === minIndent) {
+      roots.push(newNode);
+      nodeStack.length = 0; // Clear stack for new root
       nodeStack.push({ node: newNode, indent });
     } else {
       // Find parent based on indentation
@@ -195,18 +202,22 @@ export function parseMermaidToTree(code: string): {
 
       if (nodeStack.length > 0) {
         nodeStack[nodeStack.length - 1].node.children.push(newNode);
+        nodeStack.push({ node: newNode, indent });
+      } else {
+        // This shouldn't happen if minIndent is correct, but as a fallback:
+        roots.push(newNode);
+        nodeStack.push({ node: newNode, indent });
       }
-      nodeStack.push({ node: newNode, indent });
     }
     lastNode = newNode;
   }
 
-  // Second pass: Infer semantic types
-  if (rootNode) {
-    inferSemanticTypesRecursive(rootNode, 0, null);
-  }
+  // Second pass: Infer semantic types for each tree
+  roots.forEach((root) => {
+    inferSemanticTypesRecursive(root, 0, null);
+  });
 
-  return { tree: rootNode, config };
+  return { trees: roots, config };
 }
 
 /**

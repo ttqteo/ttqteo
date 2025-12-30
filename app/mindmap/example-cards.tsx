@@ -4,19 +4,19 @@ import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MindmapNode } from "./types";
-import { treeToMermaid } from "./mermaid-converter";
+import { treesToMermaid } from "./mermaid-converter";
 
 interface Sample {
   title: string;
-  node: MindmapNode;
+  trees: MindmapNode[];
 }
 
 export function ExampleCards({ samples }: { samples: Sample[] }) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  const handleCopy = async (node: MindmapNode, index: number) => {
+  const handleCopy = async (trees: MindmapNode[], index: number) => {
     try {
-      const code = treeToMermaid(node);
+      const code = treesToMermaid(trees);
       await navigator.clipboard.writeText(code);
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
@@ -28,7 +28,7 @@ export function ExampleCards({ samples }: { samples: Sample[] }) {
   return (
     <div className="grid gap-6 md:grid-cols-2">
       {samples.map((sample, index) => {
-        const code = treeToMermaid(sample.node);
+        const code = treesToMermaid(sample.trees);
         return (
           <div key={index} className="border rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
@@ -36,7 +36,7 @@ export function ExampleCards({ samples }: { samples: Sample[] }) {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => handleCopy(sample.node, index)}
+                onClick={() => handleCopy(sample.trees, index)}
                 className="h-7 w-7"
                 title={copiedIndex === index ? "Copied!" : "Copy code"}
               >

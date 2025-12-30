@@ -27,7 +27,7 @@ export interface MindmapNode {
 export interface MindmapItem {
   id: string; // UUID
   name: string; // Display name
-  tree: MindmapNode; // Mindmap data
+  trees: MindmapNode[]; // Array of root nodes
   createdAt: number; // Timestamp
   updatedAt: number; // Timestamp
   renderMode?: "brainstorm" | "study" | "classic";
@@ -58,95 +58,52 @@ export const DEFAULT_MINDMAP: MindmapNode = {
 export const SAMPLE_MINDMAPS = [
   {
     title: "Project Planning",
-    node: {
-      id: "root",
-      text: "Project",
-      children: [
-        {
-          id: "planning",
-          text: "Planning",
-          children: [
-            { id: "req", text: "Requirements", children: [] },
-            { id: "timeline", text: "Timeline", children: [] },
-            { id: "resources", text: "Resources", children: [] },
-          ],
-        },
-        {
-          id: "dev",
-          text: "Development",
-          children: [
-            { id: "fe", text: "Frontend", children: [] },
-            { id: "be", text: "Backend", children: [] },
-            { id: "db", text: "Database", children: [] },
-          ],
-        },
-        {
-          id: "testing",
-          text: "Testing",
-          children: [
-            { id: "unit", text: "Unit Tests", children: [] },
-            { id: "integration", text: "Integration", children: [] },
-            { id: "uat", text: "UAT", children: [] },
-          ],
-        },
-        {
-          id: "deploy",
-          text: "Deployment",
-          children: [
-            { id: "staging", text: "Staging", children: [] },
-            { id: "prod", text: "Production", children: [] },
-          ],
-        },
-      ],
-    } as MindmapNode,
+    trees: [
+      {
+        id: "root",
+        text: "Project",
+        children: [
+          {
+            id: "planning",
+            text: "Planning",
+            children: [
+              { id: "req", text: "Requirements", children: [] },
+              { id: "timeline", text: "Timeline", children: [] },
+              { id: "resources", text: "Resources", children: [] },
+            ],
+          },
+          {
+            id: "dev",
+            text: "Development",
+            children: [
+              { id: "fe", text: "Frontend", children: [] },
+              { id: "be", text: "Backend", children: [] },
+              { id: "db", text: "Database", children: [] },
+            ],
+          },
+        ],
+      },
+    ] as MindmapNode[],
   },
   {
-    title: "Learning Path",
-    node: {
-      id: "root",
-      text: "Learning",
-      children: [
-        {
-          id: "prog",
-          text: "Programming",
-          children: [
-            {
-              id: "js",
-              text: "JavaScript",
-              children: [
-                { id: "react", text: "React", children: [] },
-                { id: "node", text: "Node.js", children: [] },
-              ],
-            },
-            {
-              id: "py",
-              text: "Python",
-              children: [
-                { id: "django", text: "Django", children: [] },
-                { id: "fastapi", text: "FastAPI", children: [] },
-              ],
-            },
-          ],
-        },
-        {
-          id: "devops",
-          text: "DevOps",
-          children: [
-            { id: "docker", text: "Docker", children: [] },
-            { id: "k8s", text: "Kubernetes", children: [] },
-            { id: "cicd", text: "CI/CD", children: [] },
-          ],
-        },
-        {
-          id: "cloud",
-          text: "Cloud",
-          children: [
-            { id: "aws", text: "AWS", children: [] },
-            { id: "gcp", text: "GCP", children: [] },
-            { id: "azure", text: "Azure", children: [] },
-          ],
-        },
-      ],
-    } as MindmapNode,
+    title: "Multi-root Example",
+    trees: [
+      {
+        id: "root1",
+        text: "Frontend Tech",
+        children: [
+          { id: "react", text: "React", children: [] },
+          { id: "vue", text: "Vue", children: [] },
+        ],
+      },
+      {
+        id: "root2",
+        text: "Backend Tech",
+        children: [
+          { id: "node", text: "Node.js", children: [] },
+          { id: "go", text: "Go", children: [] },
+        ],
+      },
+    ] as MindmapNode[],
   },
 ];

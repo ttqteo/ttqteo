@@ -34,14 +34,23 @@ export async function getMindmaps(shareCode?: string) {
     return [];
   }
 
-  return data.map((m) => ({
-    id: m.id,
-    name: m.name,
-    tree: m.tree,
-    renderMode: m.render_mode,
-    createdAt: new Date(m.created_at).getTime(),
-    updatedAt: new Date(m.updated_at).getTime(),
-  })) as MindmapItem[];
+  return data.map((m) => {
+    let trees: any[] = [];
+    if (Array.isArray(m.tree)) {
+      trees = m.tree;
+    } else if (m.tree && typeof m.tree === "object") {
+      trees = [m.tree];
+    }
+
+    return {
+      id: m.id,
+      name: m.name,
+      trees: trees,
+      renderMode: m.render_mode,
+      createdAt: new Date(m.created_at).getTime(),
+      updatedAt: new Date(m.updated_at).getTime(),
+    };
+  }) as MindmapItem[];
 }
 
 export async function upsertMindmap(mindmap: MindmapItem, shareCode?: string) {
@@ -58,7 +67,7 @@ export async function upsertMindmap(mindmap: MindmapItem, shareCode?: string) {
     user_id: user?.id || null,
     share_code: shareCode || null,
     name: mindmap.name,
-    tree: mindmap.tree,
+    tree: mindmap.trees,
     render_mode: mindmap.renderMode,
     updated_at: new Date(mindmap.updatedAt).toISOString(),
     created_at: new Date(mindmap.createdAt).toISOString(),
@@ -91,7 +100,7 @@ export async function upsertMindmaps(
       user_id: user?.id || null,
       share_code: shareCode || null,
       name: m.name,
-      tree: m.tree,
+      tree: m.trees,
       render_mode: m.renderMode,
       updated_at: new Date(m.updatedAt).toISOString(),
       created_at: new Date(m.createdAt).toISOString(),

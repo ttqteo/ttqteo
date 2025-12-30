@@ -16,6 +16,7 @@ import {
   GraduationCap,
   Layout,
   MessageSquare,
+  Plus,
   RotateCcw,
   Trash,
   ZoomIn,
@@ -31,8 +32,8 @@ import {
 import { MindmapNode, SemanticType } from "./types";
 
 interface MindmapSvgPreviewProps {
-  tree: MindmapNode;
-  onTreeChange?: (newTree: MindmapNode) => void;
+  trees: MindmapNode[];
+  onTreesChange?: (newTrees: MindmapNode[]) => void;
   isFullscreen?: boolean;
   className?: string;
   renderMode?: "brainstorm" | "study" | "classic";
@@ -94,6 +95,7 @@ interface NodeLayout {
   height: number;
   level: number;
   branchIndex: number; // Which branch from root this node belongs to
+  treeIndex: number; // Index in the trees array
   children: NodeLayout[];
   parentId: string | null;
   nextSiblingId: string | null;
@@ -193,6 +195,7 @@ function calculateLayout(
       height,
       level,
       branchIndex,
+      treeIndex: branchIndex,
       children: [],
       parentId,
       nextSiblingId: null,
@@ -239,6 +242,7 @@ function calculateLayout(
     height,
     level,
     branchIndex,
+    treeIndex: branchIndex,
     children: childLayouts,
     parentId,
     nextSiblingId: null,
@@ -392,8 +396,8 @@ function getSemanticStyle(
  * - Escape: Cancel editing
  */
 export function MindmapSvgPreview({
-  tree,
-  onTreeChange,
+  trees,
+  onTreesChange,
   isFullscreen = false,
   className = "",
   renderMode: controlledRenderMode,
@@ -453,13 +457,6 @@ export function MindmapSvgPreview({
     [renderMode, onModeChange]
   );
 
-  // Process tree to add semantic types
-  const processedTree = useMemo(() => {
-    const t = cloneTree(tree);
-    inferSemanticTypesRecursive(t, 0, null);
-    return t;
-  }, [tree]);
-
   const [layout, setLayout] = useState<NodeLayout | null>(null);
   const [svgSize, setSvgSize] = useState({ width: 800, height: 400 });
 
@@ -491,6 +488,7 @@ export function MindmapSvgPreview({
     parentId: string | null;
     nextSiblingId: string | null;
     colors: { bg: string; text: string; border: string };
+    treeIndex: number;
   } | null>(null);
   const [editValue, setEditValue] = useState("");
   const [editNote, setEditNote] = useState("");
@@ -505,12 +503,61 @@ export function MindmapSvgPreview({
   const [radialMenuPos, setRadialMenuPos] = useState({ x: 0, y: 0 });
 
   // Calculate layout when tree changes
-  useEffect(() => {
-    // Start with top padding of 40px
-    const newLayout = calculateLayout(processedTree, 0, 40);
-    positionHorizontally(newLayout, 40);
+  const rootLayouts = useMemo(() => {
+    let currentY = 40; // Start with top padding
+    const ROOT_GAP = 200; // Large gap between independent trees
+    const layouts: NodeLayout[] = [];
 
-    // Calculate SVG size
+    for (let i = 0; i < trees.length; i++) {
+      const processedTree = cloneTree(trees[i]);
+      inferSemanticTypesRecursive(processedTree, 0, null);
+      const layout = calculateLayout(processedTree, 0, currentY, null, i);
+      positionHorizontally(layout, 40); // Start with left padding
+      layouts.push(layout);
+      currentY = getLayoutBottom(layout) + ROOT_GAP;
+    }
+    return layouts;
+  }, [trees]);
+
+  const handleTreeChange = useCallback(
+    (index: number, newTree: MindmapNode) => {
+      if (onTreesChange) {
+        const newTrees = [...trees];
+        newTrees[index] = newTree;
+        onTreesChange(newTrees);
+      }
+    },
+    [trees, onTreesChange]
+  );
+
+  // Add a brand new root node
+  const handleAddNewRoot = useCallback(() => {
+    const newId = generateNodeId();
+    const newRoot: MindmapNode = {
+      id: newId,
+      text: "New Root",
+      children: [],
+    };
+    if (onTreesChange) {
+      onTreesChange([...trees, newRoot]);
+      // Use ref to trigger focus in useEffect
+      pendingEditRef.current = newId;
+    }
+  }, [trees, onTreesChange]);
+
+  // Flattened list of all nodes across all trees for rendering
+  const allNodes = useMemo(() => {
+    const flat: NodeLayout[] = [];
+    function flatten(layout: NodeLayout) {
+      flat.push(layout);
+      for (const child of layout.children) flatten(child);
+    }
+    rootLayouts.forEach(flatten);
+    return flat;
+  }, [rootLayouts]);
+
+  useEffect(() => {
+    // Calculate SVG size based on all root layouts
     let maxX = 0;
     let maxY = 0;
 
@@ -519,11 +566,12 @@ export function MindmapSvgPreview({
       maxY = Math.max(maxY, l.y + l.height);
       l.children.forEach(traverse);
     };
-    traverse(newLayout);
+    rootLayouts.forEach(traverse);
 
-    setLayout(newLayout);
+    // Set the first layout as the main 'layout' for existing logic that expects a single layout
+    setLayout(rootLayouts.length > 0 ? rootLayouts[0] : null);
     setSvgSize({
-      width: maxX + 80,
+      width: maxX + 80, // Extra right padding
       height: maxY + 80, // Extra bottom padding
     });
 
@@ -542,6 +590,7 @@ export function MindmapSvgPreview({
         parentId: string | null;
         nextSiblingId: string | null;
         colors: { bg: string; text: string; border: string };
+        treeIndex: number;
       } | null => {
         if (l.node.id === pendingEditRef.current) {
           const colors = getNodeColor(l.level, l.branchIndex, isDark);
@@ -556,6 +605,7 @@ export function MindmapSvgPreview({
             parentId: l.parentId,
             nextSiblingId: l.nextSiblingId,
             colors,
+            treeIndex: l.treeIndex,
           };
         }
         for (const child of l.children) {
@@ -565,18 +615,22 @@ export function MindmapSvgPreview({
         return null;
       };
 
-      const found = findNode(newLayout);
+      let found = null;
+      for (const l of rootLayouts) {
+        found = findNode(l);
+        if (found) break;
+      }
       if (found) {
         setEditingNode(found);
         setEditValue(found.text === "..." ? "" : found.text);
         pendingEditRef.current = null;
       }
     }
-  }, [processedTree, isDark]);
+  }, [rootLayouts, isDark]);
 
   // Fit view to container
   const fitToView = useCallback(() => {
-    if (!layout || !containerRef.current) return;
+    if (rootLayouts.length === 0 || !containerRef.current) return;
     const { offsetWidth, offsetHeight } = containerRef.current;
     if (offsetWidth === 0 || offsetHeight === 0) return;
 
@@ -594,7 +648,7 @@ export function MindmapSvgPreview({
       x: (offsetWidth - contentWidth * newScale) / 2,
       y: (offsetHeight - contentHeight * newScale) / 2,
     });
-  }, [layout, svgSize]);
+  }, [rootLayouts, svgSize]);
 
   // Perform initial fit on load
   const hasInitialFit = useRef(false);
@@ -766,7 +820,7 @@ export function MindmapSvgPreview({
   // Handle node click
   const handleNodeClick = useCallback(
     (nodeLayout: NodeLayout) => {
-      if (onTreeChange) {
+      if (onTreesChange) {
         const colors = getNodeColor(
           nodeLayout.level,
           nodeLayout.branchIndex,
@@ -783,6 +837,7 @@ export function MindmapSvgPreview({
           parentId: nodeLayout.parentId,
           nextSiblingId: nodeLayout.nextSiblingId,
           colors,
+          treeIndex: nodeLayout.treeIndex,
         });
         setEditValue(
           nodeLayout.node.text === "..." ? "" : nodeLayout.node.text
@@ -792,17 +847,10 @@ export function MindmapSvgPreview({
         // Auto-zoom to focus on the node
         if (containerRef.current) {
           const { offsetWidth, offsetHeight } = containerRef.current;
-          const targetScale = 1.2; // Comfortable zoom level for editing
-          // If current scale is already larger, maybe keep it? Or force 1.2?
-          // User said "zoom focus 1% certain". Let's force a good readable scale (e.g. 1.0 or 1.2).
+          const targetScale = 1.2;
           const finalScale = Math.max(scale, targetScale);
 
           setScale(finalScale);
-          // Center the node:
-          // Node center in SVG coords = nodeLayout.x + width/2, nodeLayout.y + height/2
-          // Screen center = offsetWidth/2, offsetHeight/2
-          // formula: screenX = svgX * scale + posX
-          // posX = screenX - svgX * scale
 
           const nodeCenterX = nodeLayout.x + nodeLayout.width / 2;
           const nodeCenterY = nodeLayout.y + nodeLayout.height / 2;
@@ -814,7 +862,7 @@ export function MindmapSvgPreview({
         }
       }
     },
-    [onTreeChange, isDark, scale]
+    [onTreesChange, isDark, scale]
   );
 
   // Update node text and optionally add child/sibling
@@ -825,11 +873,12 @@ export function MindmapSvgPreview({
       action: "none" | "addChild" | "addSibling",
       newNote?: string
     ) => {
-      if (!onTreeChange) return;
+      if (!onTreesChange || !editingNode) return;
 
       const newNodeId = generateNodeId();
+      const treeIdx = editingNode.treeIndex;
 
-      const processTree = (node: MindmapNode): MindmapNode => {
+      const processNode = (node: MindmapNode): MindmapNode => {
         if (node.id === nodeId) {
           const updatedNode = {
             ...node,
@@ -849,7 +898,6 @@ export function MindmapSvgPreview({
           return updatedNode;
         }
 
-        // Check if this node's children contain the target (for addSibling)
         if (action === "addSibling") {
           const childIndex = node.children.findIndex((c) => c.id === nodeId);
           if (childIndex !== -1) {
@@ -866,26 +914,45 @@ export function MindmapSvgPreview({
           }
         }
 
-        return { ...node, children: node.children.map(processTree) };
+        return { ...node, children: node.children.map(processNode) };
       };
 
       if (action !== "none") {
         pendingEditRef.current = newNodeId;
       }
-      onTreeChange(processTree(tree));
+
+      // Check if we're adding a sibling to root node
+      if (action === "addSibling" && trees[treeIdx].id === nodeId) {
+        const newTrees = [...trees];
+        newTrees[treeIdx] = {
+          ...newTrees[treeIdx],
+          text: newText,
+          isDraft: false,
+        };
+        newTrees.splice(treeIdx + 1, 0, {
+          id: newNodeId,
+          text: "...",
+          children: [],
+          isDraft: true,
+        });
+        onTreesChange(newTrees);
+        return;
+      }
+
+      const newTrees = [...trees];
+      newTrees[treeIdx] = processNode(newTrees[treeIdx]);
+      onTreesChange(newTrees);
     },
-    [tree, onTreeChange]
+    [trees, onTreesChange, editingNode]
   );
 
   // Delete a node
   const deleteNode = useCallback(
     (nodeId: string) => {
-      if (!onTreeChange) return;
+      if (!onTreesChange) return;
 
       const deleteFromTree = (node: MindmapNode): MindmapNode | null => {
-        if (node.id === nodeId) {
-          return null;
-        }
+        if (node.id === nodeId) return null;
         return {
           ...node,
           children: node.children
@@ -894,18 +961,28 @@ export function MindmapSvgPreview({
         };
       };
 
-      const updatedTree = deleteFromTree(tree);
-      if (updatedTree) {
-        onTreeChange(updatedTree);
+      // Check if it's a root node
+      const rootIndex = trees.findIndex((t) => t.id === nodeId);
+      if (rootIndex !== -1) {
+        if (trees.length > 1) {
+          onTreesChange(trees.filter((t) => t.id !== nodeId));
+        } else {
+          onTreesChange([{ id: generateNodeId(), text: "...", children: [] }]);
+        }
+        return;
       }
+
+      onTreesChange(
+        trees.map(deleteFromTree).filter((t): t is MindmapNode => t !== null)
+      );
     },
-    [tree, onTreeChange]
+    [trees, onTreesChange]
   );
 
   // Toggle collapse state of a node
   const toggleCollapse = useCallback(
     (nodeId: string) => {
-      if (!onTreeChange) return;
+      if (!onTreesChange) return;
 
       const toggleInTree = (node: MindmapNode): MindmapNode => {
         if (node.id === nodeId) {
@@ -914,17 +991,17 @@ export function MindmapSvgPreview({
         return { ...node, children: node.children.map(toggleInTree) };
       };
 
-      onTreeChange(toggleInTree(tree));
+      onTreesChange(trees.map(toggleInTree));
     },
-    [tree, onTreeChange]
+    [trees, onTreesChange]
   );
 
   // Promote node (move to become sibling of parent) - Shift+Tab
   const promoteNode = useCallback(
     (nodeId: string) => {
-      if (!onTreeChange) return;
+      if (!onTreesChange) return;
 
-      // Find parent and grandparent
+      // Find which tree and parent path
       const findParentPath = (
         node: MindmapNode,
         targetId: string,
@@ -940,18 +1017,39 @@ export function MindmapSvgPreview({
         return null;
       };
 
-      const parentPath = findParentPath(tree, nodeId);
-      if (!parentPath || parentPath.length < 2) {
-        // Node is child of root or not found - cannot promote
-        return;
+      let treeIdx = -1;
+      let parentPath: MindmapNode[] | null = null;
+
+      for (let i = 0; i < trees.length; i++) {
+        parentPath = findParentPath(trees[i], nodeId);
+        if (parentPath) {
+          treeIdx = i;
+          break;
+        }
       }
 
+      if (!parentPath || parentPath.length < 1) return;
+
       const parent = parentPath[parentPath.length - 1];
-      const grandparent = parentPath[parentPath.length - 2];
       const nodeToPromote = parent.children.find((c) => c.id === nodeId);
       if (!nodeToPromote) return;
 
-      // Remove from parent, add as sibling after parent in grandparent
+      if (parentPath.length === 1) {
+        // Child of root: promote to new root
+        const newTrees = [...trees];
+        // Remove from parent (which is a root)
+        newTrees[treeIdx] = {
+          ...newTrees[treeIdx],
+          children: newTrees[treeIdx].children.filter((c) => c.id !== nodeId),
+        };
+        // Add as new root after the current one
+        newTrees.splice(treeIdx + 1, 0, nodeToPromote);
+        onTreesChange(newTrees);
+        return;
+      }
+
+      const grandparent = parentPath[parentPath.length - 2];
+
       const updateTree = (node: MindmapNode): MindmapNode => {
         if (node.id === grandparent.id) {
           const parentIndex = node.children.findIndex(
@@ -974,9 +1072,11 @@ export function MindmapSvgPreview({
         return { ...node, children: node.children.map(updateTree) };
       };
 
-      onTreeChange(updateTree(tree));
+      const finalTrees = [...trees];
+      finalTrees[treeIdx] = updateTree(finalTrees[treeIdx]);
+      onTreesChange(finalTrees);
     },
-    [tree, onTreeChange]
+    [trees, onTreesChange]
   );
 
   // Handle edit save
@@ -1699,7 +1799,7 @@ export function MindmapSvgPreview({
           <svg
             width={svgSize.width}
             height={svgSize.height}
-            className="pointer-events-none select-none"
+            className="select-none"
             style={{
               transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
               transformOrigin: "top left",
@@ -1707,7 +1807,7 @@ export function MindmapSvgPreview({
               transition: isDragging ? "none" : "transform 0.1s ease-out",
             }}
           >
-            {layout && renderNode(layout)}
+            {rootLayouts.map(renderNode)}
           </svg>
         </div>
       </div>
@@ -1725,7 +1825,7 @@ export function MindmapSvgPreview({
             }}
           >
             {(() => {
-              // Find editing node layout
+              // Find editing node layout across ALL roots
               const findNodeLayout = (nl: NodeLayout): NodeLayout | null => {
                 if (nl.node.id === editingNode.id) return nl;
                 for (const child of nl.children) {
@@ -1734,7 +1834,12 @@ export function MindmapSvgPreview({
                 }
                 return null;
               };
-              const nodeLayout = findNodeLayout(layout);
+              // Search across all root layouts
+              let nodeLayout: NodeLayout | null = null;
+              for (const rootLayout of rootLayouts) {
+                nodeLayout = findNodeLayout(rootLayout);
+                if (nodeLayout) break;
+              }
               if (!nodeLayout) return null;
 
               const { x, y, width, height, level } = nodeLayout;
@@ -2180,19 +2285,30 @@ export function MindmapSvgPreview({
                   id: "reset",
                   icon: <RotateCcw strokeWidth={2.5} className="h-6 w-6" />,
                   onClick: () => resetView(),
-                  startAngle: -44,
-                  endAngle: 44,
+                  startAngle: -35,
+                  endAngle: 35,
                   defaultColor: "rgba(75, 85, 99, 0.8)",
                   hoverColor: "rgba(243, 244, 246, 0.95)",
                   iconColor: "#FFFFFF",
                   hoverIconColor: "#111827",
                 },
                 {
+                  id: "add-root",
+                  icon: <Plus strokeWidth={2.5} className="h-7 w-7" />,
+                  onClick: () => handleAddNewRoot(),
+                  startAngle: 37,
+                  endAngle: 107,
+                  defaultColor: "rgba(59, 130, 246, 0.85)", // Blue for 'Add'
+                  hoverColor: "rgba(243, 244, 246, 0.95)",
+                  iconColor: "#FFFFFF",
+                  hoverIconColor: "#3b82f6",
+                },
+                {
                   id: "center",
                   icon: <Focus strokeWidth={2.5} className="h-6 w-6" />,
                   onClick: () => fitToView(),
-                  startAngle: 46,
-                  endAngle: 134,
+                  startAngle: 109,
+                  endAngle: 179,
                   defaultColor: "rgba(75, 85, 99, 0.8)",
                   hoverColor: "rgba(243, 244, 246, 0.95)",
                   iconColor: "#FFFFFF",
@@ -2202,8 +2318,8 @@ export function MindmapSvgPreview({
                   id: "zoom-out",
                   icon: <ZoomOut strokeWidth={2.5} className="h-6 w-6" />,
                   onClick: () => zoomOut(radialMenuPos),
-                  startAngle: 136,
-                  endAngle: 224,
+                  startAngle: 181,
+                  endAngle: 251,
                   defaultColor: "rgba(75, 85, 99, 0.8)",
                   hoverColor: "rgba(243, 244, 246, 0.95)",
                   iconColor: "#FFFFFF",
@@ -2213,8 +2329,8 @@ export function MindmapSvgPreview({
                   id: "zoom-in",
                   icon: <ZoomIn strokeWidth={2.5} className="h-7 w-7" />,
                   onClick: () => zoomIn(radialMenuPos),
-                  startAngle: 226,
-                  endAngle: 314,
+                  startAngle: 253,
+                  endAngle: 323,
                   defaultColor: "rgba(75, 85, 99, 0.8)",
                   hoverColor: "rgba(243, 244, 246, 0.95)",
                   iconColor: "#FFFFFF",

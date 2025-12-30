@@ -353,8 +353,8 @@ function NodeComponent({
 }
 
 interface MindmapEditorProps {
-  tree: MindmapNode;
-  onTreeChange: (newTree: MindmapNode) => void;
+  trees: MindmapNode[];
+  onTreesChange: (newTrees: MindmapNode[]) => void;
   className?: string;
 }
 
@@ -372,8 +372,8 @@ interface MindmapEditorProps {
  * - Collapse/expand nodes
  */
 export function MindmapEditor({
-  tree,
-  onTreeChange,
+  trees,
+  onTreesChange,
   className = "",
 }: MindmapEditorProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -382,11 +382,11 @@ export function MindmapEditor({
     null
   );
 
-  // Effect to handle focusing new nodes after tree updates
+  // Effect to handle focusing new nodes after trees update
   useEffect(() => {
     if (pendingEditRef.current) {
       const timeoutId = setTimeout(() => {
-        // Find the new node (marked with "...")
+        // Find the new node (marked with "...") across all trees
         let newNodeId: string | null = null;
 
         const findNewNode = (node: MindmapNode): void => {
@@ -400,7 +400,7 @@ export function MindmapEditor({
           }
         };
 
-        findNewNode(tree);
+        trees.forEach(findNewNode);
 
         if (newNodeId) {
           pendingEditRef.current = null;
@@ -410,7 +410,7 @@ export function MindmapEditor({
 
       return () => clearTimeout(timeoutId);
     }
-  }, [tree]);
+  }, [trees]);
 
   // Edit a node's text
   const handleEdit = useCallback(
@@ -422,9 +422,9 @@ export function MindmapEditor({
         return { ...node, children: node.children.map(updateNode) };
       };
 
-      onTreeChange(updateNode(tree));
+      onTreesChange(trees.map(updateNode));
     },
-    [tree, onTreeChange]
+    [trees, onTreesChange]
   );
 
   // Add a child to a node
@@ -447,10 +447,10 @@ export function MindmapEditor({
         return { ...node, children: node.children.map(addChild) };
       };
 
-      onTreeChange(addChild(tree));
+      onTreesChange(trees.map(addChild));
       pendingEditRef.current = { parentId: parentId, isChild: true };
     },
-    [tree, onTreeChange]
+    [trees, onTreesChange]
   );
 
   // Combined: Edit a node AND add a child in one operation
@@ -474,10 +474,10 @@ export function MindmapEditor({
         return { ...node, children: node.children.map(editAndAddChild) };
       };
 
-      onTreeChange(editAndAddChild(tree));
+      onTreesChange(trees.map(editAndAddChild));
       pendingEditRef.current = { parentId: nodeId, isChild: true };
     },
-    [tree, onTreeChange]
+    [trees, onTreesChange]
   );
 
   // Add a sibling to a node
@@ -497,15 +497,42 @@ export function MindmapEditor({
         return { ...node, children: node.children.map(addSibling) };
       };
 
-      onTreeChange(addSibling(tree));
+      // Check if it's a root node
+      const rootIndex = trees.findIndex((t) => t.id === nodeId);
+      if (rootIndex !== -1) {
+        const newTrees = [...trees];
+        newTrees.splice(rootIndex + 1, 0, {
+          id: generateNodeId(),
+          text: "...",
+          children: [],
+        });
+        onTreesChange(newTrees);
+      } else {
+        onTreesChange(trees.map(addSibling));
+      }
       pendingEditRef.current = { parentId: nodeId, isChild: false };
     },
-    [tree, onTreeChange]
+    [trees, onTreesChange]
   );
 
   // Combined: Edit a node AND add a sibling in one operation
   const handleEditAndAddSibling = useCallback(
     (nodeId: string, newText: string) => {
+      // Check if it's a root node
+      const rootIndex = trees.findIndex((t) => t.id === nodeId);
+      if (rootIndex !== -1) {
+        const newTrees = [...trees];
+        newTrees[rootIndex] = { ...newTrees[rootIndex], text: newText };
+        newTrees.splice(rootIndex + 1, 0, {
+          id: generateNodeId(),
+          text: "...",
+          children: [],
+        });
+        onTreesChange(newTrees);
+        pendingEditRef.current = { parentId: nodeId, isChild: false };
+        return;
+      }
+
       const editAndAddSibling = (parentNode: MindmapNode): MindmapNode => {
         const childIndex = parentNode.children.findIndex(
           (c) => c.id === nodeId
@@ -529,15 +556,32 @@ export function MindmapEditor({
         };
       };
 
-      onTreeChange(editAndAddSibling(tree));
+      onTreesChange(trees.map(editAndAddSibling));
       pendingEditRef.current = { parentId: nodeId, isChild: false };
     },
-    [tree, onTreeChange]
+    [trees, onTreesChange]
   );
 
   // Delete a node
   const handleDelete = useCallback(
     (nodeId: string) => {
+      // Check if it's a root node
+      if (trees.some((t) => t.id === nodeId)) {
+        if (trees.length > 1) {
+          onTreesChange(trees.filter((t) => t.id !== nodeId));
+        } else {
+          // Can't delete the last root, just reset it
+          onTreesChange([
+            {
+              id: generateNodeId(),
+              text: "...",
+              children: [],
+            },
+          ]);
+        }
+        return;
+      }
+
       const deleteNode = (node: MindmapNode): MindmapNode | null => {
         if (node.id === nodeId) {
           return null;
@@ -550,12 +594,11 @@ export function MindmapEditor({
         };
       };
 
-      const updatedTree = deleteNode(tree);
-      if (updatedTree) {
-        onTreeChange(updatedTree);
-      }
+      onTreesChange(
+        trees.map(deleteNode).filter((t): t is MindmapNode => t !== null)
+      );
     },
-    [tree, onTreeChange]
+    [trees, onTreesChange]
   );
 
   return (
@@ -569,22 +612,25 @@ export function MindmapEditor({
         = cancel
       </p>
 
-      <div className="flex justify-center py-4">
-        <NodeComponent
-          node={tree}
-          level={0}
-          nextSiblingId={null}
-          onEdit={handleEdit}
-          onAddChild={handleAddChild}
-          onEditAndAddChild={handleEditAndAddChild}
-          onAddSibling={handleAddSibling}
-          onEditAndAddSibling={handleEditAndAddSibling}
-          onDelete={handleDelete}
-          editingId={editingId}
-          setEditingId={setEditingId}
-          selectedId={selectedId}
-          setSelectedId={setSelectedId}
-        />
+      <div className="flex flex-col items-center gap-12 py-4">
+        {trees.map((tree) => (
+          <NodeComponent
+            key={tree.id}
+            node={tree}
+            level={0}
+            nextSiblingId={null}
+            onEdit={handleEdit}
+            onAddChild={handleAddChild}
+            onEditAndAddChild={handleEditAndAddChild}
+            onAddSibling={handleAddSibling}
+            onEditAndAddSibling={handleEditAndAddSibling}
+            onDelete={handleDelete}
+            editingId={editingId}
+            setEditingId={setEditingId}
+            selectedId={selectedId}
+            setSelectedId={setSelectedId}
+          />
+        ))}
       </div>
     </div>
   );

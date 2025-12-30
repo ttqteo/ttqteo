@@ -40,7 +40,7 @@ import {
   useState,
 } from "react";
 import { deleteMindmapSync, getMindmaps, upsertMindmaps } from "./actions";
-import { parseMermaidToTree, treeToMermaid } from "./mermaid-converter";
+import { parseMermaidToTrees, treesToMermaid } from "./mermaid-converter";
 import { MindmapEditor } from "./mindmap-editor";
 import { MindmapSidebar } from "./mindmap-sidebar";
 import {
@@ -55,7 +55,7 @@ import {
   switchMindmap,
   updateMindmapMode,
   updateMindmapSyncCode,
-  updateMindmapTree,
+  updateMindmapTrees,
   updateMindmapFull,
 } from "./mindmap-storage";
 import { MindmapSvgPreview } from "./mindmap-svg-preview";
@@ -117,18 +117,20 @@ export function MindmapViewer() {
   const [localCode, setLocalCode] = useState("");
   const [isTyping, setIsTyping] = useState(false);
 
-  // Get current mindmap tree
+  // Get current mindmap trees
   const currentMindmap = storage ? getCurrentMindmap(storage) : null;
-  const tree = currentMindmap?.tree || {
-    id: "root",
-    text: "...",
-    children: [],
-  };
+  const trees = currentMindmap?.trees || [
+    {
+      id: "root",
+      text: "...",
+      children: [],
+    },
+  ];
 
-  // Generate Mermaid code from tree
+  // Generate Mermaid code from trees
   const mermaidCode = useMemo(
-    () => treeToMermaid(tree, currentMindmap?.config),
-    [tree, currentMindmap?.config]
+    () => treesToMermaid(trees, currentMindmap?.config),
+    [trees, currentMindmap?.config]
   );
 
   // Sync local code with tree when tree changes externally (and not typing)
@@ -264,11 +266,11 @@ export function MindmapViewer() {
     }
   }, [mermaidCode]);
 
-  // Handle tree change for current mindmap
-  const handleTreeChange = useCallback((newTree: MindmapNode) => {
+  // Handle trees change for current mindmap
+  const handleTreesChange = useCallback((newTrees: MindmapNode[]) => {
     setStorage((prev) => {
       if (!prev) return prev;
-      return updateMindmapTree(prev, prev.currentId, newTree);
+      return updateMindmapTrees(prev, prev.currentId, newTrees);
     });
   }, []);
 
@@ -277,14 +279,14 @@ export function MindmapViewer() {
       setLocalCode(newCode);
       setIsTyping(true);
 
-      const parsed = parseMermaidToTree(newCode);
-      if (parsed.tree) {
+      const parsed = parseMermaidToTrees(newCode);
+      if (parsed.trees.length > 0) {
         setStorage((prev) => {
           if (!prev) return prev;
           return updateMindmapFull(
             prev,
             prev.currentId,
-            parsed.tree!,
+            parsed.trees,
             parsed.config
           );
         });
@@ -376,13 +378,15 @@ export function MindmapViewer() {
     [handleCodeChange]
   );
 
-  const resetTree = useCallback(() => {
-    handleTreeChange({
-      id: "root",
-      text: "...",
-      children: [],
-    });
-  }, [handleTreeChange]);
+  const resetTrees = useCallback(() => {
+    handleTreesChange([
+      {
+        id: "root",
+        text: "...",
+        children: [],
+      },
+    ]);
+  }, [handleTreesChange]);
 
   // Storage handlers
   const handleSelectMindmap = useCallback((id: string) => {
@@ -608,7 +612,7 @@ export function MindmapViewer() {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={resetTree}>
+                  <AlertDialogAction onClick={resetTrees}>
                     Reset
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -706,8 +710,8 @@ export function MindmapViewer() {
                   {viewMode === "editor" && (
                     <div className="overflow-auto p-6 sm:p-10">
                       <MindmapEditor
-                        tree={tree}
-                        onTreeChange={handleTreeChange}
+                        trees={trees}
+                        onTreesChange={handleTreesChange}
                         className="min-h-full"
                       />
                     </div>
@@ -718,8 +722,8 @@ export function MindmapViewer() {
                     <div className="flex-1 relative flex flex-col min-h-0">
                       <div className="flex-1 relative overflow-hidden">
                         <MindmapSvgPreview
-                          tree={tree}
-                          onTreeChange={handleTreeChange}
+                          trees={trees}
+                          onTreesChange={handleTreesChange}
                           isFullscreen={isFullscreen}
                           className="absolute inset-0"
                           renderMode={
