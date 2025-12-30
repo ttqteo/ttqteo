@@ -1,0 +1,61 @@
+# Mindmap Documentation
+
+Hướng dẫn nhanh để bắt đầu sử dụng Mindmap.
+
+---
+
+## ⚡ Quick Start
+
+### Phím Tắt Cơ Bản
+
+| Phím          | Chức năng             |
+| ------------- | --------------------- |
+| `Click`       | Chỉnh sửa node        |
+| `Enter`       | Lưu + tạo node anh em |
+| `Tab`         | Lưu + tạo node con    |
+| `Alt + N`     | Thêm ghi chú          |
+| `Ctrl + Z`    | Hoàn tác              |
+| `Right-click` | Mở menu tròn          |
+
+👉 Xem đầy đủ: [keyboard-shortcuts.md](./keyboard-shortcuts.md)
+
+---
+
+## 🎨 Chế Độ Render
+
+- **Brainstorm** - Tư duy nhanh, ít phân tâm
+- **Study** - Học tập, nhấn mạnh khái niệm quan trọng
+
+👉 Chi tiết: [modes.md](./modes.md)
+
+---
+
+## 🌳 Tính Năng Nổi Bật
+
+### Multi-Root (Đa Gốc)
+
+- Nhiều chủ đề trong cùng một file
+- Right-click → Add Root để tạo root mới
+
+### Node Notes (Ghi Chú)
+
+- Thêm context chi tiết cho mỗi node
+- `Alt + N` để edit note
+- Icon 💬 hiện khi có note
+
+### Undo/Redo
+
+- Lưu tối đa 50 trạng thái
+- `Ctrl + Z` / `Ctrl + Y`
+
+---
+
+## 📚 Tài Liệu Đầy Đủ
+
+- [design-philosophy.md](./design-philosophy.md) - Triết lý thiết kế
+- [node-types.md](./node-types.md) - Các loại node
+- [render-rules.md](./render-rules.md) - Quy tắc render
+- [multi-root.md](./multi-root.md) - Hướng dẫn đa gốc
+- [node-notes.md](./node-notes.md) - Ghi chú node
+- [keyboard-shortcuts.md](./keyboard-shortcuts.md) - Phím tắt đầy đủ
+- [modes.md](./modes.md) - Chế độ render chi tiết

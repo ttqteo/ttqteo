@@ -238,8 +238,8 @@ export function MindmapSidebar({
           <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
             {groupedMindmaps.thisMonth.length > 0 && (
               <div className="mb-6">
-                <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                  This month
+                <h3 className="px-3 text-xs font-semibold text-muted-foreground tracking-wider mb-2">
+                  this month
                 </h3>
                 {groupedMindmaps.thisMonth.map(renderItem)}
               </div>
@@ -247,8 +247,8 @@ export function MindmapSidebar({
 
             {groupedMindmaps.older.length > 0 && (
               <div>
-                <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                  Older
+                <h3 className="px-3 text-xs font-semibold text-muted-foreground tracking-wider mb-2">
+                  older
                 </h3>
                 {groupedMindmaps.older.map(renderItem)}
               </div>

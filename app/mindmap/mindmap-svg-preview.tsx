@@ -1,5 +1,15 @@
 "use client";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -503,6 +513,7 @@ export function MindmapSvgPreview({
   // Radial Menu State
   const [showRadialMenu, setShowRadialMenu] = useState(false);
   const [radialMenuPos, setRadialMenuPos] = useState({ x: 0, y: 0 });
+  const [showResetDialog, setShowResetDialog] = useState(false);
 
   // Undo/Redo History State
   const MAX_HISTORY = 50;
@@ -2403,7 +2414,10 @@ export function MindmapSvgPreview({
                 {
                   id: "reset",
                   icon: <RotateCcw strokeWidth={2.5} className="h-6 w-6" />,
-                  onClick: () => resetView(),
+                  onClick: () => {
+                    closeRadialMenu();
+                    setShowResetDialog(true);
+                  },
                   startAngle: -35,
                   endAngle: 35,
                   defaultColor: "rgba(75, 85, 99, 0.8)",
@@ -2602,6 +2616,30 @@ export function MindmapSvgPreview({
           </div>
         </div>
       )}
+
+      {/* Reset to Default Dialog */}
+      <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset View to Default?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reset zoom to 100% and center the view to (0, 0). Your
+              mindmap content will not be affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                resetView();
+                setShowResetDialog(false);
+              }}
+            >
+              Reset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

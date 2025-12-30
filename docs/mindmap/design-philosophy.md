@@ -6,7 +6,7 @@
 
 Mindmap có cấu trúc **tỏa** (radial) với đặc điểm:
 
-- **Một gốc duy nhất** - không phải multi-root graph
+- **Hỗ trợ multi-root** - có thể có nhiều cây độc lập trong cùng một mindmap
 - **Phân cấp nhận thức** - depth = mức độ chi tiết
 - **Hướng đọc tự nhiên** - từ trung tâm ra ngoài
 

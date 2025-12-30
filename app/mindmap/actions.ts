@@ -167,6 +167,35 @@ export async function getMindmapDocs() {
       })
     );
 
+    // Define the desired order for better UX (README first, then beginner-friendly order)
+    const order = [
+      "README",
+      "keyboard-shortcuts",
+      "multi-root",
+      "node-notes",
+      "modes",
+      "design-philosophy",
+      "node-types",
+      "render-rules",
+    ];
+
+    // Sort docs according to the order array
+    docs.sort((a, b) => {
+      const aIndex = order.indexOf(a.name);
+      const bIndex = order.indexOf(b.name);
+
+      // If both are in order array, sort by order
+      if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex;
+      }
+      // If only a is in order, put it first
+      if (aIndex !== -1) return -1;
+      // If only b is in order, put it first
+      if (bIndex !== -1) return 1;
+      // If neither is in order, sort alphabetically
+      return a.name.localeCompare(b.name);
+    });
+
     return docs;
   } catch (error) {
     console.error("Error reading mindmap docs:", error);
