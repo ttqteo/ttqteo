@@ -1,24 +1,34 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { useTheme } from "next-themes";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Brain,
+  Check,
+  ExternalLinkIcon,
+  Focus,
+  GraduationCap,
+  Layout,
+  MessageSquare,
+  RotateCcw,
+  Trash,
   ZoomIn,
   ZoomOut,
-  RotateCcw,
-  Layout,
-  Brain,
-  GraduationCap,
-  Focus,
-  ExternalLinkIcon,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { MindmapNode, SemanticType } from "./types";
+import { useTheme } from "next-themes";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  cloneTree,
   generateNodeId,
   inferSemanticTypesRecursive,
-  cloneTree,
 } from "./mermaid-converter";
+import { MindmapNode, SemanticType } from "./types";
 
 interface MindmapSvgPreviewProps {
   tree: MindmapNode;
@@ -483,10 +493,16 @@ export function MindmapSvgPreview({
     colors: { bg: string; text: string; border: string };
   } | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [editNote, setEditNote] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const noteInputRef = useRef<HTMLTextAreaElement>(null);
 
   // Pending new node to focus
   const pendingEditRef = useRef<string | null>(null);
+
+  // Radial Menu State
+  const [showRadialMenu, setShowRadialMenu] = useState(false);
+  const [radialMenuPos, setRadialMenuPos] = useState({ x: 0, y: 0 });
 
   // Calculate layout when tree changes
   useEffect(() => {
@@ -637,8 +653,14 @@ export function MindmapSvgPreview({
 
           return newScale;
         });
+      } else if (e.shiftKey) {
+        // Shift + Vertical Scroll = Horizontal Pan
+        setPosition((prev) => ({
+          x: prev.x - e.deltaY - e.deltaX,
+          y: prev.y,
+        }));
       } else {
-        // 2-finger pan (no modifier)
+        // 2-finger pan or normal scroll
         setPosition((prev) => ({
           x: prev.x - e.deltaX,
           y: prev.y - e.deltaY,
@@ -651,6 +673,30 @@ export function MindmapSvgPreview({
     });
     return () => svgContainer.removeEventListener("wheel", handleWheelNative);
   }, [layout]); // Re-attach when layout changes
+
+  // Right-click radial menu
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (editingNode) return; // Don't show while editing
+
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+
+      const newX = e.clientX - rect.left;
+      const newY = e.clientY - rect.top;
+
+      setRadialMenuPos({ x: newX, y: newY });
+      setShowRadialMenu(true);
+    },
+    [editingNode]
+  );
+
+  const closeRadialMenu = useCallback(() => {
+    setShowRadialMenu(false);
+  }, []);
 
   // React handler (backup, may not prevent scroll due to passive)
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -683,6 +729,12 @@ export function MindmapSvgPreview({
 
         return newScale;
       });
+    } else if (e.shiftKey) {
+      // Shift + Vertical Scroll = Horizontal Pan
+      setPosition((prev) => ({
+        x: prev.x - e.deltaY - e.deltaX,
+        y: prev.y,
+      }));
     } else {
       setPosition((prev) => ({
         x: prev.x - e.deltaX,
@@ -735,6 +787,7 @@ export function MindmapSvgPreview({
         setEditValue(
           nodeLayout.node.text === "..." ? "" : nodeLayout.node.text
         );
+        setEditNote(nodeLayout.node.note || "");
 
         // Auto-zoom to focus on the node
         if (containerRef.current) {
@@ -769,7 +822,8 @@ export function MindmapSvgPreview({
     (
       nodeId: string,
       newText: string,
-      action: "none" | "addChild" | "addSibling"
+      action: "none" | "addChild" | "addSibling",
+      newNote?: string
     ) => {
       if (!onTreeChange) return;
 
@@ -777,7 +831,12 @@ export function MindmapSvgPreview({
 
       const processTree = (node: MindmapNode): MindmapNode => {
         if (node.id === nodeId) {
-          const updatedNode = { ...node, text: newText, isDraft: false };
+          const updatedNode = {
+            ...node,
+            text: newText,
+            isDraft: false,
+            note: newNote !== undefined ? newNote : node.note,
+          };
           if (action === "addChild") {
             return {
               ...updatedNode,
@@ -928,7 +987,7 @@ export function MindmapSvgPreview({
       editValue.trim() || (editingNode.text !== "..." ? editingNode.text : "");
 
     if (textToSave) {
-      updateAndAddNode(editingNode.id, textToSave, "none");
+      updateAndAddNode(editingNode.id, textToSave, "none", editNote);
     } else if (editingNode.level > 0) {
       // Empty text on non-root node - delete it
       deleteNode(editingNode.id);
@@ -936,7 +995,8 @@ export function MindmapSvgPreview({
 
     setEditingNode(null);
     setEditValue("");
-  }, [editingNode, editValue, updateAndAddNode, deleteNode]);
+    setEditNote("");
+  }, [editingNode, editValue, editNote, updateAndAddNode, deleteNode]);
 
   // Handle edit cancel
   const handleEditCancel = useCallback(() => {
@@ -1030,6 +1090,10 @@ export function MindmapSvgPreview({
         // Escape: Cancel
         e.preventDefault();
         handleEditCancel();
+      } else if (e.key.toLowerCase() === "n" && e.altKey) {
+        // Alt + N: Jump to Note
+        e.preventDefault();
+        noteInputRef.current?.focus();
       } else if ((e.key === "ArrowUp" || e.key === "ArrowDown") && e.altKey) {
         // Alt + Arrow Up/Down: Navigate to previous/next sibling
         e.preventDefault();
@@ -1161,35 +1225,43 @@ export function MindmapSvgPreview({
     setPosition({ x: 0, y: 0 });
   }, []);
 
-  const zoomIn = useCallback(() => {
-    setScale((prev) => {
-      const newScale = Math.min(prev + 0.25, 3);
-      const scaleRatio = newScale / prev;
+  const zoomIn = useCallback(
+    (origin?: { x: number; y: number }) => {
+      setScale((prev) => {
+        const newScale = Math.min(prev + 0.25, 3);
+        const scaleRatio = newScale / prev;
+        const targetOrigin = origin || mousePosition;
 
-      // Adjust position to keep mouse point stationary
-      setPosition((pos) => ({
-        x: mousePosition.x - (mousePosition.x - pos.x) * scaleRatio,
-        y: mousePosition.y - (mousePosition.y - pos.y) * scaleRatio,
-      }));
+        // Adjust position to keep target point stationary
+        setPosition((pos) => ({
+          x: targetOrigin.x - (targetOrigin.x - pos.x) * scaleRatio,
+          y: targetOrigin.y - (targetOrigin.y - pos.y) * scaleRatio,
+        }));
 
-      return newScale;
-    });
-  }, [mousePosition]);
+        return newScale;
+      });
+    },
+    [mousePosition]
+  );
 
-  const zoomOut = useCallback(() => {
-    setScale((prev) => {
-      const newScale = Math.max(prev - 0.25, 0.25);
-      const scaleRatio = newScale / prev;
+  const zoomOut = useCallback(
+    (origin?: { x: number; y: number }) => {
+      setScale((prev) => {
+        const newScale = Math.max(prev - 0.25, 0.25);
+        const scaleRatio = newScale / prev;
+        const targetOrigin = origin || mousePosition;
 
-      // Adjust position to keep mouse point stationary
-      setPosition((pos) => ({
-        x: mousePosition.x - (mousePosition.x - pos.x) * scaleRatio,
-        y: mousePosition.y - (mousePosition.y - pos.y) * scaleRatio,
-      }));
+        // Adjust position to keep target point stationary
+        setPosition((pos) => ({
+          x: targetOrigin.x - (targetOrigin.x - pos.x) * scaleRatio,
+          y: targetOrigin.y - (targetOrigin.y - pos.y) * scaleRatio,
+        }));
 
-      return newScale;
-    });
-  }, [mousePosition]);
+        return newScale;
+      });
+    },
+    [mousePosition]
+  );
 
   // Mini map click handler - navigate to clicked position
   const handleMiniMapClick = useCallback(
@@ -1446,15 +1518,51 @@ export function MindmapSvgPreview({
                   wordBreak: "normal",
                   overflowWrap: "anywhere",
                   boxSizing: "border-box",
+                  position: "relative",
                 }}
                 className={isUrl(node.text) ? "" : "pointer-events-none"}
               >
-                {node.text === "..." ? (
-                  ".."
-                ) : isUrl(node.text) ? (
-                  <span className="h-auto p-0 underline">{node.text}</span>
-                ) : (
-                  node.text
+                <div
+                  className="w-full text-center"
+                  style={{
+                    display: "-webkit-box",
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                  }}
+                >
+                  {node.text === "..." ? (
+                    ".."
+                  ) : isUrl(node.text) ? (
+                    <span className="h-auto p-0 underline">{node.text}</span>
+                  ) : (
+                    node.text
+                  )}
+                </div>
+
+                {/* Note Indicator Indicator */}
+                {node.note && (
+                  <div className="absolute top-0 right-0 p-1 pointer-events-auto">
+                    <TooltipProvider delayDuration={100}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="bg-primary/20 p-0.5 rounded-full backdrop-blur-sm shadow-sm hover:scale-125 transition-transform">
+                            <MessageSquare className="h-2.5 w-2.5 text-primary" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          className="max-w-[200px] text-xs p-2 bg-background/95 backdrop-blur-sm border shadow-xl"
+                        >
+                          <div className="font-semibold text-[10px] text-muted-foreground uppercase tracking-tight mb-1 flex items-center gap-1">
+                            <MessageSquare className="h-3 w-3" /> Note
+                          </div>
+                          <p className="leading-relaxed whitespace-pre-wrap">
+                            {node.note}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 )}
               </div>
             </foreignObject>
@@ -1586,6 +1694,7 @@ export function MindmapSvgPreview({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onContextMenu={handleContextMenu}
         >
           <svg
             width={svgSize.width}
@@ -1628,14 +1737,14 @@ export function MindmapSvgPreview({
               const nodeLayout = findNodeLayout(layout);
               if (!nodeLayout) return null;
 
-              const { node, x, y, width, height, level } = nodeLayout;
+              const { x, y, width, height, level } = nodeLayout;
               const baseColors = getNodeColor(
                 level,
                 nodeLayout.branchIndex,
                 isDark
               );
               const style = getSemanticStyle(
-                node.semanticType,
+                nodeLayout.node.semanticType,
                 level,
                 renderMode,
                 baseColors,
@@ -1647,8 +1756,8 @@ export function MindmapSvgPreview({
 
               return (
                 <svg
-                  width={finalWidth + x + 50}
-                  height={finalHeight + y + 50}
+                  width={finalWidth + x + 400} // Extra width for side note and offset
+                  height={Math.max(finalHeight + y + 200, 400)}
                   style={{
                     position: "absolute",
                     top: 0,
@@ -1656,7 +1765,7 @@ export function MindmapSvgPreview({
                     pointerEvents: "none",
                   }}
                 >
-                  {/* Textarea for editing */}
+                  {/* 1. Main Textarea (Title) */}
                   <foreignObject
                     x={x}
                     y={y}
@@ -1664,50 +1773,154 @@ export function MindmapSvgPreview({
                     height={finalHeight}
                     style={{ pointerEvents: "auto" }}
                   >
-                    <textarea
-                      key={editingNode.id}
-                      ref={inputRef as any}
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        e.stopPropagation();
-                        handleKeyDown(e);
-                      }}
-                      onBlur={() => {
-                        const textToSave = editValue.trim();
-                        if (!textToSave && editingNode.level > 0) {
-                          // Delete node if empty and not root
-                          deleteNode(editingNode.id);
-                        } else if (textToSave) {
-                          // Save the text
-                          updateAndAddNode(editingNode.id, textToSave, "none");
-                        }
-                        setEditingNode(null);
-                        setEditValue("");
-                      }}
+                    <div
                       style={{
                         width: "100%",
                         height: "100%",
-                        fontSize: `${style.fontSize}px`,
-                        padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
-                        textAlign: "center",
-                        lineHeight: "1.3",
-                        fontWeight: style.fontWeight,
-                        fontFamily: "inherit",
-                        boxSizing: "border-box",
-                        background: "transparent",
-                        color: style.text,
-                        outline: "none",
-                        caretColor: style.text,
-                        wordBreak: "normal",
-                        overflowWrap: "anywhere",
-                        cursor: "text",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: style.hasBox ? style.bg : "transparent",
                         border: `2px solid ${baseColors.border}`,
                         borderRadius: `${BORDER_RADIUS}px`,
-                        resize: "none",
+                        boxSizing: "border-box",
                         overflow: "hidden",
                       }}
-                    />
+                    >
+                      <textarea
+                        key={editingNode.id}
+                        ref={inputRef as any}
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleEditSave();
+                          } else if (e.key === "Escape") {
+                            handleEditCancel();
+                          } else {
+                            handleKeyDown(e);
+                          }
+                        }}
+                        onBlur={(e) => {
+                          setTimeout(() => {
+                            if (
+                              document.activeElement !== noteInputRef.current &&
+                              editingNode
+                            ) {
+                              handleEditSave();
+                            }
+                          }, 100);
+                        }}
+                        style={{
+                          width: "100%",
+                          height: "auto",
+                          maxHeight: "100%",
+                          fontSize: `${style.fontSize}px`,
+                          padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
+                          textAlign: "center",
+                          lineHeight: "1.3",
+                          fontWeight: style.fontWeight,
+                          fontFamily: "inherit",
+                          background: "transparent",
+                          color: style.text,
+                          outline: "none",
+                          caretColor: style.text,
+                          wordBreak: "normal",
+                          overflowWrap: "anywhere",
+                          cursor: "text",
+                          resize: "none",
+                          border: "none",
+                          display: "block",
+                        }}
+                      />
+                    </div>
+                  </foreignObject>
+
+                  {/* 2. Side Note Editor (Side-by-side) */}
+                  <foreignObject
+                    x={x + finalWidth + 48} // Increased offset to avoid collapse buttons
+                    y={y - 20} // Slightly higher
+                    width={260}
+                    height={200}
+                    style={{ pointerEvents: "auto", overflow: "visible" }}
+                  >
+                    <div className="flex flex-col gap-2 p-3.5 bg-background/95 backdrop-blur-xl border-2 border-primary/30 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 slide-in-from-left-2 duration-200">
+                      <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                        <div className="flex items-center gap-2">
+                          <MessageSquare className="h-4 w-4 text-primary" />
+                          <span className="text-foreground/80">Note</span>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className="h-4 px-1 text-[9px] opacity-60 font-mono"
+                        >
+                          ALT+N
+                        </Badge>
+                      </div>
+                      <textarea
+                        ref={noteInputRef}
+                        value={editNote}
+                        onChange={(e) => setEditNote(e.target.value)}
+                        onBlur={(e) => {
+                          setTimeout(() => {
+                            if (
+                              document.activeElement !== inputRef.current &&
+                              editingNode
+                            ) {
+                              handleEditSave();
+                            }
+                          }, 100);
+                        }}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === "Escape") {
+                            handleEditCancel();
+                          }
+                          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                            handleEditSave();
+                          }
+                          if (e.key.toLowerCase() === "t" && e.altKey) {
+                            // Alt + T: Jump back to Title
+                            e.preventDefault();
+                            inputRef.current?.focus();
+                          }
+                        }}
+                        placeholder="Add deeper context here..."
+                        className="w-full h-[100px] bg-muted/30 rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-primary/20 resize-none overflow-y-auto leading-relaxed text-foreground placeholder:text-muted-foreground/30 custom-scrollbar transition-all"
+                      />
+                      <div className="flex items-center justify-between mt-1">
+                        <div className="flex flex-col">
+                          <span className="text-[9px] text-muted-foreground/60 italic">
+                            Ctrl+Enter to save
+                          </span>
+                          <span className="text-[9px] text-muted-foreground/40 font-mono uppercase tracking-tighter">
+                            Alt+T for Title
+                          </span>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 rounded-lg hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => deleteNode(editingNode.id)}
+                            title="Delete"
+                          >
+                            <Trash className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 rounded-lg hover:bg-green-500/10 hover:text-green-500"
+                            onClick={handleEditSave}
+                            title="Save"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </foreignObject>
                 </svg>
               );
@@ -1759,7 +1972,7 @@ export function MindmapSvgPreview({
           <Button
             variant="ghost"
             size="icon"
-            onClick={zoomIn}
+            onClick={() => zoomIn()}
             className="h-7 w-7 rounded-none border-r border-border/50 hover:bg-accent"
             title="Zoom in"
           >
@@ -1768,7 +1981,7 @@ export function MindmapSvgPreview({
           <Button
             variant="ghost"
             size="icon"
-            onClick={zoomOut}
+            onClick={() => zoomOut()}
             className="h-7 w-7 rounded-none border-r border-border/50 hover:bg-accent"
             title="Zoom out"
           >
@@ -1932,6 +2145,227 @@ export function MindmapSvgPreview({
             <rect x="7" y="7" width="6" height="6" rx="1" />
           </svg>
         </button>
+      )}
+
+      {/* 3. Radial Context Menu */}
+      {showRadialMenu && (
+        <div
+          className="absolute inset-0 z-[1000] pointer-events-auto overflow-hidden"
+          onClick={closeRadialMenu}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleContextMenu(e);
+          }}
+        >
+          <div
+            className="absolute origin-center"
+            style={{
+              left: radialMenuPos.x,
+              top: radialMenuPos.y,
+              transform: "translate(-50%, -50%)",
+              // Only animate-in on initial show, not on move
+              // We'll use a simple CSS class for entrance
+            }}
+          >
+            {/* SVG Donut Ring */}
+            <svg
+              width="180"
+              height="180"
+              viewBox="0 0 180 180"
+              className="drop-shadow-[0_25px_60px_rgba(0,0,0,0.6)] animate-in zoom-in duration-200"
+            >
+              {[
+                {
+                  id: "reset",
+                  icon: <RotateCcw strokeWidth={2.5} className="h-6 w-6" />,
+                  onClick: () => resetView(),
+                  startAngle: -44,
+                  endAngle: 44,
+                  defaultColor: "rgba(75, 85, 99, 0.8)",
+                  hoverColor: "rgba(243, 244, 246, 0.95)",
+                  iconColor: "#FFFFFF",
+                  hoverIconColor: "#111827",
+                },
+                {
+                  id: "center",
+                  icon: <Focus strokeWidth={2.5} className="h-6 w-6" />,
+                  onClick: () => fitToView(),
+                  startAngle: 46,
+                  endAngle: 134,
+                  defaultColor: "rgba(75, 85, 99, 0.8)",
+                  hoverColor: "rgba(243, 244, 246, 0.95)",
+                  iconColor: "#FFFFFF",
+                  hoverIconColor: "#111827",
+                },
+                {
+                  id: "zoom-out",
+                  icon: <ZoomOut strokeWidth={2.5} className="h-6 w-6" />,
+                  onClick: () => zoomOut(radialMenuPos),
+                  startAngle: 136,
+                  endAngle: 224,
+                  defaultColor: "rgba(75, 85, 99, 0.8)",
+                  hoverColor: "rgba(243, 244, 246, 0.95)",
+                  iconColor: "#FFFFFF",
+                  hoverIconColor: "#111827",
+                },
+                {
+                  id: "zoom-in",
+                  icon: <ZoomIn strokeWidth={2.5} className="h-7 w-7" />,
+                  onClick: () => zoomIn(radialMenuPos),
+                  startAngle: 226,
+                  endAngle: 314,
+                  defaultColor: "rgba(75, 85, 99, 0.8)",
+                  hoverColor: "rgba(243, 244, 246, 0.95)",
+                  iconColor: "#FFFFFF",
+                  hoverIconColor: "#111827",
+                },
+              ].map((item, i) => {
+                const outerR = 80;
+                const innerR = 38;
+                const cx = 90;
+                const cy = 90;
+
+                const polarToCartesian = (
+                  centerX: number,
+                  centerY: number,
+                  radius: number,
+                  angleInDegrees: number
+                ) => {
+                  const angleInRadians =
+                    ((angleInDegrees - 90) * Math.PI) / 180.0;
+                  return {
+                    x: centerX + radius * Math.cos(angleInRadians),
+                    y: centerY + radius * Math.sin(angleInRadians),
+                  };
+                };
+
+                const startOuter = polarToCartesian(
+                  cx,
+                  cy,
+                  outerR,
+                  item.startAngle
+                );
+                const endOuter = polarToCartesian(
+                  cx,
+                  cy,
+                  outerR,
+                  item.endAngle
+                );
+                const startInner = polarToCartesian(
+                  cx,
+                  cy,
+                  innerR,
+                  item.startAngle
+                );
+                const endInner = polarToCartesian(
+                  cx,
+                  cy,
+                  innerR,
+                  item.endAngle
+                );
+
+                const largeArcFlag = "0";
+
+                const d = [
+                  "M",
+                  startOuter.x,
+                  startOuter.y,
+                  "A",
+                  outerR,
+                  outerR,
+                  0,
+                  largeArcFlag,
+                  1,
+                  endOuter.x,
+                  endOuter.y,
+                  "L",
+                  endInner.x,
+                  endInner.y,
+                  "A",
+                  innerR,
+                  innerR,
+                  0,
+                  largeArcFlag,
+                  0,
+                  startInner.x,
+                  startInner.y,
+                  "Z",
+                ].join(" ");
+
+                const midAngle = (item.startAngle + item.endAngle) / 2;
+                const iconPos = polarToCartesian(
+                  cx,
+                  cy,
+                  (outerR + innerR) / 2,
+                  midAngle
+                );
+
+                return (
+                  <g
+                    key={item.id}
+                    className="group"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      item.onClick();
+                      closeRadialMenu();
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onMouseEnter={(e) => {
+                      const path = e.currentTarget.querySelector("path");
+                      const icon = e.currentTarget.querySelector(
+                        ".icon-container"
+                      ) as HTMLDivElement;
+                      if (path) path.style.fill = item.hoverColor;
+                      if (icon) icon.style.color = item.hoverIconColor;
+                    }}
+                    onMouseLeave={(e) => {
+                      const path = e.currentTarget.querySelector("path");
+                      const icon = e.currentTarget.querySelector(
+                        ".icon-container"
+                      ) as HTMLDivElement;
+                      if (path) path.style.fill = item.defaultColor;
+                      if (icon) icon.style.color = item.iconColor;
+                    }}
+                  >
+                    <path
+                      d={d}
+                      fill={item.defaultColor}
+                      className="transition-colors duration-200 cursor-pointer"
+                    />
+                    <foreignObject
+                      x={iconPos.x - 14}
+                      y={iconPos.y - 14}
+                      width="28"
+                      height="28"
+                      className="pointer-events-none"
+                    >
+                      <div
+                        className="icon-container flex items-center justify-center w-full h-full transition-colors duration-200"
+                        style={{ color: item.iconColor }}
+                      >
+                        {item.icon}
+                      </div>
+                    </foreignObject>
+                  </g>
+                );
+              })}
+
+              {/* Hollow center indicator dot */}
+              <circle
+                cx="90"
+                cy="90"
+                r="4"
+                fill="#3b82f6"
+                fillOpacity="0.8"
+                className="animate-pulse"
+              />
+            </svg>
+          </div>
+        </div>
       )}
     </div>
   );

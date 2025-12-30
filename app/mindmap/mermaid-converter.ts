@@ -14,9 +14,34 @@ import { MindmapNode } from "./types";
  * //   root((Root))
  * //     Child
  */
-export function treeToMermaid(node: MindmapNode): string {
-  let result = "mindmap\n";
+export function treeToMermaid(
+  node: MindmapNode,
+  config?: Record<string, any>
+): string {
+  let result = "";
+
+  // 1. Add Frontmatter if config exists
+  if (config && Object.keys(config).length > 0) {
+    result += "---\n";
+    result += "config:\n";
+    for (const [key, value] of Object.entries(config)) {
+      if (typeof value === "object") {
+        result += `  ${key}:\n`;
+        for (const [subKey, subValue] of Object.entries(value)) {
+          result += `    ${subKey}: ${subValue}\n`;
+        }
+      } else {
+        result += `  ${key}: ${value}\n`;
+      }
+    }
+    result += "---\n";
+  }
+
+  result += "mindmap\n";
   result += `  root((${escapeText(node.text)}))\n`;
+  if (node.note) {
+    result += `  %% note: ${node.note.replace(/\n/g, "\\n")}\n`;
+  }
 
   for (const child of node.children) {
     result += nodeToMermaid(child, 2);
@@ -31,6 +56,10 @@ export function treeToMermaid(node: MindmapNode): string {
 function nodeToMermaid(node: MindmapNode, level: number): string {
   const indent = "  ".repeat(level);
   let result = `${indent}${escapeText(node.text)}\n`;
+
+  if (node.note) {
+    result += `${indent}%% note: ${node.note.replace(/\n/g, "\\n")}\n`;
+  }
 
   for (const child of node.children) {
     result += nodeToMermaid(child, level + 1);
@@ -58,18 +87,81 @@ function escapeText(text: string): string {
  * @param code - Mermaid mindmap code string
  * @returns Parsed MindmapNode tree or null if invalid
  */
-export function parseMermaidToTree(code: string): MindmapNode | null {
-  const lines = code.split("\n").filter((line) => line.trim() !== "");
-  if (lines.length === 0) return null;
+export function parseMermaidToTree(code: string): {
+  tree: MindmapNode | null;
+  config: Record<string, any> | null;
+} {
+  const lines = code.split("\n");
+  let mindmapStartIndex = -1;
+  let config: Record<string, any> | null = null;
+
+  // 1. Extract Frontmatter
+  if (lines[0]?.trim() === "---") {
+    let frontmatterLines: string[] = [];
+    let i = 1;
+    while (i < lines.length && lines[i].trim() !== "---") {
+      frontmatterLines.push(lines[i]);
+      i++;
+    }
+    if (i < lines.length) {
+      // Very simple YAML parser for config:
+      const configObj: Record<string, any> = {};
+      let currentSection: string | null = null;
+
+      frontmatterLines.forEach((line) => {
+        const trimmed = line.trim();
+        if (trimmed === "config:") return;
+
+        const sectionMatch = line.match(/^\s{2}(\w+):\s*$/);
+        const kvMatch = line.match(/^\s*(\w+):\s*(.+)$/);
+
+        if (sectionMatch) {
+          currentSection = sectionMatch[1];
+          configObj[currentSection] = {};
+        } else if (kvMatch) {
+          const key = kvMatch[1];
+          const value = kvMatch[2].trim();
+          const parsedValue =
+            value === "true" ? true : value === "false" ? false : value;
+
+          if (currentSection && line.startsWith("    ")) {
+            configObj[currentSection][key] = parsedValue;
+          } else {
+            configObj[key] = parsedValue;
+          }
+        }
+      });
+      config = configObj;
+      mindmapStartIndex = i + 1;
+    }
+  }
+
+  const mindmapLines =
+    mindmapStartIndex !== -1
+      ? lines.slice(mindmapStartIndex)
+      : lines.filter((line) => line.trim() !== "");
+
+  if (mindmapLines.length === 0) return { tree: null, config };
 
   let rootNode: MindmapNode | null = null;
   const nodeStack: { node: MindmapNode; indent: number }[] = [];
   let idCounter = 0;
+  let lastNode: MindmapNode | null = null;
 
-  // First pass: build tree structure
-  for (const line of lines) {
+  for (const line of mindmapLines) {
     const trimmed = line.trim();
-    if (trimmed === "mindmap") continue;
+    if (trimmed === "mindmap" || trimmed === "") continue;
+
+    // Handle notes
+    if (trimmed.startsWith("%% note:")) {
+      if (lastNode) {
+        lastNode.note = trimmed
+          .replace("%% note:", "")
+          .trim()
+          .replace(/\\n/g, "\n");
+      }
+      continue;
+    }
 
     const indentMatch = line.match(/^(\s*)/);
     const indent = indentMatch ? indentMatch[1].length : 0;
@@ -106,6 +198,7 @@ export function parseMermaidToTree(code: string): MindmapNode | null {
       }
       nodeStack.push({ node: newNode, indent });
     }
+    lastNode = newNode;
   }
 
   // Second pass: Infer semantic types
@@ -113,7 +206,7 @@ export function parseMermaidToTree(code: string): MindmapNode | null {
     inferSemanticTypesRecursive(rootNode, 0, null);
   }
 
-  return rootNode;
+  return { tree: rootNode, config };
 }
 
 /**
@@ -226,6 +319,7 @@ export function cloneTree(node: MindmapNode): MindmapNode {
     children: node.children.map(cloneTree),
     isDraft: node.isDraft,
     isCollapsed: node.isCollapsed,
+    note: node.note,
   };
 }
 

@@ -284,3 +284,40 @@ export function updateMindmapMode(
     ),
   };
 }
+
+/**
+ * Update config for specific mindmap
+ */
+export function updateMindmapConfig(
+  storage: MindmapStorage,
+  mindmapId: string,
+  config: Record<string, any> | null
+): MindmapStorage {
+  return {
+    ...storage,
+    mindmaps: storage.mindmaps.map((m) =>
+      m.id === mindmapId
+        ? { ...m, config: config || undefined, updatedAt: Date.now() }
+        : m
+    ),
+  };
+}
+
+/**
+ * Update both tree and config
+ */
+export function updateMindmapFull(
+  storage: MindmapStorage,
+  mindmapId: string,
+  tree: MindmapNode,
+  config: Record<string, any> | null
+): MindmapStorage {
+  return {
+    ...storage,
+    mindmaps: storage.mindmaps.map((m) =>
+      m.id === mindmapId
+        ? { ...m, tree, config: config || undefined, updatedAt: Date.now() }
+        : m
+    ),
+  };
+}

@@ -56,6 +56,7 @@ import {
   updateMindmapMode,
   updateMindmapSyncCode,
   updateMindmapTree,
+  updateMindmapFull,
 } from "./mindmap-storage";
 import { MindmapSvgPreview } from "./mindmap-svg-preview";
 import { MindmapNode, MindmapStorage } from "./types";
@@ -125,7 +126,10 @@ export function MindmapViewer() {
   };
 
   // Generate Mermaid code from tree
-  const mermaidCode = useMemo(() => treeToMermaid(tree), [tree]);
+  const mermaidCode = useMemo(
+    () => treeToMermaid(tree, currentMindmap?.config),
+    [tree, currentMindmap?.config]
+  );
 
   // Sync local code with tree when tree changes externally (and not typing)
   useEffect(() => {
@@ -274,11 +278,19 @@ export function MindmapViewer() {
       setIsTyping(true);
 
       const parsed = parseMermaidToTree(newCode);
-      if (parsed) {
-        handleTreeChange(parsed);
+      if (parsed.tree) {
+        setStorage((prev) => {
+          if (!prev) return prev;
+          return updateMindmapFull(
+            prev,
+            prev.currentId,
+            parsed.tree!,
+            parsed.config
+          );
+        });
       }
     },
-    [handleTreeChange]
+    [setStorage]
   );
 
   // Reset typing flag when popup closes or on blur

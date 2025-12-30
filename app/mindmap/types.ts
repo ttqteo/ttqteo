@@ -18,6 +18,7 @@ export interface MindmapNode {
   isDraft?: boolean; // true = uncommitted draft node
   isCollapsed?: boolean; // true = children are hidden
   semanticType?: SemanticType;
+  note?: string; // Optional detailed note/annotation
 }
 
 /**
@@ -30,6 +31,7 @@ export interface MindmapItem {
   createdAt: number; // Timestamp
   updatedAt: number; // Timestamp
   renderMode?: "brainstorm" | "study" | "classic";
+  config?: Record<string, any>; // Mermaid frontmatter config
 }
 
 /**
