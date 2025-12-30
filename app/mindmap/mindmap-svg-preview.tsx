@@ -70,24 +70,25 @@ function generateBranchColor(
   // Golden angle (~137.5°) for optimal color distribution
   const hue = (branchIndex * 137.5 + 30) % 360;
 
-  // Primary: saturated, medium lightness
-  const primaryBg = `hsl(${hue}, 75%, 55%)`;
-  const primaryBorder = `hsl(${hue}, 75%, 45%)`;
-  // Dark mode: always white text for primary nodes if they are saturated
-  const primaryText = isDark
-    ? "#ffffff"
-    : hue > 45 && hue < 200
-    ? "#1f2937"
-    : "#ffffff";
+  // Primary: saturated
+  // Reduce lightness in dark mode to prevent glare ("chói")
+  const primaryLightness = isDark ? 45 : 55;
+  const primaryBg = `hsl(${hue}, 75%, ${primaryLightness}%)`;
+  const primaryBorder = `hsl(${hue}, 75%, ${primaryLightness - 10}%)`;
+
+  // Text contrast: use dark text for bright hues (Yellow, Green, Cyan)
+  // These hues (approx 45-190) are naturally very bright at 45-55% lightness
+  const isBrightHue = hue > 45 && hue < 195;
+  const primaryText = isBrightHue ? "#0f172a" : "#ffffff";
 
   // Secondary: less saturated
   const secondaryBg = isDark
-    ? `hsl(${hue}, 40%, 15%)`
+    ? `hsl(${hue}, 40%, 12%)`
     : `hsl(${hue}, 80%, 85%)`;
   const secondaryBorder = isDark
-    ? `hsl(${hue}, 50%, 25%)`
+    ? `hsl(${hue}, 50%, 20%)`
     : `hsl(${hue}, 70%, 75%)`;
-  const secondaryText = isDark ? "#f9fafb" : "#1f2937"; // High contrast white for dark mode secondary
+  const secondaryText = isDark ? "#f1f5f9" : "#1f2937";
 
   return {
     primary: { bg: primaryBg, text: primaryText, border: primaryBorder },
@@ -381,20 +382,34 @@ function getSemanticStyle(
   if (!style.hasBox) {
     style.bg = "transparent";
     style.border = "transparent";
-    // Keep text color, or ensure it's visible on white/dark bg
-    if (mode === "brainstorm" && level > 0) {
-      // In brainstorm, maybe force standard text color for readability if transparent
-      if (baseColors.text === "#ffffff") {
-        // If original was white text (on dark bg), switch to dark text for transparent bg
-        // But wait, generateBranchColor returns white text for saturated backgrounds.
-        // If we remove bg, we must change text to dark.
-        style.text = baseColors.border; // Use the border color (darker version of hue) for text
+
+    // In brainstorm/study modes, if background is transparent,
+    // we must ensure text color has contrast with the main background.
+    if (isDark) {
+      // In Dark Mode, we need Light text.
+      // If the node's text color was set to dark (#0f172a / #1f2937) for a box,
+      // or if it's the very dark secondary background (12% lightness), switch it.
+      const isDarkText =
+        style.text === "#0f172a" ||
+        style.text === "#1f2937" ||
+        style.text.includes("12%)");
+
+      if (isDarkText || level > 0) {
+        // For nodes without a box, we use the branch's hue but ensure it's bright enough
+        if (baseColors.bg.startsWith("hsl")) {
+          // Identify the current lightness in the HSL string (e.g., 45% or 12%)
+          // and replace it with a consistent bright 70% for text readability
+          style.text = baseColors.bg.replace(/,\s*\d+%\)/, ", 70%)");
+        } else {
+          // Fallback if not HSL
+          style.text = baseColors.bg;
+        }
       }
-    }
-    // Similar for Study mode
-    if (mode === "study" && !style.hasBox && baseColors.text === "#ffffff") {
-      style.text = baseColors.border;
-      style.fontWeight = 600;
+    } else {
+      // In Light Mode, we need Dark text.
+      if (style.text === "#ffffff") {
+        style.text = baseColors.border; // Usually a darker version
+      }
     }
   }
 
@@ -506,6 +521,7 @@ export function MindmapSvgPreview({
   } | null>(null);
   const [editValue, setEditValue] = useState("");
   const [editNote, setEditNote] = useState("");
+  const [isNoteVisible, setIsNoteVisible] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const noteInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -698,6 +714,8 @@ export function MindmapSvgPreview({
       if (found) {
         setEditingNode(found);
         setEditValue(found.text === "..." ? "" : found.text);
+        setEditNote(""); // New nodes have no note initially
+        setIsNoteVisible(false); // Hide note for auto-focused new nodes
         pendingEditRef.current = null;
       }
     }
@@ -943,6 +961,7 @@ export function MindmapSvgPreview({
           nodeLayout.node.text === "..." ? "" : nodeLayout.node.text
         );
         setEditNote(nodeLayout.node.note || "");
+        setIsNoteVisible(true); // Show note when explicitly clicking a node
 
         // Auto-zoom to focus on the node
         if (containerRef.current) {
@@ -1315,7 +1334,8 @@ export function MindmapSvgPreview({
       } else if (e.key.toLowerCase() === "n" && e.altKey) {
         // Alt + N: Jump to Note
         e.preventDefault();
-        noteInputRef.current?.focus();
+        setIsNoteVisible(true);
+        setTimeout(() => noteInputRef.current?.focus(), 50);
       } else if ((e.key === "ArrowUp" || e.key === "ArrowDown") && e.altKey) {
         // Alt + Arrow Up/Down: Navigate to previous/next sibling
         e.preventDefault();
@@ -1947,7 +1967,7 @@ export function MindmapSvgPreview({
       {/* Editing node overlay - rendered separately to be on top */}
       {editingNode && layout && (
         <div
-          className="absolute inset-0 pointer-events-none overflow-hidden"
+          className="absolute inset-0 pointer-events-none"
           style={{ zIndex: 50 }}
         >
           <div
@@ -1992,9 +2012,7 @@ export function MindmapSvgPreview({
               const finalHeight = Math.max(height, editDimensions.height);
 
               return (
-                <svg
-                  width={finalWidth + x + 400} // Extra width for side note and offset
-                  height={Math.max(finalHeight + y + 200, 400)}
+                <div
                   style={{
                     position: "absolute",
                     top: 0,
@@ -2003,163 +2021,168 @@ export function MindmapSvgPreview({
                   }}
                 >
                   {/* 1. Main Textarea (Title) */}
-                  <foreignObject
-                    x={x}
-                    y={y}
-                    width={finalWidth}
-                    height={finalHeight}
-                    style={{ pointerEvents: "auto" }}
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: x,
+                      top: y,
+                      width: finalWidth,
+                      height: finalHeight,
+                      pointerEvents: "auto",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: style.hasBox ? style.bg : "transparent",
+                      border: `2px solid ${baseColors.border}`,
+                      borderRadius: `${BORDER_RADIUS}px`,
+                      boxSizing: "border-box",
+                      overflow: "hidden",
+                    }}
                   >
-                    <div
+                    <textarea
+                      key={editingNode.id}
+                      ref={inputRef as any}
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleEditSave();
+                        } else if (e.key === "Escape") {
+                          handleEditCancel();
+                        } else {
+                          handleKeyDown(e);
+                        }
+                      }}
+                      onBlur={(e) => {
+                        setTimeout(() => {
+                          if (
+                            document.activeElement !== noteInputRef.current &&
+                            editingNode
+                          ) {
+                            handleEditSave();
+                          }
+                        }, 100);
+                      }}
+                      onClick={() => setIsNoteVisible(true)}
                       style={{
                         width: "100%",
-                        height: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background: style.hasBox ? style.bg : "transparent",
-                        border: `2px solid ${baseColors.border}`,
-                        borderRadius: `${BORDER_RADIUS}px`,
-                        boxSizing: "border-box",
-                        overflow: "hidden",
+                        height: "auto",
+                        maxHeight: "100%",
+                        fontSize: `${style.fontSize}px`,
+                        padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
+                        textAlign: "center",
+                        lineHeight: "1.3",
+                        fontWeight: style.fontWeight,
+                        fontFamily: "inherit",
+                        background: "transparent",
+                        color: style.text,
+                        outline: "none",
+                        caretColor: style.text,
+                        wordBreak: "normal",
+                        overflowWrap: "anywhere",
+                        cursor: "text",
+                        resize: "none",
+                        border: "none",
+                        display: "block",
+                      }}
+                    />
+                  </div>
+
+                  {/* 2. Side Note Editor (Now below the node, using HTML for no clipping) */}
+                  {isNoteVisible && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: x + finalWidth / 2,
+                        top: y + finalHeight + 12,
+                        width: 280,
+                        transform: "translateX(-50%)",
+                        pointerEvents: "auto",
                       }}
                     >
-                      <textarea
-                        key={editingNode.id}
-                        ref={inputRef as any}
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          e.stopPropagation();
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            handleEditSave();
-                          } else if (e.key === "Escape") {
-                            handleEditCancel();
-                          } else {
-                            handleKeyDown(e);
-                          }
-                        }}
-                        onBlur={(e) => {
-                          setTimeout(() => {
-                            if (
-                              document.activeElement !== noteInputRef.current &&
-                              editingNode
-                            ) {
+                      <div className="flex flex-col gap-2 p-3 bg-background/95 backdrop-blur-xl border border-primary/20 rounded-xl shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="bg-primary/10 p-1 rounded-md">
+                              <MessageSquare className="h-3.5 w-3.5 text-primary" />
+                            </div>
+                            <span className="text-[11px] font-bold text-foreground/70 uppercase tracking-wider">
+                              Note
+                            </span>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className="h-4 px-1.5 text-[9px] opacity-70 font-mono tracking-tighter"
+                          >
+                            ALT + N
+                          </Badge>
+                        </div>
+                        <textarea
+                          ref={noteInputRef}
+                          value={editNote}
+                          onChange={(e) => setEditNote(e.target.value)}
+                          onBlur={(e) => {
+                            setTimeout(() => {
+                              if (
+                                document.activeElement !== inputRef.current &&
+                                editingNode
+                              ) {
+                                handleEditSave();
+                              }
+                            }, 100);
+                          }}
+                          onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === "Escape") {
+                              handleEditCancel();
+                            }
+                            if (e.key === "Enter" && e.altKey) {
                               handleEditSave();
                             }
-                          }, 100);
-                        }}
-                        style={{
-                          width: "100%",
-                          height: "auto",
-                          maxHeight: "100%",
-                          fontSize: `${style.fontSize}px`,
-                          padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
-                          textAlign: "center",
-                          lineHeight: "1.3",
-                          fontWeight: style.fontWeight,
-                          fontFamily: "inherit",
-                          background: "transparent",
-                          color: style.text,
-                          outline: "none",
-                          caretColor: style.text,
-                          wordBreak: "normal",
-                          overflowWrap: "anywhere",
-                          cursor: "text",
-                          resize: "none",
-                          border: "none",
-                          display: "block",
-                        }}
-                      />
-                    </div>
-                  </foreignObject>
-
-                  {/* 2. Side Note Editor (Side-by-side) */}
-                  <foreignObject
-                    x={x + finalWidth + 48} // Increased offset to avoid collapse buttons
-                    y={y - 20} // Slightly higher
-                    width={260}
-                    height={200}
-                    style={{ pointerEvents: "auto", overflow: "visible" }}
-                  >
-                    <div className="flex flex-col gap-2 p-3.5 bg-background/95 backdrop-blur-xl border-2 border-primary/30 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 slide-in-from-left-2 duration-200">
-                      <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                        <div className="flex items-center gap-2">
-                          <MessageSquare className="h-4 w-4 text-primary" />
-                          <span className="text-foreground/80">Note</span>
-                        </div>
-                        <Badge
-                          variant="outline"
-                          className="h-4 px-1 text-[9px] opacity-60 font-mono"
-                        >
-                          ALT+N
-                        </Badge>
-                      </div>
-                      <textarea
-                        ref={noteInputRef}
-                        value={editNote}
-                        onChange={(e) => setEditNote(e.target.value)}
-                        onBlur={(e) => {
-                          setTimeout(() => {
-                            if (
-                              document.activeElement !== inputRef.current &&
-                              editingNode
-                            ) {
-                              handleEditSave();
+                            if (e.key.toLowerCase() === "t" && e.altKey) {
+                              e.preventDefault();
+                              inputRef.current?.focus();
                             }
-                          }, 100);
-                        }}
-                        onKeyDown={(e) => {
-                          e.stopPropagation();
-                          if (e.key === "Escape") {
-                            handleEditCancel();
-                          }
-                          if (e.key === "Enter" && e.altKey) {
-                            handleEditSave();
-                          }
-                          if (e.key.toLowerCase() === "t" && e.altKey) {
-                            // Alt + T: Jump back to Title
-                            e.preventDefault();
-                            inputRef.current?.focus();
-                          }
-                        }}
-                        placeholder="Add deeper context here..."
-                        className="w-full h-[100px] bg-muted/30 rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-primary/20 resize-none overflow-y-auto leading-relaxed text-foreground placeholder:text-muted-foreground/30 custom-scrollbar transition-all"
-                      />
-                      <div className="flex items-center justify-between mt-1">
-                        <div className="flex flex-col">
-                          <span className="text-[9px] text-muted-foreground/60 italic">
-                            Alt+Enter to save
-                          </span>
-                          <span className="text-[9px] text-muted-foreground/40 font-mono uppercase tracking-tighter">
-                            Alt+T for Title
-                          </span>
-                        </div>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 rounded-lg hover:bg-destructive/10 hover:text-destructive"
-                            onClick={() => deleteNode(editingNode.id)}
-                            title="Delete"
-                          >
-                            <Trash className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 rounded-lg hover:bg-green-500/10 hover:text-green-500"
-                            onClick={handleEditSave}
-                            title="Save"
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                          </Button>
+                          }}
+                          placeholder="Add deeper context here..."
+                          className="w-full h-[90px] bg-muted/20 hover:bg-muted/30 focus:bg-muted/40 rounded-lg p-2.5 text-xs outline-none transition-all resize-none overflow-y-auto leading-relaxed text-foreground placeholder:text-muted-foreground/30 custom-scrollbar"
+                        />
+                        <div className="flex items-center justify-between pt-1">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] text-muted-foreground/50 italic leading-none mb-1">
+                              Alt+Enter to save
+                            </span>
+                            <span className="text-[9px] text-muted-foreground/30 font-mono uppercase tracking-tighter leading-none">
+                              Alt+T for Title
+                            </span>
+                          </div>
+                          <div className="flex gap-1.5">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors"
+                              onClick={() => deleteNode(editingNode.id)}
+                              title="Delete"
+                            >
+                              <Trash className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="default"
+                              size="icon"
+                              className="h-7 w-7 rounded-md shadow-sm"
+                              onClick={handleEditSave}
+                              title="Save"
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </foreignObject>
-                </svg>
+                  )}
+                </div>
               );
             })()}
           </div>
