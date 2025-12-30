@@ -31,6 +31,8 @@ import {
   Trash,
   ZoomIn,
   ZoomOut,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -418,7 +420,7 @@ export function MindmapSvgPreview({
   const containerRef = useRef<HTMLDivElement>(null);
   const svgContainerRef = useRef<HTMLDivElement>(null);
 
-  const { resolvedTheme } = useTheme();
+  const { resolvedTheme, theme, setTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
   // Render mode state (Brainstorm vs Study vs Classic)
@@ -2226,10 +2228,25 @@ export function MindmapSvgPreview({
             variant="ghost"
             size="icon"
             onClick={fitToView}
-            className="h-7 w-7 rounded-none hover:bg-accent"
+            className="h-7 w-7 rounded-none border-r border-border/50 hover:bg-accent"
             title="Center view"
           >
             <Focus className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="h-7 w-7 rounded-none hover:bg-accent"
+            title={
+              theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"
+            }
+          >
+            {theme === "dark" ? (
+              <Sun className="h-3.5 w-3.5" />
+            ) : (
+              <Moon className="h-3.5 w-3.5" />
+            )}
           </Button>
         </div>
         <span className="flex items-center px-1.5 text-[10px] font-mono text-muted-foreground bg-background/90 backdrop-blur-md rounded border border-border/50 shadow-sm min-w-[35px] justify-center">

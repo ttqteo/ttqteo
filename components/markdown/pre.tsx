@@ -12,7 +12,9 @@ export default function Pre({
         <Copy content={raw!} />
       </div>
       <div className="relative">
-        <pre {...rest}>{children}</pre>
+        <pre {...rest} className="p-4 pt-12 rounded-lg overflow-x-auto">
+          {children}
+        </pre>
       </div>
     </div>
   );
