@@ -222,7 +222,7 @@ export function MindmapSidebar({
           {/* Sidebar Header */}
           <div className="p-4 flex items-center justify-between border-b">
             <h2 className="font-semibold text-lg flex items-center gap-2">
-              Mindmaps
+              mindmaps
             </h2>
             <Button
               variant="ghost"

@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  useState,
-  useRef,
-  useCallback,
-  KeyboardEvent,
-  useEffect,
-  useMemo,
-} from "react";
-import { Button } from "@/components/ui/button";
+import { useFocusMode } from "@/components/contexts/focus-mode-context";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,47 +12,54 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { User } from "@supabase/supabase-js";
 import {
   Check,
-  Copy,
-  Code,
-  RotateCcw,
-  Maximize2,
-  Minimize2,
-  X,
-  Loader2,
-  Layers,
-  Eye,
-  PanelLeft,
   Cloud,
   CloudOff,
   CloudUpload,
+  Code,
+  Copy,
+  Loader2,
+  Maximize2,
+  Minimize2,
+  PanelLeft,
+  RotateCcw,
+  X,
 } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
-import { useFocusMode } from "@/components/contexts/focus-mode-context";
-import { MindmapNode, MindmapStorage } from "./types";
-import { treeToMermaid, parseMermaidToTree } from "./mermaid-converter";
-import { MindmapSvgPreview } from "./mindmap-svg-preview";
+import Image from "next/image";
+import {
+  KeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { deleteMindmapSync, getMindmaps, upsertMindmaps } from "./actions";
+import { parseMermaidToTree, treeToMermaid } from "./mermaid-converter";
 import { MindmapEditor } from "./mindmap-editor";
 import { MindmapSidebar } from "./mindmap-sidebar";
 import {
-  loadMindmapStorage,
-  saveMindmapStorage,
-  getCurrentMindmap,
-  updateMindmapTree,
   addMindmap,
   deleteMindmap,
+  generateSyncCode,
+  getCurrentMindmap,
+  loadMindmapStorage,
+  mergeMindmaps,
   renameMindmap,
+  saveMindmapStorage,
   switchMindmap,
   updateMindmapMode,
-  mergeMindmaps,
   updateMindmapSyncCode,
-  generateSyncCode,
+  updateMindmapTree,
 } from "./mindmap-storage";
-import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
-import { getMindmaps, upsertMindmap, deleteMindmapSync } from "./actions";
-import { User } from "@supabase/supabase-js";
+import { MindmapSvgPreview } from "./mindmap-svg-preview";
+import { MindmapNode, MindmapStorage } from "./types";
+import { cn } from "@/lib/utils";
 
 type ViewMode = "editor" | "preview";
 
@@ -220,19 +219,17 @@ export function MindmapViewer() {
           );
 
           if (toSync.length > 0) {
-            await Promise.all(
-              toSync.map(async (m) => {
-                await upsertMindmap(m, storage.syncCode);
-                lastSyncedRef.current[m.id] = m.updatedAt;
-              })
-            );
+            await upsertMindmaps(toSync, storage.syncCode);
+            toSync.forEach((m) => {
+              lastSyncedRef.current[m.id] = m.updatedAt;
+            });
           }
           setSyncStatus("synced");
         } catch (error) {
           console.error("Sync error:", error);
           setSyncStatus("error");
         }
-      }, 2000); // 2s debounce
+      }, 10000); // 10s debounce
 
       return () => clearTimeout(timeoutId);
     }
@@ -429,7 +426,7 @@ export function MindmapViewer() {
     >
       <div
         className={`relative border rounded-xl overflow-hidden bg-background flex ${
-          isFullscreen ? "h-screen" : "h-[80vh] min-h-[500px]"
+          isFullscreen ? "h-screen" : "h-[calc(100vh-80px)] min-h-[500px]"
         }`}
       >
         {/* Sidebar for multiple mindmaps */}
@@ -609,76 +606,76 @@ export function MindmapViewer() {
 
           <div className="flex-1 flex overflow-hidden">
             {/* Code Sidebar (Popup) */}
-            {showCodePopup && (
+            <div
+              className={cn(
+                "absolute top-16 right-4 z-40 border rounded-lg shadow-xl bg-background flex flex-col transition-all duration-300 ease-in-out transform",
+                showCodePopup
+                  ? "translate-x-0 opacity-100 scale-100"
+                  : "translate-x-[120%] opacity-0 scale-95 pointer-events-none"
+              )}
+              style={{
+                width: sidebarWidth,
+                height: "calc(100% - 80px)",
+                minWidth: 300,
+                maxWidth: 800,
+              }}
+            >
+              {/* Resize handle */}
               <div
-                className="absolute top-16 right-4 z-40 border rounded-lg shadow-xl bg-background flex flex-col animate-in fade-in zoom-in-95 duration-200"
-                style={{
-                  width: sidebarWidth,
-                  height: "calc(100% - 80px)",
-                  minWidth: 300,
-                  maxWidth: 800,
+                className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-primary/50 transition-colors z-[60] opacity-0 hover:opacity-100"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setIsResizing(true);
+                  const startX = e.clientX;
+                  const startWidth = sidebarWidth;
+
+                  const handleMouseMove = (e: MouseEvent) => {
+                    const newWidth = startWidth - (e.clientX - startX);
+                    setSidebarWidth(Math.min(800, Math.max(300, newWidth)));
+                  };
+
+                  const handleMouseUp = () => {
+                    setIsResizing(false);
+                    document.removeEventListener("mousemove", handleMouseMove);
+                    document.removeEventListener("mouseup", handleMouseUp);
+                  };
+
+                  document.addEventListener("mousemove", handleMouseMove);
+                  document.addEventListener("mouseup", handleMouseUp);
                 }}
-              >
-                {/* Resize handle */}
-                <div
-                  className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-primary/50 transition-colors z-[60] opacity-0 hover:opacity-100"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    setIsResizing(true);
-                    const startX = e.clientX;
-                    const startWidth = sidebarWidth;
-
-                    const handleMouseMove = (e: MouseEvent) => {
-                      const newWidth = startWidth - (e.clientX - startX);
-                      setSidebarWidth(Math.min(800, Math.max(300, newWidth)));
-                    };
-
-                    const handleMouseUp = () => {
-                      setIsResizing(false);
-                      document.removeEventListener(
-                        "mousemove",
-                        handleMouseMove
-                      );
-                      document.removeEventListener("mouseup", handleMouseUp);
-                    };
-
-                    document.addEventListener("mousemove", handleMouseMove);
-                    document.addEventListener("mouseup", handleMouseUp);
-                  }}
-                />
-                <div className="flex-1 overflow-hidden flex flex-col">
-                  <div className="bg-muted/50 px-3 py-2 border-b flex items-center justify-between">
-                    <span className="text-xs font-semibold text-foreground flex items-center gap-2">
-                      <Code className="h-3 w-3" /> Mermaid Source
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setShowCodePopup(false)}
-                      className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  <div className="flex-1 overflow-hidden relative">
-                    <Textarea
-                      ref={textareaRef}
-                      value={localCode}
-                      onChange={(e) => handleCodeChange(e.target.value)}
-                      onBlur={() => setIsTyping(false)}
-                      onKeyDown={handleCodeKeyDown}
-                      className="absolute inset-0 w-full h-full font-mono text-xs border-0 rounded-none focus-visible:ring-0 resize-none p-3 leading-relaxed break-all"
-                      style={{
-                        overflowWrap: "break-word",
-                        wordBreak: "break-all",
-                      }}
-                      placeholder="Enter your mermaid mindmap syntax..."
-                      spellCheck={false}
-                    />
-                  </div>
+              />
+              <div className="flex-1 overflow-hidden flex flex-col">
+                <div className="bg-muted/50 px-3 py-2 border-b flex items-center justify-between">
+                  <span className="text-xs font-semibold text-foreground flex items-center gap-2">
+                    <Code className="h-3 w-3" /> Mermaid Source
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowCodePopup(false)}
+                    className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="flex-1 overflow-hidden relative">
+                  <Textarea
+                    ref={textareaRef}
+                    value={localCode}
+                    onChange={(e) => handleCodeChange(e.target.value)}
+                    onBlur={() => setIsTyping(false)}
+                    onKeyDown={handleCodeKeyDown}
+                    className="absolute inset-0 w-full h-full font-mono text-xs border-0 rounded-none focus-visible:ring-0 resize-none p-3 leading-relaxed break-all"
+                    style={{
+                      overflowWrap: "break-word",
+                      wordBreak: "break-all",
+                    }}
+                    placeholder="Enter your mermaid mindmap syntax..."
+                    spellCheck={false}
+                  />
                 </div>
               </div>
-            )}
+            </div>
 
             {/* Main Content */}
             <div className="flex-1 relative">

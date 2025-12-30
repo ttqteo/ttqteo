@@ -73,6 +73,40 @@ export async function upsertMindmap(mindmap: MindmapItem, shareCode?: string) {
   return { success: true };
 }
 
+export async function upsertMindmaps(
+  mindmaps: MindmapItem[],
+  shareCode?: string
+) {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user && !shareCode)
+    return { success: false, error: "Not authenticated" };
+
+  const { error } = await supabase.from("mindmaps").upsert(
+    mindmaps.map((m) => ({
+      id: m.id,
+      user_id: user?.id || null,
+      share_code: shareCode || null,
+      name: m.name,
+      tree: m.tree,
+      render_mode: m.renderMode,
+      updated_at: new Date(m.updatedAt).toISOString(),
+      created_at: new Date(m.createdAt).toISOString(),
+      is_deleted: false,
+    }))
+  );
+
+  if (error) {
+    console.error("Error upserting mindmaps:", error);
+    return { success: false, error };
+  }
+
+  return { success: true };
+}
+
 export async function deleteMindmapSync(id: string, shareCode?: string) {
   const supabase = await createSupabaseServerClient();
   const {
