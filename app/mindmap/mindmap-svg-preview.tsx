@@ -144,6 +144,8 @@ function measureNode(
   text: string,
   fontSize: number = 14
 ): { width: number; height: number } {
+  if (typeof text !== "string") return { width: 64, height: 28 };
+
   // Vietnamese characters with diacritics are "tall" and "wide"
   const AVG_CHAR_WIDTH = fontSize * 0.65;
   const SAFE_CHAR_WIDTH = fontSize * 0.65;
@@ -172,16 +174,43 @@ function measureNode(
 
   let totalLines = 0;
   for (const line of sourceLines) {
-    const wrappedLines = Math.ceil(line.length / charsPerLine) || 1;
-    totalLines += wrappedLines;
+    if (!line.trim()) {
+      totalLines += 1;
+      continue;
+    }
+    // Simulate word wrapping
+    const words = line.split(/\s+/);
+    let currentLineLength = 0;
+    let linesForThisSourceLine = 1;
+
+    for (const word of words) {
+      const wordLen = word.length;
+      if (currentLineLength + wordLen > charsPerLine) {
+        // If word itself is longer than line, split it
+        if (wordLen > charsPerLine) {
+          linesForThisSourceLine += Math.floor(wordLen / charsPerLine);
+          currentLineLength = wordLen % charsPerLine;
+        } else {
+          linesForThisSourceLine++;
+          currentLineLength = wordLen;
+        }
+      } else {
+        currentLineLength += wordLen + 1; // +1 for space
+      }
+    }
+    totalLines += linesForThisSourceLine;
   }
 
-  const height = Math.max(
+  const finalHeight = Math.max(
     NODE_MIN_HEIGHT,
-    totalLines * LINE_HEIGHT_MEASURE + NODE_PADDING_Y * 2 + 8 // Increased safety buffer
+    totalLines * LINE_HEIGHT_MEASURE + NODE_PADDING_Y * 2 + 12
   );
 
-  return { width, height };
+  // Safeguard against NaN or Infinity
+  const safeWidth = isFinite(width) ? width : 200;
+  const safeHeight = isFinite(finalHeight) ? finalHeight : 40;
+
+  return { width: safeWidth, height: safeHeight };
 }
 
 /**
@@ -272,12 +301,14 @@ function calculateLayout(
  */
 function getLayoutBottom(layout: NodeLayout): number {
   if (layout.children.length === 0 || layout.node.isCollapsed) {
-    return layout.y + layout.height;
+    const bottom = layout.y + layout.height;
+    return isFinite(bottom) ? bottom : layout.y + 40;
   }
-  return Math.max(
+  const bottom = Math.max(
     layout.y + layout.height,
     ...layout.children.map(getLayoutBottom)
   );
+  return isFinite(bottom) ? bottom : layout.y + 100;
 }
 
 /**
@@ -664,9 +695,11 @@ export function MindmapSvgPreview({
 
     // Set the first layout as the main 'layout' for existing logic that expects a single layout
     setLayout(rootLayouts.length > 0 ? rootLayouts[0] : null);
+    const safeWidth = isFinite(maxX) ? maxX + 120 : 1000;
+    const safeHeight = isFinite(maxY) ? maxY + 120 : 1000;
     setSvgSize({
-      width: maxX + 80, // Extra right padding
-      height: maxY + 80, // Extra bottom padding
+      width: safeWidth,
+      height: safeHeight,
     });
 
     // If there's a pending node to focus, find and edit it
@@ -737,12 +770,16 @@ export function MindmapSvgPreview({
     const padding = 60;
     const scaleX = (offsetWidth - padding * 2) / contentWidth;
     const scaleY = (offsetHeight - padding * 2) / contentHeight;
-    const newScale = Math.min(Math.max(0.3, Math.min(scaleX, scaleY)), 1.2);
+    const newScale = Math.min(Math.max(0.1, Math.min(scaleX, scaleY)), 1.2);
 
-    setScale(newScale);
+    setScale(isNaN(newScale) ? 1 : newScale);
     setPosition({
-      x: (offsetWidth - contentWidth * newScale) / 2,
-      y: (offsetHeight - contentHeight * newScale) / 2,
+      x: isFinite((offsetWidth - contentWidth * newScale) / 2)
+        ? (offsetWidth - contentWidth * newScale) / 2
+        : 0,
+      y: isFinite((offsetHeight - contentHeight * newScale) / 2)
+        ? (offsetHeight - contentHeight * newScale) / 2
+        : 0,
     });
   }, [rootLayouts, svgSize]);
 
@@ -1285,9 +1322,10 @@ export function MindmapSvgPreview({
           handleEditSave();
         } else if (editingNode.level > 0) {
           // Not root - save and add new sibling below
+          const idToUpdate = editingNode.id;
+          updateAndAddNode(idToUpdate, textToSave, "addSibling");
           setEditingNode(null);
           setEditValue("");
-          updateAndAddNode(editingNode.id, textToSave, "addSibling");
         } else {
           // Root node - just save
           handleEditSave();
@@ -1307,9 +1345,10 @@ export function MindmapSvgPreview({
           return;
         }
 
+        const idToUpdate = editingNode.id;
+        updateAndAddNode(idToUpdate, textToSave || "Node", "addChild");
         setEditingNode(null);
         setEditValue("");
-        updateAndAddNode(editingNode.id, textToSave || "Node", "addChild");
       } else if (e.key === "Backspace" && editValue === "") {
         // Backspace on empty text - delete node and focus parent
         if (editingNode.level > 0) {
@@ -1573,7 +1612,8 @@ export function MindmapSvgPreview({
     let finalWidth = width;
     let finalHeight = height;
     if (isEditing && editValue) {
-      const editDimensions = measureNode(editValue);
+      // Pass correct font size for root/section etc
+      const editDimensions = measureNode(editValue, style.fontSize);
       finalWidth = Math.max(width, editDimensions.width);
       finalHeight = Math.max(height, editDimensions.height);
     }
@@ -1762,7 +1802,7 @@ export function MindmapSvgPreview({
                   width: "100%",
                   height: "100%",
                   display: "flex",
-                  alignItems: "center",
+                  alignItems: style.hasBox ? "center" : "flex-end", // Align to underline for boxless
                   justifyContent: "center",
                   padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
                   fontSize: `${style.fontSize}px`,
@@ -1777,6 +1817,7 @@ export function MindmapSvgPreview({
                   overflowWrap: "anywhere",
                   boxSizing: "border-box",
                   position: "relative",
+                  overflow: "visible", // Ensure tooltips aren't clipped
                 }}
                 className={isUrl(node.text) ? "" : "pointer-events-none"}
               >
@@ -1785,7 +1826,7 @@ export function MindmapSvgPreview({
                   style={{
                     display: "-webkit-box",
                     WebkitBoxOrient: "vertical",
-                    overflow: "hidden",
+                    overflow: style.hasBox ? "hidden" : "visible",
                   }}
                 >
                   {node.text === "..." ? (
@@ -1797,29 +1838,21 @@ export function MindmapSvgPreview({
                   )}
                 </div>
 
-                {/* Note Indicator Indicator */}
+                {/* Note Indicator Indicator - Custom CSS Tooltip to avoid SVG Portal issues */}
                 {node.note && (
-                  <div className="absolute top-0 right-0 p-1 pointer-events-auto">
-                    <TooltipProvider delayDuration={100}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="bg-primary/20 p-0.5 rounded-full backdrop-blur-sm shadow-sm hover:scale-125 transition-transform">
-                            <MessageSquare className="h-2.5 w-2.5 text-primary" />
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent
-                          side="top"
-                          className="max-w-[200px] text-xs p-2 bg-background/95 backdrop-blur-sm border shadow-xl"
-                        >
-                          <div className="font-semibold text-[10px] text-muted-foreground uppercase tracking-tight mb-1 flex items-center gap-1">
-                            <MessageSquare className="h-3 w-3" /> Note
-                          </div>
-                          <p className="leading-relaxed whitespace-pre-wrap">
-                            {node.note}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                  <div className="absolute top-0 right-0 p-1 pointer-events-auto group/note">
+                    <div className="bg-primary/20 p-0.5 rounded-full backdrop-blur-sm shadow-sm hover:scale-125 transition-transform">
+                      <MessageSquare className="h-2.5 w-2.5 text-primary" />
+                    </div>
+                    {/* Hover Tooltip - Local absolute positioning avoids SVG scale drift */}
+                    <div className="absolute bottom-full right-0 mb-2 opacity-0 group-hover/note:opacity-100 pointer-events-none transition-all duration-200 translate-y-2 group-hover/note:translate-y-0 z-[100] min-w-[150px] max-w-[240px] bg-background/95 backdrop-blur-md border border-border/50 shadow-2xl rounded-lg p-3 text-xs text-foreground text-left flex gap-2 items-center">
+                      <MessageSquare className="h-2.5 w-2.5 text-primary" />
+                      <div className="leading-relaxed whitespace-pre-wrap font-medium">
+                        {node.note}
+                      </div>
+                      {/* Tooltip Arrow */}
+                      <div className="absolute top-full right-3 -translate-y-px border-8 border-transparent border-t-background/95 drop-shadow-sm" />
+                    </div>
                   </div>
                 )}
               </div>
@@ -1868,7 +1901,7 @@ export function MindmapSvgPreview({
           >
             <circle
               cx={x + width + 12}
-              cy={y + height / 2}
+              cy={style.hasBox ? y + height / 2 : y + height - 10}
               r={10}
               fill={baseColors.bg}
               stroke={baseColors.border}
@@ -1877,7 +1910,7 @@ export function MindmapSvgPreview({
             />
             <text
               x={x + width + 12}
-              y={y + height / 2}
+              y={style.hasBox ? y + height / 2 : y + height - 10}
               textAnchor="middle"
               dominantBaseline="central"
               fontSize="12"
@@ -1892,13 +1925,13 @@ export function MindmapSvgPreview({
               <>
                 <circle
                   cx={x + width + 22}
-                  cy={y + height / 2 - 8}
+                  cy={style.hasBox ? y + height / 2 - 8 : y + height - 18}
                   r={8}
                   fill={baseColors.border}
                 />
                 <text
                   x={x + width + 22}
-                  y={y + height / 2 - 8}
+                  y={style.hasBox ? y + height / 2 - 8 : y + height - 18}
                   textAnchor="middle"
                   dominantBaseline="central"
                   fontSize="9"
