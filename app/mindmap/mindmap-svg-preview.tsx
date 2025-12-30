@@ -182,6 +182,7 @@ function calculateLayout(
   level: number = 0,
   startY: number = 0,
   parentId: string | null = null,
+  treeIndex: number = 0,
   branchIndex: number = 0
 ): NodeLayout {
   const { width, height } = measureNode(node.text);
@@ -195,7 +196,7 @@ function calculateLayout(
       height,
       level,
       branchIndex,
-      treeIndex: branchIndex,
+      treeIndex,
       children: [],
       parentId,
       nextSiblingId: null,
@@ -216,6 +217,7 @@ function calculateLayout(
       level + 1,
       currentY,
       node.id,
+      treeIndex, // Pass treeIndex to all children
       childBranchIndex
     );
     childLayouts.push(childLayout);
@@ -242,7 +244,7 @@ function calculateLayout(
     height,
     level,
     branchIndex,
-    treeIndex: branchIndex,
+    treeIndex,
     children: childLayouts,
     parentId,
     nextSiblingId: null,
@@ -332,10 +334,10 @@ function getSemanticStyle(
       style.fontWeight = 600;
       style.fontSize = 16;
     } else if (semanticType === "Explanation") {
-      style.fontSize = 12;
+      style.fontSize = 14;
       style.text = isDark ? "#9ca3af" : "#6b7280"; // Gray-400 / Gray-500
     } else if (semanticType === "Example") {
-      style.fontSize = 12;
+      style.fontSize = 14;
       style.dashed = true;
       style.text = isDark ? "#d1d5db" : "#4b5563"; // Gray-300 / Gray-600
     }
@@ -345,7 +347,7 @@ function getSemanticStyle(
     if (semanticType === "Section") {
       style.text = isDark ? "#fbbf24" : "#b45309"; // Amber for sections
       style.fontWeight = 700;
-      style.fontSize = 11; // Moved from original position
+      style.fontSize = 13; // Moved from original position
     } else if (semanticType === "Concept") {
       // Original brainstorm concept rule
       style.hasBox = false; // key diff: no box for concepts
@@ -502,6 +504,66 @@ export function MindmapSvgPreview({
   const [showRadialMenu, setShowRadialMenu] = useState(false);
   const [radialMenuPos, setRadialMenuPos] = useState({ x: 0, y: 0 });
 
+  // Undo/Redo History State
+  const MAX_HISTORY = 50;
+  const historyRef = useRef<MindmapNode[][]>([]);
+  const historyIndexRef = useRef(-1);
+  const isUndoRedoRef = useRef(false);
+
+  // Track tree changes for undo/redo
+  useEffect(() => {
+    // Skip if this change came from undo/redo
+    if (isUndoRedoRef.current) {
+      isUndoRedoRef.current = false;
+      return;
+    }
+
+    // Skip if trees haven't actually changed (deep compare would be expensive, so just check reference)
+    const currentHistory = historyRef.current;
+    const currentIndex = historyIndexRef.current;
+
+    // If we're in the middle of history, truncate future states
+    if (currentIndex < currentHistory.length - 1) {
+      historyRef.current = currentHistory.slice(0, currentIndex + 1);
+    }
+
+    // Add current state to history
+    historyRef.current = [
+      ...historyRef.current,
+      JSON.parse(JSON.stringify(trees)),
+    ];
+
+    // Limit history size
+    if (historyRef.current.length > MAX_HISTORY) {
+      historyRef.current = historyRef.current.slice(-MAX_HISTORY);
+    }
+
+    historyIndexRef.current = historyRef.current.length - 1;
+  }, [trees]);
+
+  // Undo function
+  const handleUndo = useCallback(() => {
+    if (historyIndexRef.current > 0 && onTreesChange) {
+      isUndoRedoRef.current = true;
+      historyIndexRef.current -= 1;
+      const previousState = historyRef.current[historyIndexRef.current];
+      onTreesChange(JSON.parse(JSON.stringify(previousState)));
+    }
+  }, [onTreesChange]);
+
+  // Redo function
+  const handleRedo = useCallback(() => {
+    if (
+      historyIndexRef.current < historyRef.current.length - 1 &&
+      onTreesChange
+    ) {
+      isUndoRedoRef.current = true;
+      historyIndexRef.current += 1;
+      const nextState = historyRef.current[historyIndexRef.current];
+      onTreesChange(JSON.parse(JSON.stringify(nextState)));
+    }
+  }, [onTreesChange]);
+
   // Calculate layout when tree changes
   const rootLayouts = useMemo(() => {
     let currentY = 40; // Start with top padding
@@ -511,7 +573,7 @@ export function MindmapSvgPreview({
     for (let i = 0; i < trees.length; i++) {
       const processedTree = cloneTree(trees[i]);
       inferSemanticTypesRecursive(processedTree, 0, null);
-      const layout = calculateLayout(processedTree, 0, currentY, null, i);
+      const layout = calculateLayout(processedTree, 0, currentY, null, i, 0);
       positionHorizontally(layout, 40); // Start with left padding
       layouts.push(layout);
       currentY = getLayoutBottom(layout) + ROOT_GAP;
@@ -727,6 +789,31 @@ export function MindmapSvgPreview({
     });
     return () => svgContainer.removeEventListener("wheel", handleWheelNative);
   }, [layout]); // Re-attach when layout changes
+
+  // Global keyboard shortcuts for Undo/Redo
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Skip if we're editing a node (let the input handle it)
+      if (editingNode) return;
+
+      // Ctrl/Cmd + Z = Undo
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+      // Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y = Redo
+      else if (
+        (e.ctrlKey || e.metaKey) &&
+        (e.key === "y" || (e.key === "z" && e.shiftKey))
+      ) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [editingNode, handleUndo, handleRedo]);
 
   // Right-click radial menu
   const handleContextMenu = useCallback(
@@ -1081,22 +1168,44 @@ export function MindmapSvgPreview({
 
   // Handle edit save
   const handleEditSave = useCallback(() => {
-    if (!editingNode) return;
+    if (!editingNode || !onTreesChange) return;
+
+    const currentEditingNode = editingNode;
+    const currentEditValue = editValue;
+    const currentEditNote = editNote;
 
     const textToSave =
-      editValue.trim() || (editingNode.text !== "..." ? editingNode.text : "");
+      currentEditValue.trim() ||
+      (currentEditingNode.text !== "..." ? currentEditingNode.text : "");
 
-    if (textToSave) {
-      updateAndAddNode(editingNode.id, textToSave, "none", editNote);
-    } else if (editingNode.level > 0) {
-      // Empty text on non-root node - delete it
-      deleteNode(editingNode.id);
-    }
-
+    // Clear editing state first
     setEditingNode(null);
     setEditValue("");
     setEditNote("");
-  }, [editingNode, editValue, editNote, updateAndAddNode, deleteNode]);
+
+    if (textToSave) {
+      // Inline the update logic to avoid dependency issues
+      const treeIdx = currentEditingNode.treeIndex;
+      const processNode = (node: MindmapNode): MindmapNode => {
+        if (node.id === currentEditingNode.id) {
+          return {
+            ...node,
+            text: textToSave,
+            isDraft: false,
+            note: currentEditNote !== undefined ? currentEditNote : node.note,
+          };
+        }
+        return { ...node, children: node.children.map(processNode) };
+      };
+
+      const newTrees = [...trees];
+      newTrees[treeIdx] = processNode(newTrees[treeIdx]);
+      onTreesChange(newTrees);
+    } else if (currentEditingNode.level > 0) {
+      // Empty text on non-root node - delete it
+      deleteNode(currentEditingNode.id);
+    }
+  }, [editingNode, editValue, editNote, trees, onTreesChange, deleteNode]);
 
   // Handle edit cancel
   const handleEditCancel = useCallback(() => {
@@ -1286,12 +1395,22 @@ export function MindmapSvgPreview({
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
+      // Close editing when clicking on background (not on a node)
+      if (editingNode) {
+        // Check if we clicked on a node or the background
+        const target = e.target as HTMLElement;
+        const isNode = target.closest(".mindmap-node");
+        if (!isNode) {
+          handleEditSave();
+        }
+      }
+
       if (e.button === 0 && !editingNode) {
         setIsDragging(true);
         setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
       }
     },
-    [position, editingNode]
+    [position, editingNode, handleEditSave]
   );
 
   const handleMouseMove = useCallback(
@@ -1983,7 +2102,7 @@ export function MindmapSvgPreview({
                           if (e.key === "Escape") {
                             handleEditCancel();
                           }
-                          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                          if (e.key === "Enter" && e.altKey) {
                             handleEditSave();
                           }
                           if (e.key.toLowerCase() === "t" && e.altKey) {
@@ -1998,7 +2117,7 @@ export function MindmapSvgPreview({
                       <div className="flex items-center justify-between mt-1">
                         <div className="flex flex-col">
                           <span className="text-[9px] text-muted-foreground/60 italic">
-                            Ctrl+Enter to save
+                            Alt+Enter to save
                           </span>
                           <span className="text-[9px] text-muted-foreground/40 font-mono uppercase tracking-tighter">
                             Alt+T for Title
