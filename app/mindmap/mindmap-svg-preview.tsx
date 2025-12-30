@@ -1838,15 +1838,18 @@ export function MindmapSvgPreview({
                   )}
                 </div>
 
-                {/* Note Indicator Indicator - Custom CSS Tooltip to avoid SVG Portal issues */}
+                {/* Note Indicator Indicator - Always show small preview text */}
                 {node.note && (
-                  <div className="absolute top-0 right-0 p-1 pointer-events-auto group/note">
-                    <div className="bg-primary/20 p-0.5 rounded-full backdrop-blur-sm shadow-sm hover:scale-125 transition-transform">
+                  <div className="absolute top-0 right-0 p-1 pointer-events-auto group/note flex items-center gap-1.5">
+                    <div className="text-[9px] text-muted-foreground font-medium max-w-[150px] truncate">
+                      {node.note}
+                    </div>
+                    <div className="bg-primary/20 p-0.5 rounded-full backdrop-blur-sm shadow-sm hover:scale-125 transition-transform shrink-0">
                       <MessageSquare className="h-2.5 w-2.5 text-primary" />
                     </div>
                     {/* Hover Tooltip - Local absolute positioning avoids SVG scale drift */}
-                    <div className="absolute bottom-full right-0 mb-2 opacity-0 group-hover/note:opacity-100 pointer-events-none transition-all duration-200 translate-y-2 group-hover/note:translate-y-0 z-[100] min-w-[150px] max-w-[240px] bg-background/95 backdrop-blur-md border border-border/50 shadow-2xl rounded-lg p-3 text-xs text-foreground text-left flex gap-2 items-center">
-                      <MessageSquare className="h-2.5 w-2.5 text-primary" />
+                    <div className="absolute bottom-full right-0 mb-2 opacity-0 group-hover/note:opacity-100 pointer-events-none transition-all duration-200 translate-y-2 group-hover/note:translate-y-0 z-[100] min-w-[150px] max-w-[240px] bg-background/95 backdrop-blur-md border border-border/50 shadow-2xl rounded-lg p-3 text-xs text-foreground text-left">
+                      <MessageSquare className="size-3 text-primary" />
                       <div className="leading-relaxed whitespace-pre-wrap font-medium">
                         {node.note}
                       </div>
@@ -2152,22 +2155,6 @@ export function MindmapSvgPreview({
                       }}
                     >
                       <div className="flex flex-col gap-1.5 p-2 bg-background/95 backdrop-blur-xl border border-primary/20 rounded-xl shadow-2xl animate-in fade-in slide-in-from-top-1 duration-200">
-                        <div className="flex items-center justify-between px-1">
-                          <div className="flex items-center gap-1.5">
-                            <div className="bg-primary/10 p-1 rounded-md">
-                              <MessageSquare className="h-3 w-3 text-primary" />
-                            </div>
-                            <span className="text-[10px] font-bold text-foreground/70 uppercase tracking-wider">
-                              Note
-                            </span>
-                          </div>
-                          <Badge
-                            variant="secondary"
-                            className="h-3.5 px-1 text-[8px] opacity-70 font-mono tracking-tighter"
-                          >
-                            ALT + N
-                          </Badge>
-                        </div>
                         <textarea
                           ref={noteInputRef}
                           value={editNote}
@@ -2200,29 +2187,49 @@ export function MindmapSvgPreview({
                           autoCorrect="off"
                           className="w-full h-[60px] bg-muted/20 hover:bg-muted/30 focus:bg-muted/40 rounded-lg p-2 text-xs outline-none transition-all resize-none overflow-y-auto leading-tight text-foreground placeholder:text-muted-foreground/30 custom-scrollbar"
                         />
-                        <div className="flex items-center justify-between pt-0.5 px-0.5">
-                          <div className="flex flex-col">
-                            <span className="text-[8px] text-muted-foreground/50 italic leading-none mb-0.5">
-                              Alt+Enter to save
-                            </span>
-                            <span className="text-[8px] text-muted-foreground/30 font-mono uppercase tracking-tighter leading-none">
-                              Alt+T for Title
-                            </span>
+                        <div className="mt-1 pt-2 flex items-center justify-between border-t border-primary/5">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex flex-col items-center">
+                              <span className="flex items-center gap-1 text-[10px] text-muted-foreground/70 font-medium">
+                                <kbd className="pointer-events-none h-3.5 select-none items-center gap-1 rounded border border-border/80 bg-muted/80 px-1 font-mono text-[7px] font-bold flex text-foreground">
+                                  alt
+                                </kbd>
+                                <span className="opacity-70">+</span>
+                                <kbd className="pointer-events-none h-3.5 select-none items-center gap-1 rounded border border-border/80 bg-muted/80 px-1 font-mono text-[7px] font-bold flex text-foreground">
+                                  n
+                                </kbd>
+                                <span className="ml-0.5 opacity-60">
+                                  to note
+                                </span>
+                              </span>
+                              <span className="flex items-center gap-1 text-[10px] text-muted-foreground/70 font-medium">
+                                <kbd className="pointer-events-none h-3.5 select-none items-center gap-1 rounded border border-border/80 bg-muted/80 px-1 font-mono text-[7px] font-bold flex text-foreground">
+                                  alt
+                                </kbd>
+                                <span className="opacity-70">+</span>
+                                <kbd className="pointer-events-none h-3.5 select-none items-center gap-1 rounded border border-border/80 bg-muted/80 px-1 font-mono text-[7px] font-bold flex text-foreground">
+                                  enter
+                                </kbd>
+                                <span className="ml-0.5 opacity-60">
+                                  to save
+                                </span>
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex gap-1">
+                          <div className="flex items-center gap-1.5 bg-background/50 p-1 rounded-xl border border-border/40 shadow-sm backdrop-blur-md">
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors"
+                              className="h-7 w-7 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-all active:scale-90"
                               onClick={() => deleteNode(editingNode.id)}
                               title="Delete"
                             >
-                              <Trash className="h-3 w-3" />
+                              <Trash className="h-3.5 w-3.5" />
                             </Button>
                             <Button
                               variant="default"
                               size="icon"
-                              className="h-6 w-6 rounded-md shadow-sm"
+                              className="h-7 w-7 rounded-lg shadow-md transition-all active:scale-90 bg-primary hover:bg-primary/90"
                               onClick={handleEditSave}
                               title="Save"
                             >
