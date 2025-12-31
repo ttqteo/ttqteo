@@ -1802,7 +1802,7 @@ export function MindmapSvgPreview({
                   width: "100%",
                   height: "100%",
                   display: "flex",
-                  alignItems: style.hasBox ? "center" : "flex-end", // Align to underline for boxless
+                  alignItems: "center", // Align to underline for boxless
                   justifyContent: "center",
                   padding: `${NODE_PADDING_Y}px ${NODE_PADDING_X}px`,
                   fontSize: `${style.fontSize}px`,
@@ -1840,7 +1840,7 @@ export function MindmapSvgPreview({
 
                 {/* Note Indicator Indicator - Always show small preview text */}
                 {node.note && (
-                  <div className="absolute top-0 right-0 p-1 pointer-events-auto group/note flex items-center gap-1.5">
+                  <div className="absolute top-[-4px] right-0 p-1 pointer-events-auto group/note flex items-center gap-1.5">
                     <div className="text-[9px] text-muted-foreground font-medium max-w-[150px] truncate">
                       {node.note}
                     </div>
