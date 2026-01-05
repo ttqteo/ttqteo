@@ -752,6 +752,27 @@ export function MindmapSvgPreview({
         setEditValue(found.text === "..." ? "" : found.text);
         setEditNote(""); // New nodes have no note initially
         setIsNoteVisible(false); // Hide note for auto-focused new nodes
+
+        // Auto-center to the new node
+        if (containerRef.current) {
+          const { offsetWidth, offsetHeight } = containerRef.current;
+          // Zoom in slightly if we're too far out
+          const targetScale = 1.1;
+          const finalScale = Math.max(scale, targetScale);
+
+          if (finalScale !== scale) {
+            setScale(finalScale);
+          }
+
+          const nodeCenterX = found.x + found.width / 2;
+          const nodeCenterY = found.y + found.height / 2;
+
+          setPosition({
+            x: offsetWidth / 2 - nodeCenterX * finalScale,
+            y: offsetHeight / 2 - nodeCenterY * finalScale,
+          });
+        }
+
         pendingEditRef.current = null;
       }
     }
@@ -1840,12 +1861,25 @@ export function MindmapSvgPreview({
 
                 {/* Note Indicator Indicator - Always show small preview text */}
                 {node.note && (
-                  <div className="absolute top-[-4px] right-0 p-1 pointer-events-auto group/note flex items-center gap-1.5">
-                    <div className="text-[9px] text-muted-foreground font-medium max-w-[150px] truncate">
+                  <div className="absolute top-[-4px] right-2 p-1 pointer-events-auto group/note flex items-center gap-1.5">
+                    <div
+                      style={{ color: style.text, opacity: 0.7 }}
+                      className="text-[9px] font-medium max-w-[150px] truncate"
+                    >
                       {node.note}
                     </div>
-                    <div className="bg-primary/20 p-0.5 rounded-full backdrop-blur-sm shadow-sm hover:scale-125 transition-transform shrink-0">
-                      <MessageSquare className="h-2.5 w-2.5 text-primary" />
+                    <div
+                      style={{
+                        backgroundColor: isDark
+                          ? "rgba(255,255,255,0.15)"
+                          : "rgba(0,0,0,0.1)",
+                      }}
+                      className="p-0.5 rounded-full backdrop-blur-sm shadow-sm hover:scale-125 transition-transform shrink-0"
+                    >
+                      <MessageSquare
+                        style={{ color: style.text }}
+                        className="h-2.5 w-2.5"
+                      />
                     </div>
                     {/* Hover Tooltip - Local absolute positioning avoids SVG scale drift */}
                     <div className="absolute bottom-full right-0 mb-2 opacity-0 group-hover/note:opacity-100 pointer-events-none transition-all duration-200 translate-y-2 group-hover/note:translate-y-0 z-[100] min-w-[150px] max-w-[240px] bg-background/95 backdrop-blur-md border border-border/50 shadow-2xl rounded-lg p-3 text-xs text-foreground text-left">

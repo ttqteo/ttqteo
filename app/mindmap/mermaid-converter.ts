@@ -4,11 +4,14 @@ import { MindmapNode } from "./types";
  * Converts multiple MindmapNode trees to Mermaid mindmap syntax
  *
  * @param trees - The root nodes of the mindmaps
+ * @param config - Optional Mermaid frontmatter config
+ * @param name - Optional name for the Virtual Root (if multiple trees exist)
  * @returns Mermaid mindmap code as string
  */
 export function treesToMermaid(
   trees: MindmapNode[],
-  config?: Record<string, any>
+  config?: Record<string, any>,
+  name: string = "Mindmap"
 ): string {
   let result = "";
 
@@ -31,12 +34,20 @@ export function treesToMermaid(
 
   result += "mindmap\n";
 
-  for (const tree of trees) {
-    result += `  root((${escapeText(tree.text)}))\n`;
+  if (trees.length > 1) {
+    // Multi-root case: Wrap in a Virtual Root
+    result += `  %% virtual_root\n`;
+    result += `  ${escapeText(name)}\n`;
+    for (const tree of trees) {
+      result += nodeToMermaid(tree, 2);
+    }
+  } else if (trees.length === 1) {
+    // Single root case: No Virtual Root, no root(( )) bọc
+    const tree = trees[0];
+    result += `  ${escapeText(tree.text)}\n`;
     if (tree.note) {
       result += `  %% note: ${tree.note.replace(/\n/g, "\\n")}\n`;
     }
-
     for (const child of tree.children) {
       result += nodeToMermaid(child, 2);
     }
@@ -154,9 +165,17 @@ export function parseMermaidToTrees(code: string): {
     if (indent < minIndent) minIndent = indent;
   }
 
+  let isVirtualRoot = false;
+
   for (const line of mindmapLines) {
     const trimmed = line.trim();
     if (trimmed === "mindmap" || trimmed === "") continue;
+
+    // Handle virtual root marker
+    if (trimmed === "%% virtual_root") {
+      isVirtualRoot = true;
+      continue;
+    }
 
     // Handle notes
     if (trimmed.startsWith("%% note:")) {
@@ -172,13 +191,24 @@ export function parseMermaidToTrees(code: string): {
     const indentMatch = line.match(/^(\s*)/);
     const indent = indentMatch ? indentMatch[1].length : 0;
 
-    // Extract text (handle root((text)) syntax)
+    // Extract text (handle root((text)) syntax for backward compatibility)
     let text = trimmed;
     const rootMatch = trimmed.match(/^root\(\((.+)\)\)$/);
     if (rootMatch) {
       text = unescapeText(rootMatch[1]);
     } else {
-      text = unescapeText(text);
+      // Also handle simple parens or brackets if they were used for shapes
+      const shapeMatch = trimmed.match(
+        /^(.+?)(?:\(\(|\(\)|\[\[|\[\]|\{\{|\{\})\s*$/
+      );
+      if (shapeMatch) {
+        // This is a bit complex to regex perfectly for all Mermaid shapes,
+        // but we want to at least handle the text inside.
+        // For now, let's keep it simple and just unescape everything.
+        text = unescapeText(text);
+      } else {
+        text = unescapeText(text);
+      }
     }
 
     const newNode: MindmapNode = {
@@ -212,12 +242,18 @@ export function parseMermaidToTrees(code: string): {
     lastNode = newNode;
   }
 
+  // Handle Virtual Root unwrapping
+  let finalRoots = roots;
+  if (isVirtualRoot && roots.length === 1 && roots[0].children.length > 0) {
+    finalRoots = roots[0].children;
+  }
+
   // Second pass: Infer semantic types for each tree
-  roots.forEach((root) => {
+  finalRoots.forEach((root) => {
     inferSemanticTypesRecursive(root, 0, null);
   });
 
-  return { trees: roots, config };
+  return { trees: finalRoots, config };
 }
 
 /**

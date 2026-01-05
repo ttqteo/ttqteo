@@ -129,8 +129,8 @@ export function MindmapViewer() {
 
   // Generate Mermaid code from trees
   const mermaidCode = useMemo(
-    () => treesToMermaid(trees, currentMindmap?.config),
-    [trees, currentMindmap?.config]
+    () => treesToMermaid(trees, currentMindmap?.config, currentMindmap?.name),
+    [trees, currentMindmap?.config, currentMindmap?.name]
   );
 
   // Sync local code with tree when tree changes externally (and not typing)
