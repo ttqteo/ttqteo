@@ -19,11 +19,18 @@ const Views = ({
   isDetail?: boolean;
   isPublished?: boolean;
 }) => {
+  const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<BlogStats | null>(null);
   const hasViewedRef = useRef(false);
   const [isLiking, setIsLiking] = useState(false);
 
+  // Prevent hydration mismatch by only rendering after mount
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
     const fetchAndMaybeIncrement = async () => {
       const { data } = await supabase
         .from("blogs")
@@ -54,7 +61,7 @@ const Views = ({
     };
 
     fetchAndMaybeIncrement();
-  }, [slug, isDetail, isPublished]);
+  }, [mounted, slug, isDetail, isPublished]);
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent link navigation if inside a card
@@ -72,6 +79,18 @@ const Views = ({
 
     setIsLiking(false);
   };
+
+  // Render skeleton during SSR to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="flex items-center justify-center text-muted-foreground gap-2">
+        <EyeIcon width={16} height={16} className="animate-pulse" />
+        <span className="min-w-[20px] animate-pulse">-</span>
+        <HeartIcon width={16} height={16} className="animate-pulse" />
+        <span className="min-w-[20px] animate-pulse">-</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center justify-center text-muted-foreground gap-2">
