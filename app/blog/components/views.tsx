@@ -40,8 +40,14 @@ const Views = ({
         currentViews += 1;
         hasViewedRef.current = true;
 
-        // Increment in background
-        supabase.rpc("increment_views", { blog_slug: slug });
+        // Increment in background (with error logging)
+        supabase
+          .rpc("increment_views", { blog_slug: slug })
+          .then(({ error }) => {
+            if (error) {
+              console.error("Failed to increment views:", error);
+            }
+          });
       }
 
       setStats({ views: currentViews, likes: currentLikes });
