@@ -14,10 +14,12 @@ const Views = ({
   slug,
   isDetail = false,
   isPublished = false,
+  viewOnly = false,
 }: {
   slug: string;
   isDetail?: boolean;
   isPublished?: boolean;
+  viewOnly?: boolean;
 }) => {
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<BlogStats | null>(null);
@@ -83,17 +85,31 @@ const Views = ({
   // Render skeleton during SSR to prevent hydration mismatch
   if (!mounted) {
     return (
-      <div className="flex items-center justify-center text-muted-foreground gap-2">
+      <div
+        className={cn(
+          "flex items-center text-muted-foreground gap-2",
+          viewOnly && "pointer-events-none"
+        )}
+      >
         <EyeIcon width={16} height={16} className="animate-pulse" />
         <span className="min-w-[20px] animate-pulse">-</span>
-        <HeartIcon width={16} height={16} className="animate-pulse" />
-        <span className="min-w-[20px] animate-pulse">-</span>
+        {!viewOnly && (
+          <>
+            <HeartIcon width={16} height={16} className="animate-pulse" />
+            <span className="min-w-[20px] animate-pulse">-</span>
+          </>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-center text-muted-foreground gap-2">
+    <div
+      className={cn(
+        "flex items-center text-muted-foreground gap-2",
+        viewOnly && "pointer-events-none"
+      )}
+    >
       <EyeIcon
         width={16}
         height={16}
@@ -102,19 +118,25 @@ const Views = ({
       <span className={cn("min-w-[20px]", stats === null && "animate-pulse")}>
         {stats?.views ?? "-"}
       </span>
-      <HeartIcon
-        width={16}
-        height={16}
-        className={cn(
-          "cursor-pointer hover:text-red-500 transition-colors",
-          isLiking && "animate-pulse text-red-500",
-          stats === null && "animate-pulse"
-        )}
-        onClick={handleLike}
-      />
-      <span className={cn("min-w-[20px]", stats === null && "animate-pulse")}>
-        {stats?.likes ?? "-"}
-      </span>
+      {!viewOnly && (
+        <>
+          <HeartIcon
+            width={16}
+            height={16}
+            className={cn(
+              "hover:text-red-500 transition-colors",
+              isLiking && "animate-pulse text-red-500",
+              stats === null && "animate-pulse"
+            )}
+            onClick={handleLike}
+          />
+          <span
+            className={cn("min-w-[20px]", stats === null && "animate-pulse")}
+          >
+            {stats?.likes ?? "-"}
+          </span>
+        </>
+      )}
     </div>
   );
 };
