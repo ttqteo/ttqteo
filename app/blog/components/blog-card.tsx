@@ -1,7 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { formatDate2 } from "@/lib/utils";
 import Link from "next/link";
-import Views from "./views";
 
 type BlogCardProps = {
   date: string;
@@ -34,11 +33,7 @@ export function BlogCard({
         )}
         <div className="mt-4 flex items-center gap-3 text-sm text-muted-foreground">
           {isPublished ? (
-            <>
-              <time>{formatDate2(date)}</time>
-              <span className="text-muted-foreground/40">·</span>
-              <Views slug={slug} viewOnly />
-            </>
+            <time>{formatDate2(date)}</time>
           ) : (
             <Badge variant="destructive">draft</Badge>
           )}
@@ -62,11 +57,7 @@ export function BlogCard({
       )}
       <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
         {isPublished ? (
-          <>
-            <time>{formatDate2(date)}</time>
-            <span className="text-muted-foreground/40">·</span>
-            <Views slug={slug} viewOnly />
-          </>
+          <time>{formatDate2(date)}</time>
         ) : (
           <Badge variant="destructive">draft</Badge>
         )}

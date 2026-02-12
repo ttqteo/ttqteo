@@ -199,9 +199,8 @@ export type BlogMdxFrontmatter = BaseMdxFrontmatter & {
 
 export async function getAllBlogStaticPaths() {
   try {
-    const blogFolder = path.join(process.cwd(), "/contents/blogs/");
-    const res = await fs.readdir(blogFolder);
-    return res.map((file) => file.split(".")[0]);
+    const blogs = await getAllBlogs();
+    return blogs?.map((blog) => blog.slug);
   } catch (err) {
     console.log(err);
   }

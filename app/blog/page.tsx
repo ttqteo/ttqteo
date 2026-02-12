@@ -2,60 +2,35 @@ import { getAllBlogs } from "@/lib/markdown";
 import { stringToDate } from "@/lib/utils";
 import { Metadata } from "next";
 import { BlogCard } from "./components/blog-card";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 export const metadata: Metadata = {
   title: "blog",
 };
 
-export const dynamic = "force-dynamic";
+// Enable static generation
+export const dynamic = "force-static";
+export const revalidate = false; // Never revalidate (pure static)
 
-type UnifiedBlog = {
-  slug: string;
-  title: string;
-  description: string;
-  date: string;
-  isPublished: boolean;
-  source: "mdx" | "db";
-};
-
+/**
+ * PURE STATIC VERSION
+ *
+ * Benefits:
+ * - Instant loading (pre-rendered at build time)
+ * - No database wake-up delays
+ * - Perfect for portfolio blogs
+ * - SEO optimized
+ *
+ * To use:
+ * 1. Rename this file to page.tsx (replace current one)
+ * 2. Remove Supabase queries
+ * 3. Only use MDX files for blog content
+ */
 export default async function BlogIndexPage() {
-  // Get MDX blogs
-  const mdxBlogs = (await getAllBlogs()).map((blog) => ({
-    slug: blog.slug,
-    title: blog.title,
-    description: blog.description,
-    date: blog.date,
-    isPublished: blog.isPublished,
-    source: "mdx" as const,
-  }));
+  // Get MDX blogs only
+  const mdxBlogs = await getAllBlogs();
 
-  // Get database posts
-  const supabase = await createSupabaseServerClient();
-  const { data: dbPosts, error } = await supabase
-    .from("blogs")
-    .select("slug, title, description, created_at, is_published")
-    .eq("is_published", true);
-
-  // Log error for debugging (will show in server logs)
-  if (error) {
-    console.error("Supabase query error:", error.message);
-    console.error(
-      "If you see a 406 error, the 'blogs' table might not exist. Run schema.sql in Supabase Dashboard."
-    );
-  }
-
-  const dbBlogs: UnifiedBlog[] = (dbPosts || []).map((post) => ({
-    slug: post.slug,
-    title: post.title,
-    description: post.description || "",
-    date: post.created_at,
-    isPublished: post.is_published,
-    source: "db" as const,
-  }));
-
-  // Merge and sort by date (newest first)
-  const allBlogs = [...mdxBlogs, ...dbBlogs].sort(
+  // Sort by date (newest first)
+  const allBlogs = mdxBlogs.sort(
     (a, b) => stringToDate(b.date).getTime() - stringToDate(a.date).getTime()
   );
 
@@ -70,7 +45,7 @@ export default async function BlogIndexPage() {
       {/* Featured Post */}
       {featuredBlog && (
         <BlogCard
-          key={`${featuredBlog.source}-${featuredBlog.slug}`}
+          key={featuredBlog.slug}
           title={featuredBlog.title}
           description={featuredBlog.description}
           date={featuredBlog.date}
@@ -84,7 +59,7 @@ export default async function BlogIndexPage() {
       <div className="flex flex-col">
         {restBlogs.map((blog) => (
           <BlogCard
-            key={`${blog.source}-${blog.slug}`}
+            key={blog.slug}
             title={blog.title}
             description={blog.description}
             date={blog.date}

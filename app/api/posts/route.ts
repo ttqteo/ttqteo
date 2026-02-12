@@ -3,6 +3,7 @@ import {
   getUser,
   isAdmin,
 } from "@/lib/supabase-server";
+import { safeFetch } from "@/lib/supabase-safe-fetch";
 import { NextRequest, NextResponse } from "next/server";
 
 // GET /api/posts - List all posts (for admin)
@@ -18,16 +19,31 @@ export async function GET() {
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("blogs")
-    .select("*")
-    .order("updated_at", { ascending: false });
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // Use safeFetch to prevent timeout errors
+  const result = await safeFetch(async () => {
+    const { data, error } = await supabase
+      .from("blogs")
+      .select("*")
+      .order("updated_at", { ascending: false });
+
+    if (error) throw error;
+    return data;
+  });
+
+  if (!result.success) {
+    // Return 503 (Service Unavailable) instead of 500 when DB is waking up
+    const status = result.error === "timeout" ? 503 : 500;
+    return NextResponse.json(
+      {
+        error: result.message,
+        code: result.error
+      },
+      { status }
+    );
   }
 
-  return NextResponse.json(data);
+  return NextResponse.json(result.data);
 }
 
 // POST /api/posts - Create new post
@@ -53,22 +69,36 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("blogs")
-    .insert({
-      title,
-      slug,
-      description,
-      content: content || "",
-      is_published,
-      author_id: user.id,
-    })
-    .select()
-    .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // Use safeFetch to prevent timeout errors
+  const result = await safeFetch(async () => {
+    const { data, error } = await supabase
+      .from("blogs")
+      .insert({
+        title,
+        slug,
+        description,
+        content: content || "",
+        is_published,
+        author_id: user.id,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  });
+
+  if (!result.success) {
+    const status = result.error === "timeout" ? 503 : 500;
+    return NextResponse.json(
+      {
+        error: result.message,
+        code: result.error
+      },
+      { status }
+    );
   }
 
-  return NextResponse.json(data);
+  return NextResponse.json(result.data);
 }
