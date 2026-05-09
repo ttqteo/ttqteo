@@ -24,7 +24,7 @@ export function AdminTabs({ isTrash }: AdminTabsProps) {
   return (
     <div className="flex gap-4 mt-4 text-sm">
       <button
-        onClick={() => handleTabClick("all", "/admin")}
+        onClick={() => handleTabClick("all", "/admin/posts")}
         className={`flex items-center gap-1.5 ${
           !isTrash ? "font-bold underline" : "text-muted-foreground"
         }`}
@@ -36,7 +36,7 @@ export function AdminTabs({ isTrash }: AdminTabsProps) {
         All Posts
       </button>
       <button
-        onClick={() => handleTabClick("trash", "/admin?view=trash")}
+        onClick={() => handleTabClick("trash", "/admin/posts?view=trash")}
         className={`flex items-center gap-1.5 ${
           isTrash ? "font-bold underline" : "text-muted-foreground"
         }`}

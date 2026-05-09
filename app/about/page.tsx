@@ -1,42 +1,70 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Author, BlogMdxFrontmatter, getAllBlogs } from "@/lib/markdown";
-import { formatDate2, stringToDate } from "@/lib/utils";
-import { ExternalLinkIcon } from "lucide-react";
-import { Metadata } from "next";
-import Image from "next/image";
-import Link from "next/link";
+import { CurrentlyBlock } from "@/components/portfolio/CurrentlyBlock";
 
-export const metadata: Metadata = {
-  title: "about me",
-};
+export const metadata = { title: "about" };
 
-export default async function AboutPage() {
+export default function AboutPage() {
   return (
-    <div className="w-full mx-auto flex flex-col gap-1 sm:min-h-[78vh] min-h-[76vh] pt-2">
-      <div className="mb-7 flex flex-col items-start sm:items-center gap-2">
-        <Image
-          src="/images/avatar.png"
-          width={200}
-          height={200}
-          alt="avatar"
-          className="rounded-full"
-        />
-        <h1 className="text-6xl sm:text-7xl font-semibold pt-4 pb-6">
-          Hello World
-        </h1>
-        <p className="text-muted-foreground text-2xl">
-          Xin gửi lời chào đến các bạn.
-        </p>
-        <p className="text-muted-foreground text-2xl text-start sm:text-center">
-          Tôi là anh lập trình viên luôn tìm cái mới thoát khỏi khuôn viên,{" "}
-          <br /> và đó là điều hiển nhiên.
-        </p>
-        <blockquote className="text-muted-foreground mt-6 border-l-2 sm:pl-6 pl-3 sm:text-2xl text-lg italic text-start sm:text-center">
-          {'"'}Tại sao số 10 lại là dấu X vào thời kỳ La Mã <br /> hay điểm
-          IELTS chỉ dừng ở 9 là tối đa?{'"'}
-        </blockquote>
-      </div>
-    </div>
+    <article className="max-w-[680px] mx-auto px-4 py-12 prose dark:prose-invert">
+      <h1 className="text-4xl mb-6 not-prose">About</h1>
+
+      <p>I&apos;m Tran Tu Quang.</p>
+
+      <CurrentlyBlock />
+
+      <h2 className="not-prose text-2xl mt-12 mb-4">Education</h2>
+      <ul className="font-mono text-sm space-y-2 not-prose">
+        <li>
+          <span className="text-muted-foreground">2025–2027</span> · Master of
+          Information Technology @ UIT-VNU
+        </li>
+        <li>
+          <span className="text-muted-foreground">2018–2022</span> · BSc
+          Computer and Embedded System @ HCMUS
+        </li>
+        <li>
+          <span className="text-muted-foreground">2023–2025</span> · BA English
+          Literature @ Hue University
+        </li>
+      </ul>
+
+      <h2 className="not-prose text-2xl mt-12 mb-4">Skills</h2>
+      <p className="font-mono text-sm not-prose leading-relaxed">
+        TypeScript · Python · Go · Java · Next.js · NestJS · React Native ·
+        Spring Boot · FastAPI · Postgres · MongoDB · Redis · Kafka · Pulsar ·
+        Socket.IO · LiveKit · Docker · Kubernetes · AWS
+      </p>
+
+      <h2 className="not-prose text-2xl mt-12 mb-4">Contact</h2>
+      <ul className="not-prose space-y-1">
+        <li>
+          <a
+            href="mailto:ttuquang282@gmail.com"
+            className="hover:text-accent transition-colors"
+          >
+            ttuquang282@gmail.com
+          </a>
+        </li>
+        <li>
+          <a
+            href="https://github.com/ttqteo"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-accent transition-colors"
+          >
+            github/ttqteo
+          </a>
+        </li>
+        <li>
+          <a
+            href="https://www.linkedin.com/in/ttqteo"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-accent transition-colors"
+          >
+            linkedin/ttqteo
+          </a>
+        </li>
+      </ul>
+    </article>
   );
 }

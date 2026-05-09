@@ -90,13 +90,16 @@ export function formatDate2(dateStr: string): string {
 }
 
 export function stringToDate(date: string) {
-  // Handle ISO format from database (e.g., "2024-12-13T10:30:00Z")
   if (date.includes("T") || date.includes(":")) {
     return new Date(date);
   }
-  // Handle dd-MM-yyyy format from MDX
-  const [day, month, year] = date.split("-").map(Number);
-  return new Date(year, month - 1, day);
+  const parts = date.split("-").map(Number);
+  // YYYY-MM-DD (ISO): first part is the year (> 31)
+  if (parts[0] > 31) {
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  // DD-MM-YYYY (legacy)
+  return new Date(parts[2], parts[1] - 1, parts[0]);
 }
 
 // https://devicon.dev/

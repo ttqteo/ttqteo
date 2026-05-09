@@ -7,22 +7,10 @@ import { SheetLeftbar } from "./leftbar";
 import { isAdmin } from "@/lib/supabase-server";
 
 export const NAVLINKS = [
-  {
-    title: "home",
-    href: "/",
-  },
-  {
-    title: "blog",
-    href: "/blog",
-  },
-  {
-    title: "mindmap",
-    href: "/mindmap",
-  },
-  {
-    title: "about",
-    href: "/about",
-  },
+  { title: "projects", href: "/projects" },
+  { title: "blog", href: "/blog" },
+  { title: "lab", href: "/lab" },
+  { title: "about", href: "/about" },
 ];
 
 export async function Navbar() {
@@ -74,16 +62,20 @@ export function NavMenu({ isSheet = false }) {
         const Comp = (
           <Anchor
             key={item.title + item.href}
-            activeClassName="!text-primary dark:font-medium font-bold"
+            activeClassName="!text-primary font-semibold"
             absolute
-            className="flex items-center gap-1 dark:text-stone-300/85 text-stone-800 hover:text-destructive dark:hover:text-[#e72020]"
+            className={
+              isSheet
+                ? "text-3xl font-serif text-foreground hover:text-accent transition-colors"
+                : "flex items-center gap-1 text-sm text-muted-foreground hover:text-accent dark:hover:text-accent transition-colors"
+            }
             href={item.href}
           >
             {item.title}
           </Anchor>
         );
         return isSheet ? (
-          <SheetClose key={item.title + item.href} asChild className="text-3xl">
+          <SheetClose key={item.title + item.href} asChild>
             {Comp}
           </SheetClose>
         ) : (

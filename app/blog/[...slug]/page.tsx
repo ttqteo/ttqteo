@@ -1,16 +1,19 @@
 import { Typography } from "@/components/typography";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { buttonVariants } from "@/components/ui/button";
-import { Author, getAllBlogStaticPaths, getBlogForSlug } from "@/lib/markdown";
+import { Author, getAllBlogStaticPaths, getBlogForSlug, getBlogTocs } from "@/lib/markdown";
+import { extractTocFromHtml, getSupabasePostBySlug, injectHeadingIds } from "@/lib/posts";
+import TocObserver from "@/components/toc-observer";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDate } from "@/lib/utils";
 import { ArrowLeftIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AdminEditButton } from "./admin-edit-button";
 
-// Enable static generation
-export const dynamic = "force-static";
-export const revalidate = false; // Never revalidate (pure static)
+// MDX paths are pre-rendered via generateStaticParams; supabase paths render on-demand.
+export const dynamicParams = true;
 
 type PageProps = {
   params: Promise<{ slug: string[] }>;
@@ -20,13 +23,20 @@ export async function generateMetadata(props: PageProps) {
   const params = await props.params;
   const slug = params.slug.join("/");
 
-  // Only check MDX (no database)
   const mdxRes = await getBlogForSlug(slug);
   if (mdxRes) {
     const { frontmatter } = mdxRes;
     return {
       title: `${!frontmatter.isPublished ? "[draft] " : ""}${frontmatter.title}`,
       description: frontmatter.description,
+    };
+  }
+
+  const dbPost = await getSupabasePostBySlug(slug);
+  if (dbPost) {
+    return {
+      title: `${!dbPost.isPublished ? "[draft] " : ""}${dbPost.title}`,
+      description: dbPost.description ?? undefined,
     };
   }
 
@@ -39,68 +49,89 @@ export async function generateStaticParams() {
   return val.map((it) => ({ slug: it.split("/") }));
 }
 
-/**
- * PURE STATIC VERSION
- *
- * Changes from original:
- * - Removed Supabase database fallback
- * - Only renders MDX blog posts
- * - No view counter (completely static)
- * - Static generation enabled (instant loading)
- *
- * Benefits:
- * - No database wake-up delays
- * - Perfect SEO (pre-rendered)
- * - Instant page loads
- * - Zero database costs
- * - 100% static, 100% fast!
- */
 export default async function BlogPage(props: PageProps) {
   const params = await props.params;
   const slug = params.slug.join("/");
 
-  // Only try MDX (no database fallback)
   const mdxRes = await getBlogForSlug(slug);
 
-  if (!mdxRes) {
-    notFound();
+  let title: string;
+  let dateLabel: string;
+  let authors: Author[] = [];
+  let cover: string | null = null;
+  let tocs: { level: number; text: string; href: string }[] = [];
+  let body: React.ReactNode;
+
+  if (mdxRes) {
+    title = mdxRes.frontmatter.title;
+    dateLabel = formatDate(mdxRes.frontmatter.date);
+    authors = mdxRes.frontmatter.authors || [];
+    cover = mdxRes.frontmatter.cover || null;
+    tocs = await getBlogTocs(slug);
+    body = <Typography>{mdxRes.content}</Typography>;
+  } else {
+    const dbPost = await getSupabasePostBySlug(slug);
+    if (!dbPost || !dbPost.isPublished) {
+      notFound();
+    }
+    title = dbPost.title;
+    dateLabel = formatDate(dbPost.updatedAt);
+    const html = injectHeadingIds(dbPost.content);
+    tocs = extractTocFromHtml(html);
+    body = (
+      <div
+        className="prose prose-zinc dark:prose-invert max-w-none prose-headings:scroll-m-20"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
   }
 
   return (
-    <div className="lg:w-[60%] sm:[95%] md:[75%] mx-auto sm:min-h-[78vh] min-h-[76vh]">
-      <Link
-        className={buttonVariants({
-          variant: "link",
-          className: "!mx-0 !px-0 mb-7 !-ml-1 ",
-        })}
-        href="/blog"
-      >
-        <ArrowLeftIcon className="w-4 h-4 mr-1.5" /> back to blog
-      </Link>
-      <div className="flex flex-col gap-3 pb-2 w-full mb-2">
-        <h1 className="sm:text-4xl text-5xl font-semibold mb-2">
-          {mdxRes.frontmatter.title}
-        </h1>
-        <Authors
-          authors={mdxRes.frontmatter.authors || []}
-          date={formatDate(mdxRes.frontmatter.date)}
-        />
-      </div>
+    <div className="mx-auto sm:min-h-[78vh] min-h-[76vh] flex gap-10 max-w-6xl px-4">
+      <article className="flex-1 min-w-0 max-w-[760px] mx-auto lg:mx-0">
+        <div className="flex items-center justify-between mb-7">
+          <Link
+            className={buttonVariants({
+              variant: "link",
+              className: "!mx-0 !px-0 !-ml-1",
+            })}
+            href="/blog"
+          >
+            <ArrowLeftIcon className="w-4 h-4 mr-1.5" /> back to blog
+          </Link>
+          <AdminEditButton slug={slug} />
+        </div>
+        <div className="flex flex-col gap-3 pb-2 w-full mb-2">
+          <h1 className="sm:text-3xl text-3xl font-semibold mb-2 leading-tight">
+            {title}
+          </h1>
+          <Authors authors={authors} date={dateLabel} />
+        </div>
 
-      <div className="!w-full text-lg">
-        {mdxRes.frontmatter.cover !== "" && (
-          <div className="w-full mb-7">
-            <Image
-              src={mdxRes.frontmatter.cover}
-              alt="cover"
-              width={700}
-              height={400}
-              className="w-full h-[400px] rounded-md border object-contain bg-white"
-            />
-          </div>
-        )}
-        <Typography>{mdxRes.content}</Typography>
-      </div>
+        <div className="!w-full prose-h2:text-2xl prose-h3:text-xl prose-h4:text-lg prose-h2:font-semibold prose-h3:font-semibold prose-h4:font-semibold prose-h2:mt-10 prose-h2:mb-3 prose-h3:mt-6 prose-h3:mb-2">
+          {cover && (
+            <div className="w-full mb-7">
+              <Image
+                src={cover}
+                alt="cover"
+                width={700}
+                height={400}
+                className="w-full h-[400px] rounded-md border object-contain bg-white"
+              />
+            </div>
+          )}
+          {body}
+        </div>
+      </article>
+
+      {tocs.length > 0 && (
+        <aside className="hidden lg:flex flex-col w-[220px] shrink-0 sticky top-16 h-[calc(100vh-5rem)] py-9">
+          <h3 className="font-semibold text-sm mb-3">On this page</h3>
+          <ScrollArea className="pb-2 pt-0.5 overflow-y-auto">
+            <TocObserver data={tocs} />
+          </ScrollArea>
+        </aside>
+      )}
     </div>
   );
 }

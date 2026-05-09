@@ -16,6 +16,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -24,14 +31,39 @@ import {
   ArrowLeftIcon,
   Loader2Icon,
   LogOutIcon,
+  Maximize2,
+  Minimize2,
+  PenLineIcon,
   SaveIcon,
   SendIcon,
   TrashIcon,
 } from "lucide-react";
+import "tldraw/tldraw.css";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+
+const Tldraw = dynamic(() => import("tldraw").then((m) => m.Tldraw), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm font-mono">
+      loading tldraw...
+    </div>
+  ),
+});
+
+const ALLOWED_TYPES = ["post", "note", "reading", "paper"] as const;
+type PostType = (typeof ALLOWED_TYPES)[number];
+
+function resolveType(raw: string | undefined): PostType {
+  if (raw && (ALLOWED_TYPES as readonly string[]).includes(raw)) {
+    return raw as PostType;
+  }
+  return "post";
+}
 
 interface PostData {
   id?: string;
@@ -40,6 +72,7 @@ interface PostData {
   description: string;
   content: string;
   is_published: boolean;
+  type?: PostType;
 }
 
 const DRAFT_STORAGE_KEY = "editor-draft";
@@ -55,14 +88,25 @@ function removeVietnameseTones(str: string): string {
 export default function EditPostClient({
   initialData,
   isNew,
+  initialType,
 }: {
   initialData?: PostData;
   isNew: boolean;
+  initialType?: string;
 }) {
   const router = useRouter();
-  const { setFocusMode } = useFocusMode();
+  const { focusMode, setFocusMode, toggleFocusMode } = useFocusMode();
+  const { resolvedTheme } = useTheme();
+
+  const [showTldraw, setShowTldraw] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("editor-show-tldraw") === "true";
+  });
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [type, setType] = useState<PostType>(
+    resolveType(initialData?.type ?? initialType)
+  );
   const [post, setPost] = useState<PostData>({
     title: initialData?.title || "",
     slug: initialData?.slug || "",
@@ -71,9 +115,8 @@ export default function EditPostClient({
     is_published: initialData?.is_published || false,
   });
 
-  // Auto-enable focus mode when entering editor, disable when leaving
+  // Disable focus mode when leaving editor (entering it is opt-in via toggle)
   useEffect(() => {
-    setFocusMode(true);
     return () => setFocusMode(false);
   }, [setFocusMode]);
 
@@ -151,11 +194,11 @@ export default function EditPostClient({
         router.push("/admin");
         router.refresh();
       } else {
-        const error = await res.json();
-        toast.error(error.message || "Failed to delete");
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || err.message || `Failed to delete (${res.status})`);
       }
-    } catch {
-      toast.error("Failed to delete");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete");
     } finally {
       setLoadingAction(null);
     }
@@ -173,28 +216,36 @@ export default function EditPostClient({
         body: JSON.stringify({
           ...post,
           is_published: publish,
+          type,
         }),
       });
 
       if (res.ok) {
         clearDraft();
+        toast.success(publish ? "Post published" : "Draft saved");
         router.push("/admin");
         router.refresh();
       } else {
-        const error = await res.json();
-        toast.error(error.message || "Failed to save");
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || err.message || `Failed to save (${res.status})`);
       }
-    } catch {
-      toast.error("Failed to save");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save");
     } finally {
       setLoadingAction(null);
     }
   };
 
+  const isSplit = showTldraw && !focusMode;
+
   return (
-    <div className="min-h-[80vh]">
+    <div className={
+      focusMode ? "fixed inset-0 z-50 bg-background flex flex-col" :
+      isSplit   ? "fixed inset-0 z-40 bg-background flex flex-col pt-[36px]" :
+                  "min-h-[80vh]"
+    }>
       {/* Sticky Top Header */}
-      <div className="sticky top-0 bg-background/95 backdrop-blur border-b z-40">
+      <div className={`${isSplit || focusMode ? "flex-shrink-0" : "sticky top-[36px]"} bg-background/95 backdrop-blur border-b z-[55] focus-mode-hidden`}>
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" asChild>
@@ -308,9 +359,69 @@ export default function EditPostClient({
         </div>
       </div>
 
+      {/* Bottom-right controls — always visible */}
+      <div className="fixed bottom-4 right-4 z-[51] flex flex-col gap-2">
+        {!focusMode && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant={showTldraw ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowTldraw((v) => {
+                  const next = !v;
+                  localStorage.setItem("editor-show-tldraw", String(next));
+                  return next;
+                })}
+                aria-label="Toggle tldraw"
+              >
+                <PenLineIcon className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              {showTldraw ? "Hide drawing board" : "Show drawing board"}
+            </TooltipContent>
+          </Tooltip>
+        )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant={focusMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                if (!focusMode) {
+                  setShowTldraw(false);
+                  localStorage.setItem("editor-show-tldraw", "false");
+                }
+                toggleFocusMode();
+              }}
+              aria-label="Toggle focus mode"
+            >
+              {focusMode ? (
+                <Minimize2 className="w-4 h-4" />
+              ) : (
+                <Maximize2 className="w-4 h-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            {focusMode ? "Exit focus mode" : "Focus mode"}
+          </TooltipContent>
+        </Tooltip>
+      </div>
+
       {/* Main Content */}
-      <div className="py-8">
-        <div className="max-w-3xl mx-auto px-4 space-y-6">
+      <div className={
+        isSplit || focusMode ? "flex flex-1 overflow-hidden" :
+                               "py-8"
+      }>
+        {/* Editor column */}
+        <div className={
+          isSplit   ? "w-[55%] overflow-auto py-8 px-8 space-y-6" :
+          focusMode ? "flex-1 overflow-auto max-w-2xl mx-auto px-8 py-16 space-y-6 w-full" :
+                      "max-w-3xl mx-auto px-4 space-y-6"
+        }>
           {/* Title */}
           <Input
             type="text"
@@ -350,12 +461,39 @@ export default function EditPostClient({
             );
           })()}
 
+          {/* Type Selector */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium">Type</label>
+            <Select value={type} onValueChange={(v) => setType(v as PostType)}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="post">Post</SelectItem>
+                <SelectItem value="note">Note</SelectItem>
+                <SelectItem value="reading">Reading</SelectItem>
+                <SelectItem value="paper">Paper</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* WYSIWYG Editor */}
           <SimpleEditor
             content={post.content}
             onChange={(content) => setPost({ ...post, content })}
+            stickyTop={focusMode || isSplit ? "0px" : null}
           />
         </div>
+
+        {/* tldraw panel */}
+        {isSplit && (
+          <div className="w-[45%] border-l h-full overflow-hidden">
+            <Tldraw
+              persistenceKey={`editor-${initialData?.id ?? "new"}`}
+              colorScheme={resolvedTheme === "dark" ? "dark" : "light"}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

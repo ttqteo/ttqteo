@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { title, slug, description, content, is_published } = body;
+  const { title, slug, description, content, is_published, type } = body;
 
   if (!title || !slug) {
     return NextResponse.json(
@@ -70,21 +70,24 @@ export async function POST(request: NextRequest) {
 
   const supabase = await createSupabaseServerClient();
 
+  const basePayload: Record<string, unknown> = {
+    title,
+    slug,
+    description,
+    content: content || "",
+    is_published,
+    author_id: user.id,
+  };
+
+  const tryInsert = (payload: Record<string, unknown>) =>
+    supabase.from("blogs").insert(payload).select().single();
+
   // Use safeFetch to prevent timeout errors
   const result = await safeFetch(async () => {
-    const { data, error } = await supabase
-      .from("blogs")
-      .insert({
-        title,
-        slug,
-        description,
-        content: content || "",
-        is_published,
-        author_id: user.id,
-      })
-      .select()
-      .single();
-
+    let { data, error } = await tryInsert({ ...basePayload, type: type || "post" });
+    if (error && /'?type'? column|column .*type.* does not exist/i.test(error.message)) {
+      ({ data, error } = await tryInsert(basePayload));
+    }
     if (error) throw error;
     return data;
   });

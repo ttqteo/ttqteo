@@ -7,7 +7,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import DocsMenu from "./docs-menu";
-import { FooterButtons } from "./footer";
 import { Logo, NavMenu } from "./navbar";
 import { Button } from "./ui/button";
 import { DialogTitle } from "./ui/dialog";
@@ -38,11 +37,8 @@ export function SheetLeftbar() {
           </SheetClose>
         </SheetHeader>
         <div className="flex flex-col gap-4 overflow-y-auto">
-          <div className="flex flex-col items-center justify-center h-[85vh] gap-3 mt-3 mx-2 px-5">
+          <div className="flex flex-col items-center justify-center h-[85vh] gap-8 mt-3 mx-2 px-5">
             <NavMenu isSheet />
-          </div>
-          <div className="p-6 pb-4 flex gap-2.5">
-            <FooterButtons />
           </div>
         </div>
       </SheetContent>

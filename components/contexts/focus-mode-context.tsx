@@ -25,19 +25,19 @@ export function FocusModeProvider({ children }: { children: ReactNode }) {
   const [focusMode, setFocusModeState] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // Load from sessionStorage on mount
+  // Load from localStorage on mount (state only — body class is applied by the editor itself)
   useEffect(() => {
     setMounted(true);
-    const saved = sessionStorage.getItem(FOCUS_MODE_KEY);
+    const saved = localStorage.getItem(FOCUS_MODE_KEY);
     if (saved === "true") {
       setFocusModeState(true);
     }
   }, []);
 
-  // Save to sessionStorage when changed
+  // Save to localStorage when changed
   const setFocusMode = useCallback((value: boolean) => {
     setFocusModeState(value);
-    sessionStorage.setItem(FOCUS_MODE_KEY, String(value));
+    localStorage.setItem(FOCUS_MODE_KEY, String(value));
 
     // Add/remove class to body for CSS-based hiding
     if (value) {
@@ -50,13 +50,6 @@ export function FocusModeProvider({ children }: { children: ReactNode }) {
   const toggleFocusMode = useCallback(() => {
     setFocusMode(!focusMode);
   }, [focusMode, setFocusMode]);
-
-  // Apply focus mode class on initial load
-  useEffect(() => {
-    if (mounted && focusMode) {
-      document.body.classList.add("focus-mode");
-    }
-  }, [mounted, focusMode]);
 
   // Keyboard shortcut: Cmd/Ctrl + Shift + F
   useEffect(() => {

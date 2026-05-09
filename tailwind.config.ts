@@ -71,6 +71,9 @@ const config = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
+        serif: ["var(--font-serif)", "Georgia", "serif"],
+        sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["ui-monospace", "SFMono-Regular", "monospace"],
         code: ["var(--font-geist-mono)"],
         regular: ["var(--font-geist-sans)"],
       },
