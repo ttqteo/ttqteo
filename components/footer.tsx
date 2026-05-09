@@ -1,40 +1,44 @@
-import { GithubIcon, Linkedin } from "lucide-react";
 import Link from "next/link";
-import { ModeToggle } from "./theme-toggle";
-import { Button } from "./ui/button";
+
+const QUOTES = [
+  "keep it simple, stupid.",
+  "make it work, then make it right.",
+  "the best code is no code.",
+  "early optimization is the root of all evil.",
+];
 
 export function Footer() {
+  const quote = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+
   return (
-    <footer className="border-t w-full h-16">
-      <div className="container flex items-center sm:justify-between justify-center sm:gap-0 gap-4 h-full text-muted-foreground text-sm flex-wrap sm:py-0 py-3 max-sm:px-4">
-        <div className="flex items-center gap-3">
-          <p className="text-center">© Copyright {new Date().getFullYear()}</p>
+    <footer className="border-t border-border/60 mt-16 focus-mode-hidden">
+      <div className="max-w-[720px] mx-auto px-4 py-10 grid grid-cols-2 gap-8 text-sm">
+        <div className="space-y-2">
+          <p className="font-mono text-xs tracking-widest text-muted-foreground">
+            ttqteo
+          </p>
+          <p className="text-muted-foreground italic">— {quote}</p>
         </div>
 
-        <div className="hidden md:flex">
-          <FooterButtons />
-        </div>
+        <nav className="space-y-2">
+          <ul className="grid grid-cols-2 gap-x-4 gap-y-1">
+            <li><Link href="/projects" className="hover:text-accent transition-colors">projects</Link></li>
+            <li><Link href="/blog" className="hover:text-accent transition-colors">blog</Link></li>
+            <li><Link href="/lab" className="hover:text-accent transition-colors">lab</Link></li>
+            <li><Link href="/about" className="hover:text-accent transition-colors">about</Link></li>
+            <li>
+              <a
+                href="https://github.com/ttqteo"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-accent transition-colors"
+              >
+                github
+              </a>
+            </li>
+          </ul>
+        </nav>
       </div>
     </footer>
-  );
-}
-
-export function FooterButtons() {
-  return (
-    <div className="w-full flex justify-between sm:justify-end sm:gap-2">
-      <Link href="https://github.com/ttqteo">
-        <Button variant={"link"}>
-          <GithubIcon className="h-[0.8rem] w-4 mr-2 text-primary fill-current" />
-          GitHub
-        </Button>
-      </Link>
-      <Link href="https://linkedin.com/in/ttqteo">
-        <Button variant={"link"}>
-          <Linkedin className="h-[0.8rem] w-4 mr-2 text-primary" />
-          LinkedIn
-        </Button>
-      </Link>
-      <ModeToggle />
-    </div>
   );
 }

@@ -10,7 +10,7 @@ export default async function Template({ children }: PropsWithChildren) {
   const admin = await isAdmin();
 
   return (
-    <div className={`min-h-screen flex flex-col ${admin ? "pt-10" : ""}`}>
+    <div className={`min-h-screen flex flex-col ${admin ? "pt-[36px]" : ""}`}>
       <div className="focus-mode-hidden">
         <AdminToolbar />
       </div>
@@ -20,9 +20,11 @@ export default async function Template({ children }: PropsWithChildren) {
       <main className="sm:container mx-auto w-[90vw] h-auto scroll-smooth flex-1">
         {children}
       </main>
-      <div className="focus-mode-hidden">
-        <Footer />
-      </div>
+      {!admin && (
+        <div className="focus-mode-hidden">
+          <Footer />
+        </div>
+      )}
     </div>
   );
 }

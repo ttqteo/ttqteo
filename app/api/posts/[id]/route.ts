@@ -42,25 +42,34 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 
   const body = await request.json();
-  const { title, slug, description, content, is_published, deleted_at } = body;
+  const { title, slug, description, content, is_published, deleted_at, type } = body;
 
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("blogs")
-    .update({
-      title,
-      slug,
-      description,
-      content: content || null,
-      is_published,
-      deleted_at,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .select()
-    .single();
+
+  const basePayload: Record<string, unknown> = {
+    title,
+    slug,
+    description,
+    content: content || null,
+    is_published,
+    deleted_at,
+    updated_at: new Date().toISOString(),
+  };
+
+  const tryUpdate = (payload: Record<string, unknown>) =>
+    supabase.from("blogs").update(payload).eq("id", id).select().single();
+
+  let { data, error } =
+    type !== undefined
+      ? await tryUpdate({ ...basePayload, type })
+      : await tryUpdate(basePayload);
+
+  if (error && /'?type'? column|column .*type.* does not exist/i.test(error.message)) {
+    ({ data, error } = await tryUpdate(basePayload));
+  }
 
   if (error) {
+    console.error("[posts PUT] supabase error:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

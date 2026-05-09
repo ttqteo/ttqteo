@@ -1,57 +1,51 @@
-import {
-  SectionHeader,
-  ProjectCard,
-  CaseStudyCard,
-} from "@/components/portfolio";
-import { featuredProjects } from "@/data/projects";
-import { caseStudies } from "@/data/case-studies";
+import { Hero } from "@/components/portfolio/Hero";
+import { IndexTable } from "@/components/portfolio/IndexTable";
+import { projectIndex } from "@/data/projects";
+import { getAllBlogs } from "@/lib/markdown";
+import { stringToDate } from "@/lib/utils";
 import Link from "next/link";
 
-export default function Home() {
-  return (
-    <div className="py-8 max-w-[600px] mx-auto">
-      <div className="flex sm:min-h-[85.5vh] min-h-[85vh] flex-col items-center justify-center text-center px-2 sm:py-8 py-12">
-        <h1 className="text-8xl sm:text-6xl font-bold mb-4">
-          hi, i{"'"}m{" "}
-          <span className="underline-offset-4 underline hover:text-destructive">
-            <Link href={"/about"}>ttqteo</Link>
-          </span>
-        </h1>
-        <p className="mb-8 sm:text-2xl text-xl max-w-[800px] text-muted-foreground italic">
-          keep it simple, stupid
-        </p>
-        <p className="mb-8 sm:text-2xl text-xl max-w-[800px] text-muted-foreground">
-          --oOo--
-        </p>
-        <p className="mb-8 sm:text-2xl text-xl max-w-[800px] text-muted-foreground">
-          welcome to my world
-        </p>
-      </div>
+export const dynamic = "force-dynamic";
 
-      {/* Featured Projects */}
-      <section className="py-16">
-        <SectionHeader
-          title="Featured Projects"
-          subtitle="Open-source and production projects showcasing full-stack development, data engineering, and system design."
-        />
-        <div>
-          {featuredProjects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-        </div>
+function SectionHeader({ title, href }: { title: string; href: string }) {
+  return (
+    <div className="flex items-baseline justify-between mb-4">
+      <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+        {title}
+      </h2>
+      <Link
+        href={href}
+        className="font-mono text-xs text-muted-foreground hover:text-accent transition-colors"
+      >
+        see all →
+      </Link>
+    </div>
+  );
+}
+
+export default async function Home() {
+  const blogs = await getAllBlogs();
+  const recentBlogs = blogs
+    .filter((b) => b.isPublished)
+    .slice(0, 3)
+    .map((b) => ({
+      year: stringToDate(b.date).getFullYear(),
+      title: b.title,
+      href: `/blog/${b.slug}`,
+    }));
+
+  return (
+    <div className="max-w-[720px] mx-auto px-4">
+      <Hero />
+
+      <section className="py-12">
+        <SectionHeader title="Built" href="/projects" />
+        <IndexTable entries={projectIndex.slice(0, 3)} />
       </section>
 
-      {/* Real-World Case Studies */}
-      <section className="py-16">
-        <SectionHeader
-          title="Real-World Case Studies"
-          subtitle="Production systems built for real businesses. Private repositories - showcasing technical decisions and scale."
-        />
-        <div className="space-y-8">
-          {caseStudies.map((caseStudy) => (
-            <CaseStudyCard key={caseStudy.id} caseStudy={caseStudy} />
-          ))}
-        </div>
+      <section className="py-12">
+        <SectionHeader title="Written" href="/blog" />
+        <IndexTable entries={recentBlogs} />
       </section>
     </div>
   );

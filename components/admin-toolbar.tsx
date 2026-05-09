@@ -1,7 +1,8 @@
 import { isAdmin } from "@/lib/supabase-server";
-import { LayoutDashboardIcon, LogOutIcon, PencilIcon } from "lucide-react";
+import { FileTextIcon, LayoutDashboardIcon, LogOutIcon, PencilIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { AdminNavLink } from "@/components/admin-nav-link";
 
 interface AdminToolbarProps {
   editPostId?: string;
@@ -13,7 +14,7 @@ export async function AdminToolbar({ editPostId }: AdminToolbarProps) {
   if (!admin) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[60] bg-zinc-900 text-white text-sm border-b border-zinc-800">
+    <div className="fixed top-0 left-0 right-0 z-[60] h-9 bg-zinc-900 text-white text-sm border-b border-zinc-800">
       <div className="container mx-auto px-4 py-1.5 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link
@@ -30,25 +31,22 @@ export async function AdminToolbar({ editPostId }: AdminToolbarProps) {
             <span className="font-semibold">ttqteo</span>
           </Link>
           <div className="w-px h-4 bg-zinc-700 mx-1" />
-          <Link
-            href="/admin"
-            className="flex items-center gap-1.5 hover:text-zinc-300 transition-colors"
-          >
+          <AdminNavLink href="/admin" exact>
             <LayoutDashboardIcon className="w-3.5 h-3.5" />
             <span>dashboard</span>
-          </Link>
+          </AdminNavLink>
+          <AdminNavLink href="/admin/posts">
+            <FileTextIcon className="w-3.5 h-3.5" />
+            <span>posts</span>
+          </AdminNavLink>
           {editPostId && (
-            <Link
-              href={`/admin/edit/${editPostId}`}
-              className="flex items-center gap-1.5 hover:text-zinc-300 transition-colors"
-            >
+            <AdminNavLink href={`/admin/edit/${editPostId}`}>
               <PencilIcon className="w-3.5 h-3.5" />
               <span>Edit Post</span>
-            </Link>
+            </AdminNavLink>
           )}
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-zinc-400 text-xs">admin mode</span>•
           <Link
             href="/admin/edit/new"
             className="flex items-center gap-1.5 hover:text-zinc-300 transition-colors text-xs"

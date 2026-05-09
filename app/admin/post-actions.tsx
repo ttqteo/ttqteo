@@ -136,7 +136,7 @@ export function AdminPostActions({
         <Button
           variant="outline"
           size="sm"
-          className="text-destructive hover:bg-destructive/10"
+          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
           disabled={!!loading}
           title="Move to Trash"
         >

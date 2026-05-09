@@ -1,13 +1,24 @@
 import { FocusModeProvider } from "@/components/contexts/focus-mode-context";
 import { ThemeProvider } from "@/components/contexts/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { KeyboardNav } from "@/lib/keyboard-nav";
 import type { Metadata } from "next";
-import { EB_Garamond } from "next/font/google";
+import { Inter, Newsreader } from "next/font/google";
 import "./globals.css";
 
-const eb_garamond = EB_Garamond({
-  weight: ["400", "500", "600", "700", "800"],
+const newsreader = Newsreader({
   subsets: ["latin"],
+  weight: ["400"],
+  style: ["normal", "italic"],
+  variable: "--font-serif",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -47,12 +58,16 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${eb_garamond.className} antialiased tracking-wide text-base`}
+        className={`${newsreader.variable} ${inter.variable} font-sans antialiased text-base`}
         suppressHydrationWarning
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <FocusModeProvider>
-            <TooltipProvider delayDuration={0}>{children}</TooltipProvider>
+            <TooltipProvider delayDuration={0}>
+              <KeyboardNav />
+              {children}
+              <Toaster richColors closeButton position="top-right" />
+            </TooltipProvider>
           </FocusModeProvider>
         </ThemeProvider>
       </body>
