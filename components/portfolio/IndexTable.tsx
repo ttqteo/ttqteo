@@ -16,6 +16,8 @@ export interface IndexEntry {
   type?: IndexEntryType;
   draft?: boolean;
   source?: "mdx" | "db";
+  updatedLabel?: string;
+  updatedRecent?: boolean;
 }
 
 const STACK_VISIBLE = 3;
@@ -60,6 +62,16 @@ function IndexRow({ entry }: { entry: IndexEntry }) {
               </span>
             )}
             {entry.title}
+            {entry.updatedLabel && (
+              <span
+                title={`Cập nhật ${entry.updatedLabel}`}
+                aria-label={`Cập nhật ${entry.updatedLabel}`}
+                className={cn(
+                  "ml-1.5 inline-block w-1.5 h-1.5 rounded-full align-middle",
+                  entry.updatedRecent ? "bg-accent" : "bg-muted-foreground/50",
+                )}
+              />
+            )}
             {entry.draft && (
               <span className="ml-2 font-mono text-xs text-muted-foreground/60 border border-border px-1 py-0.5 align-middle">
                 draft

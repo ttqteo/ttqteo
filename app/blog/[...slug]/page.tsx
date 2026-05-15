@@ -1,15 +1,24 @@
 import { Typography } from "@/components/typography";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Author, getAllBlogStaticPaths, getBlogForSlug, getBlogTocs } from "@/lib/markdown";
 import { extractTocFromHtml, getSupabasePostBySlug, injectHeadingIds } from "@/lib/posts";
+import {
+  ReaderContent,
+  ReaderControlsAnchor,
+  ReaderSidebar,
+  ScrollToTopButton,
+} from "@/components/reader-controls";
+import { FadedScroll } from "@/components/faded-scroll";
 import TocObserver from "@/components/toc-observer";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { formatDate } from "@/lib/utils";
-import { ArrowLeftIcon } from "lucide-react";
+import { buildGitHubFileUrl, getGitFileMeta } from "@/lib/git-meta";
+import { formatDate, stringToDate } from "@/lib/utils";
+import { ArrowLeftIcon, History } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import path from "path";
 import { AdminEditButton } from "./admin-edit-button";
 
 // MDX paths are pre-rendered via generateStaticParams; supabase paths render on-demand.
@@ -57,8 +66,11 @@ export default async function BlogPage(props: PageProps) {
 
   let title: string;
   let dateLabel: string;
+  let updatedLabel: string | null = null;
+  let historyHref: string | null = null;
   let authors: Author[] = [];
   let cover: string | null = null;
+  let tags: string[] = [];
   let tocs: { level: number; text: string; href: string }[] = [];
   let body: React.ReactNode;
 
@@ -67,15 +79,45 @@ export default async function BlogPage(props: PageProps) {
     dateLabel = formatDate(mdxRes.frontmatter.date);
     authors = mdxRes.frontmatter.authors || [];
     cover = mdxRes.frontmatter.cover || null;
+    tags = (mdxRes.frontmatter.tags || "")
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
     tocs = await getBlogTocs(slug);
     body = <Typography>{mdxRes.content}</Typography>;
+
+    const blogAbsPath = path.join(process.cwd(), "/contents/blogs/", `${slug}.mdx`);
+    const meta = await getGitFileMeta(blogAbsPath);
+    if (meta.lastCommitIso) {
+      const published = stringToDate(mdxRes.frontmatter.date).getTime();
+      const updated = new Date(meta.lastCommitIso).getTime();
+      const DAY = 24 * 60 * 60 * 1000;
+      if (updated - published >= DAY) {
+        updatedLabel = formatDate(meta.lastCommitIso);
+      }
+    }
+    historyHref = buildGitHubFileUrl({
+      owner: "ttqteo",
+      repo: "ttqteo",
+      branch: "master",
+      relPath: `contents/blogs/${slug}.mdx`,
+      view: "history",
+    });
   } else {
     const dbPost = await getSupabasePostBySlug(slug);
     if (!dbPost || !dbPost.isPublished) {
       notFound();
     }
     title = dbPost.title;
-    dateLabel = formatDate(dbPost.updatedAt);
+    dateLabel = formatDate(dbPost.createdAt);
+    const DAY = 24 * 60 * 60 * 1000;
+    if (
+      new Date(dbPost.updatedAt).getTime() -
+        new Date(dbPost.createdAt).getTime() >=
+      DAY
+    ) {
+      updatedLabel = formatDate(dbPost.updatedAt);
+    }
     const html = injectHeadingIds(dbPost.content);
     tocs = extractTocFromHtml(html);
     body = (
@@ -87,8 +129,9 @@ export default async function BlogPage(props: PageProps) {
   }
 
   return (
-    <div className="mx-auto sm:min-h-[78vh] min-h-[76vh] flex gap-10 max-w-6xl px-4">
-      <article className="flex-1 min-w-0 max-w-[760px] mx-auto lg:mx-0">
+    <div className="relative w-full mx-auto sm:min-h-[78vh] min-h-[76vh] flex gap-10 max-w-[1280px] px-4">
+      <ReaderControlsAnchor hasToc={tocs.length > 0} />
+      <article className="flex-1 min-w-0 max-w-[920px] mx-auto lg:mx-0">
         <div className="flex items-center justify-between mb-7">
           <Link
             className={buttonVariants({
@@ -105,7 +148,32 @@ export default async function BlogPage(props: PageProps) {
           <h1 className="sm:text-3xl text-3xl font-semibold mb-2 leading-tight">
             {title}
           </h1>
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 -mt-1 mb-1">
+              {tags.map((t) => (
+                <Badge key={t} variant="secondary" className="font-mono text-xs">
+                  {t}
+                </Badge>
+              ))}
+            </div>
+          )}
           <Authors authors={authors} date={dateLabel} />
+          {updatedLabel && (
+            <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
+              <span>Cập nhật ngày {updatedLabel}</span>
+              {historyHref && (
+                <a
+                  href={historyHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 hover:text-accent transition-colors"
+                >
+                  <History className="w-3 h-3" />
+                  lịch sử thay đổi
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="!w-full prose-h2:text-2xl prose-h3:text-xl prose-h4:text-lg prose-h2:font-semibold prose-h3:font-semibold prose-h4:font-semibold prose-h2:mt-10 prose-h2:mb-3 prose-h3:mt-6 prose-h3:mb-2">
@@ -120,18 +188,16 @@ export default async function BlogPage(props: PageProps) {
               />
             </div>
           )}
-          {body}
+          <ReaderContent>{body}</ReaderContent>
         </div>
       </article>
 
-      {tocs.length > 0 && (
-        <aside className="hidden lg:flex flex-col w-[220px] shrink-0 sticky top-16 h-[calc(100vh-5rem)] py-9">
-          <h3 className="font-semibold text-sm mb-3">On this page</h3>
-          <ScrollArea className="pb-2 pt-0.5 overflow-y-auto">
-            <TocObserver data={tocs} />
-          </ScrollArea>
-        </aside>
-      )}
+      <ReaderSidebar hasToc={tocs.length > 0}>
+        <FadedScroll className="flex-1 min-h-0 pb-2 pt-0.5 pr-2">
+          <TocObserver data={tocs} />
+        </FadedScroll>
+      </ReaderSidebar>
+      <ScrollToTopButton />
     </div>
   );
 }
@@ -147,7 +213,7 @@ function Authors({
   if (!authors || authors.length === 0) {
     return (
       <div className="text-sm text-muted-foreground">
-        {date}
+        Xuất bản ngày {date}
       </div>
     );
   }
@@ -174,7 +240,7 @@ function Authors({
                   @{author.handle}
                 </span>
               </p>
-              <p className="text-muted-foreground text-sm">{date}</p>
+              <p className="text-muted-foreground text-sm">Xuất bản ngày {date}</p>
             </div>
           </Link>
         );

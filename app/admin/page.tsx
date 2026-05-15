@@ -10,6 +10,7 @@ import { getUser, isAdmin } from "@/lib/supabase-server";
 import { FileTextIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { LoginButton } from "./login-button";
+import { SyncMdxButton } from "./sync-mdx-button";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +72,9 @@ export default async function AdminPage() {
     <div className="max-w-3xl mx-auto py-8 space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">admin dashboard</h1>
-        <DropdownMenu>
+        <div className="flex items-center gap-2">
+          <SyncMdxButton />
+          <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button>
               <PlusIcon className="w-4 h-4 mr-2" />
@@ -93,6 +96,7 @@ export default async function AdminPage() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

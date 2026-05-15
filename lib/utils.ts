@@ -48,39 +48,18 @@ export function advanceSearch(query: string) {
 
 // Thursday, May 23, 2024
 export function formatDate(dateStr: string): string {
-  let date: Date;
-
-  // Handle ISO format from database (e.g., "2024-12-13T10:30:00Z")
-  if (dateStr.includes("T") || dateStr.includes(":")) {
-    date = new Date(dateStr);
-  } else {
-    // Handle dd-MM-yyyy format from MDX
-    const [day, month, year] = dateStr.split("-").map(Number);
-    date = new Date(year, month - 1, day);
-  }
-
+  const date = stringToDate(dateStr);
   const options: Intl.DateTimeFormatOptions = {
     year: "numeric",
     month: "long",
     day: "numeric",
   };
-
   return date.toLocaleDateString("en-US", options);
 }
 
 //  May 23, 2024
 export function formatDate2(dateStr: string): string {
-  let date: Date;
-
-  // Handle ISO format from database (e.g., "2024-12-13T10:30:00Z")
-  if (dateStr.includes("T") || dateStr.includes(":")) {
-    date = new Date(dateStr);
-  } else {
-    // Handle dd-MM-yyyy format from MDX
-    const [day, month, year] = dateStr.split("-").map(Number);
-    date = new Date(year, month - 1, day);
-  }
-
+  const date = stringToDate(dateStr);
   const options: Intl.DateTimeFormatOptions = {
     month: "short",
     day: "numeric",

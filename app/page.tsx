@@ -1,11 +1,10 @@
 import { Hero } from "@/components/portfolio/Hero";
 import { IndexTable } from "@/components/portfolio/IndexTable";
 import { projectIndex } from "@/data/projects";
-import { getAllBlogs } from "@/lib/markdown";
-import { stringToDate } from "@/lib/utils";
+import { getAllPosts } from "@/lib/posts";
 import Link from "next/link";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 function SectionHeader({ title, href }: { title: string; href: string }) {
   return (
@@ -24,14 +23,14 @@ function SectionHeader({ title, href }: { title: string; href: string }) {
 }
 
 export default async function Home() {
-  const blogs = await getAllBlogs();
-  const recentBlogs = blogs
-    .filter((b) => b.isPublished)
+  const posts = await getAllPosts({ view: "active" });
+  const recentBlogs = posts
+    .filter((p) => p.type === "post" && p.isPublished)
     .slice(0, 3)
-    .map((b) => ({
-      year: stringToDate(b.date).getFullYear(),
-      title: b.title,
-      href: `/blog/${b.slug}`,
+    .map((p) => ({
+      year: new Date(p.createdAt).getFullYear(),
+      title: p.title,
+      href: `/blog/${p.slug}`,
     }));
 
   return (

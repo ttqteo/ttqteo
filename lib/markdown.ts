@@ -1,4 +1,5 @@
 import { promises as fs } from "fs";
+import GithubSlugger from "github-slugger";
 import matter from "gray-matter";
 import { compileMDX } from "next-mdx-remote/rsc";
 import path from "path";
@@ -208,13 +209,31 @@ export async function getAllBlogStaticPaths() {
 }
 const ALLOWED_BLOG_TYPES = ["post", "note", "reading", "paper"] as const;
 
+async function walkMdxFiles(dir: string, base: string): Promise<string[]> {
+  const out: string[] = [];
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  for (const e of entries) {
+    const abs = path.join(dir, e.name);
+    if (e.isDirectory()) {
+      out.push(...(await walkMdxFiles(abs, base)));
+    } else if (
+      e.isFile() &&
+      e.name.endsWith(".mdx") &&
+      !e.name.startsWith("_")
+    ) {
+      const rel = path.relative(base, abs).replace(/\\/g, "/");
+      out.push(rel);
+    }
+  }
+  return out;
+}
+
 export async function getAllBlogs() {
   const blogFolder = path.join(process.cwd(), "/contents/blogs/");
-  const files = await fs.readdir(blogFolder);
+  const relFiles = await walkMdxFiles(blogFolder, blogFolder);
   const uncheckedRes = await Promise.all(
-    files.map(async (file) => {
-      if (!file.endsWith(".mdx")) return undefined;
-      const filepath = path.join(process.cwd(), `/contents/blogs/${file}`);
+    relFiles.map(async (relFile) => {
+      const filepath = path.join(blogFolder, relFile);
       const rawMdx = await fs.readFile(filepath, "utf-8");
       const frontmatter = justGetFrontmatterFromMD<BlogMdxFrontmatter>(rawMdx);
       const rawType = (frontmatter as any).type;
@@ -224,7 +243,7 @@ export async function getAllBlogs() {
       return {
         ...frontmatter,
         type,
-        slug: file.split(".")[0],
+        slug: relFile.replace(/\.mdx$/, ""),
       };
     })
   );
@@ -244,13 +263,14 @@ export async function getBlogTocs(slug: string) {
   const blogFile = path.join(process.cwd(), "/contents/blogs/", `${slug}.mdx`);
   try {
     const rawMdx = await fs.readFile(blogFile, "utf-8");
-    const headingsRegex = /^(#{2,4})\s(.+)$/gm;
+    const headingsRegex = /^(#{1,4})\s(.+)$/gm;
+    const slugger = new GithubSlugger();
     let match;
     const extracted: { level: number; text: string; href: string }[] = [];
     while ((match = headingsRegex.exec(rawMdx)) !== null) {
       const level = match[1].length;
       const text = match[2].trim();
-      extracted.push({ level, text, href: `#${sluggify(text)}` });
+      extracted.push({ level, text, href: `#${slugger.slug(text)}` });
     }
     return extracted;
   } catch {

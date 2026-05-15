@@ -1,0 +1,91 @@
+---
+title: "What the <topic> docs don't tell you about <specific behavior>"
+description: "A research post: textbook model vs. the model that actually predicts behavior, plus the experiment that taught you the difference."
+date: "2000-02-28"
+authors:
+  - avatar: "https://avatars.githubusercontent.com/ttqteo"
+    handle: "ttqteo"
+    username: "Tran Tu Quang"
+    handleUrl: "https://github.com/ttqteo"
+cover: ""
+isPublished: false
+tags: "template,research"
+---
+
+{/*
+  TEMPLATE: "I researched this" post.
+  Use when writing about something you learned, not something you shipped.
+  Authority comes from a concrete experiment with surprising numbers,
+  and from naming what you still don't understand.
+  Failure mode if you skip the experiment: reads like a tutorial.
+
+  For cybersecurity / topics where you can't run an "experiment":
+  replace the experiment table with a concrete artifact — a CVE writeup
+  with PoC, a threat model for a specific system, a comparison of N
+  real configurations against a specific attack class. The artifact is
+  what proves you went past reading.
+*/}
+
+> **TL;DR** — <one sentence claim. The thing the canonical sources get wrong or underweight.>
+
+## Why I went down this hole
+
+<The concrete problem that sent you in. NOT "I wanted to learn X." Something like "our consumers paused 40s every deploy" or "I couldn't explain to a colleague why <surprising behavior>.">
+
+This post is what I wish someone had written before I started.
+
+## The mental model the docs give you
+
+<The textbook picture. Diagram or short description. State it fairly — you're going to argue with it, not strawman it.>
+
+It's correct. It's also useless for <the specific debugging or prediction task you cared about>, because <reason>.
+
+## The model that actually predicts behavior
+
+<Your better model. The one you arrived at after instrumenting / experimenting / reading source.>
+
+[**↗ Open the <topic> mindmap**](/mind/<slug>) — <what the annotations on the nodes mean, e.g., measured timings, attack surface, dependency direction>.
+
+<N> things the docs underweight:
+
+1. **<claim>.** <One paragraph. Why it matters. Often: "the docs mention this as one sentence; it deserves a chapter.">
+2. **<claim>.** <Same shape.>
+3. **<claim>.** <Same shape.>
+4. **<claim>.** <Same shape. Cite a KIP / RFC / CVE / paper if relevant.>
+
+## The experiment that taught me the most
+
+{/* For cybersecurity research, replace this section with "The artifact":
+    a working PoC, a threat model, a config comparison. Same goal —
+    proof you went past reading. */}
+
+<One paragraph describing the setup. Link the repo or notebook.>
+
+What I expected: <a clean story>.
+
+What I got:
+
+| Scenario | Measured | What I'd have guessed |
+|---|---|---|
+| <case 1> | <number> | <number or "no idea"> |
+| <case 2> | <number> | <number> |
+| <case 3> | <number> | <number> |
+| <case 4> | <number> | <number> |
+
+The interesting cells are <which ones and why>. Both surprised me, and both are explained by the model above. **If you can't predict those numbers from your mental model, your mental model is wrong** — that's the test I now apply to anything I claim to "know."
+
+## What I think I still don't understand
+
+{/* Listing this honestly is the whole point. An expert reader decides
+    whether to trust the rest of the post based on whether this list
+    is plausible. Three items, specific, not falsely humble. */}
+
+- **<specific gap>.** <Why you don't trust yourself on it.>
+- **<specific gap>.** <What you saw but couldn't explain.>
+- **<specific gap>.** <The part you haven't touched at all.>
+
+## The opinion I'll die on
+
+> **<One sharp claim about how this kind of thing should be learned, written about, or evaluated. Should generalize past the specific topic.>**
+
+<One paragraph on why you're writing it down — usually: to hold yourself to the same bar on the next topic you learn.>

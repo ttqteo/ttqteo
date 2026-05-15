@@ -1,6 +1,8 @@
 import { getAllBlogs } from "@/lib/markdown";
+import { getGitFileMeta } from "@/lib/git-meta";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { stringToDate } from "@/lib/utils";
+import path from "path";
 
 export type PostSource = "mdx" | "supabase";
 export type PostType = "post" | "note" | "reading" | "paper";
@@ -147,21 +149,29 @@ export function injectHeadingIds(html: string): string {
 
 export async function getMdxPosts(): Promise<UnifiedPost[]> {
   const blogs = await getAllBlogs();
-  return blogs.map((b) => {
-    const iso = stringToDate(b.date).toISOString();
-    return {
-      id: `mdx-${b.slug}`,
-      slug: b.slug,
-      title: b.title,
-      description: undefined,
-      type: normalizeType(b.type),
-      isPublished: !!b.isPublished,
-      source: "mdx" as const,
-      createdAt: iso,
-      updatedAt: iso,
-      deletedAt: null,
-    };
-  });
+  return Promise.all(
+    blogs.map(async (b) => {
+      const createdIso = stringToDate(b.date).toISOString();
+      const absPath = path.join(
+        process.cwd(),
+        "/contents/blogs/",
+        `${b.slug}.mdx`,
+      );
+      const meta = await getGitFileMeta(absPath);
+      return {
+        id: `mdx-${b.slug}`,
+        slug: b.slug,
+        title: b.title,
+        description: undefined,
+        type: normalizeType(b.type),
+        isPublished: !!b.isPublished,
+        source: "mdx" as const,
+        createdAt: createdIso,
+        updatedAt: meta.lastCommitIso ?? createdIso,
+        deletedAt: null,
+      };
+    }),
+  );
 }
 
 export async function getAllPosts(opts: GetAllPostsOptions = {}): Promise<UnifiedPost[]> {
@@ -169,7 +179,11 @@ export async function getAllPosts(opts: GetAllPostsOptions = {}): Promise<Unifie
   const dbPosts = await getSupabasePosts(view);
   const mdxPosts = view === "trash" || !includeMdx ? [] : await getMdxPosts();
 
-  return [...dbPosts, ...mdxPosts].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  // MDX is source of truth: if a slug exists in both, drop the DB copy.
+  const mdxSlugs = new Set(mdxPosts.map((p) => p.slug));
+  const dedupedDb = dbPosts.filter((p) => !mdxSlugs.has(p.slug));
+
+  return [...dedupedDb, ...mdxPosts].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 }

@@ -198,3 +198,55 @@ body.focus-mode {
 body.focus-mode .pt-8 {
   padding-top: 0 !important;
 }
+
+/* Blog detail: sidebar width is driven by CSS based on data-toc-expanded so it can be
+   set by the pre-hydration inline script — no flash on reload. */
+.blog-sidebar {
+  width: 2.5rem; /* 40px collapsed */
+  transition: width 300ms ease-out;
+}
+html[data-toc-expanded="1"] .blog-sidebar {
+  width: 220px;
+}
+.blog-toc-panel {
+  opacity: 0;
+  transform: translateX(1rem);
+  clip-path: inset(0 0 0 100%);
+  pointer-events: none;
+  transition: opacity 300ms ease-out, transform 300ms ease-out;
+}
+html[data-toc-expanded="1"] .blog-toc-panel {
+  opacity: 1;
+  transform: none;
+  clip-path: none;
+  pointer-events: auto;
+}
+/* Disable all sidebar transitions until first paint after hydration */
+html:not([data-reader-hydrated="1"]) .blog-sidebar,
+html:not([data-reader-hydrated="1"]) .blog-toc-panel {
+  transition: none !important;
+}
+
+/* Reader content: scale prose typography from --reader-fs */
+.reader-content .prose,
+.reader-content.prose {
+  font-size: var(--reader-fs, 1rem);
+}
+.reader-content .prose p,
+.reader-content .prose li,
+.reader-content .prose blockquote {
+  font-size: var(--reader-fs, 1rem);
+  line-height: 1.7;
+}
+.reader-content .prose h1 {
+  font-size: calc(var(--reader-fs, 1rem) * 2);
+}
+.reader-content .prose h2 {
+  font-size: calc(var(--reader-fs, 1rem) * 1.5);
+}
+.reader-content .prose h3 {
+  font-size: calc(var(--reader-fs, 1rem) * 1.25);
+}
+.reader-content .prose h4 {
+  font-size: calc(var(--reader-fs, 1rem) * 1.1);
+}
