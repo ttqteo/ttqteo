@@ -195,17 +195,19 @@ export type BlogMdxFrontmatter = BaseMdxFrontmatter & {
   cover: string;
   isPublished: boolean;
   tags: string;
+  type?: "post" | "note" | "reading" | "paper";
 };
 
 export async function getAllBlogStaticPaths() {
   try {
-    const blogFolder = path.join(process.cwd(), "/contents/blogs/");
-    const res = await fs.readdir(blogFolder);
-    return res.map((file) => file.split(".")[0]);
+    const blogs = await getAllBlogs();
+    return blogs?.map((blog) => blog.slug);
   } catch (err) {
     console.log(err);
   }
 }
+const ALLOWED_BLOG_TYPES = ["post", "note", "reading", "paper"] as const;
+
 export async function getAllBlogs() {
   const blogFolder = path.join(process.cwd(), "/contents/blogs/");
   const files = await fs.readdir(blogFolder);
@@ -214,8 +216,14 @@ export async function getAllBlogs() {
       if (!file.endsWith(".mdx")) return undefined;
       const filepath = path.join(process.cwd(), `/contents/blogs/${file}`);
       const rawMdx = await fs.readFile(filepath, "utf-8");
+      const frontmatter = justGetFrontmatterFromMD<BlogMdxFrontmatter>(rawMdx);
+      const rawType = (frontmatter as any).type;
+      const type: "post" | "note" | "reading" | "paper" = ALLOWED_BLOG_TYPES.includes(rawType)
+        ? rawType
+        : "post";
       return {
-        ...justGetFrontmatterFromMD<BlogMdxFrontmatter>(rawMdx),
+        ...frontmatter,
+        type,
         slug: file.split(".")[0],
       };
     })
@@ -230,6 +238,24 @@ export async function getAllBlogs() {
   return uncheckedRes.filter((it) => !!it) as (BlogMdxFrontmatter & {
     slug: string;
   })[];
+}
+
+export async function getBlogTocs(slug: string) {
+  const blogFile = path.join(process.cwd(), "/contents/blogs/", `${slug}.mdx`);
+  try {
+    const rawMdx = await fs.readFile(blogFile, "utf-8");
+    const headingsRegex = /^(#{2,4})\s(.+)$/gm;
+    let match;
+    const extracted: { level: number; text: string; href: string }[] = [];
+    while ((match = headingsRegex.exec(rawMdx)) !== null) {
+      const level = match[1].length;
+      const text = match[2].trim();
+      extracted.push({ level, text, href: `#${sluggify(text)}` });
+    }
+    return extracted;
+  } catch {
+    return [];
+  }
 }
 
 export async function getBlogForSlug(slug: string) {

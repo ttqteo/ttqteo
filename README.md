@@ -11,7 +11,7 @@
   <p align="center">
     welcome to my world
     <br />
-    <a href="https://ttqteo.vercel.app" target="_blank"><strong>explore my website »</strong></a>
+    <a href="https://ttqteo.dev" target="_blank"><strong>explore my website »</strong></a>
   </p>
 </div>
 

@@ -37,9 +37,10 @@ import { useImageUpload } from "./use-image-upload";
 interface SimpleEditorProps {
   content: string;
   onChange: (content: string) => void;
+  stickyTop?: string | null;
 }
 
-export function SimpleEditor({ content, onChange }: SimpleEditorProps) {
+export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEditorProps) {
   const { uploadImage, isUploading } = useImageUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -69,7 +70,7 @@ export function SimpleEditor({ content, onChange }: SimpleEditorProps) {
     editorProps: {
       attributes: {
         class:
-          "prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[500px] p-4 text-lg prose-p:my-1 leading-normal",
+          "prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[500px] p-4 text-base prose-p:my-1 leading-normal prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-h1:font-bold prose-h2:font-semibold prose-h3:font-semibold prose-h1:mt-6 prose-h1:mb-3 prose-h2:mt-5 prose-h2:mb-2 prose-h3:mt-4 prose-h3:mb-2",
       },
     },
   });
@@ -140,7 +141,7 @@ export function SimpleEditor({ content, onChange }: SimpleEditorProps) {
   );
 
   return (
-    <div className="border rounded-lg">
+    <div>
       <input
         type="file"
         ref={fileInputRef}
@@ -148,7 +149,10 @@ export function SimpleEditor({ content, onChange }: SimpleEditorProps) {
         accept="image/*"
         onChange={handleImageUpload}
       />
-      <div className="sticky top-16 z-30 flex flex-wrap gap-1 p-2 border-b bg-background/95 backdrop-blur rounded-t-lg">
+      <div
+        className={`z-30 flex flex-wrap gap-1 p-2 border-y bg-background/95 backdrop-blur ${stickyTop !== null ? "sticky" : ""}`}
+        style={stickyTop !== null ? { top: stickyTop } : undefined}
+      >
         {/* Undo/Redo */}
         <ToolbarButton
           onClick={() => editor.chain().focus().undo().run()}

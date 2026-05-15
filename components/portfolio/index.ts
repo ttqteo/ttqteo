@@ -1,4 +1,4 @@
-export { SectionHeader } from "./SectionHeader";
-export { TechBadge } from "./TechBadge";
-export { ProjectCard } from "./ProjectCard";
-export { CaseStudyCard } from "./CaseStudyCard";
+export { IndexTable } from "./IndexTable";
+export type { IndexEntry, IndexEntryType } from "./IndexTable";
+export { Hero } from "./Hero";
+export { CurrentlyBlock } from "./CurrentlyBlock";

@@ -10,10 +10,12 @@ export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ type?: string }>;
 };
 
-export default async function EditPostPage({ params }: PageProps) {
+export default async function EditPostPage({ params, searchParams }: PageProps) {
   const { id } = await params;
+  const { type } = await searchParams;
 
   const user = await getUser();
   if (!user) redirect("/login");
@@ -23,7 +25,7 @@ export default async function EditPostPage({ params }: PageProps) {
 
   // New post
   if (id === "new") {
-    return <EditPostClient isNew={true} />;
+    return <EditPostClient isNew={true} initialType={type} />;
   }
 
   // Existing post
@@ -48,6 +50,7 @@ export default async function EditPostPage({ params }: PageProps) {
         description: post.description || "",
         content: post.content || "",
         is_published: post.is_published,
+        type: post.type || "post",
       }}
     />
   );

@@ -23,6 +23,40 @@ export interface Project {
 
 export const featuredProjects: Project[] = [
   {
+    id: "neurite",
+    title: "neurite",
+    tagline: "AI-native neural knowledge system for learning and research",
+    description:
+      "A lightweight self-hosted AI workspace that combines note-taking, semantic search, AI memory, document ingestion, and knowledge graphs into a single connected-thinking environment for students, developers, and researchers.",
+    problem:
+      "Knowledge tools today are fragmented — notes, PDFs, web clippings, and AI chats live in separate silos with no long-term memory or semantic connections. Researchers and learners lose context across sessions and struggle to synthesize what they already know.",
+    solution:
+      "Built a self-hosted workspace where notes, ingested documents (PDF/YouTube/Web), and AI conversations share a vector memory and knowledge graph. Capture → Organize → Connect → Recall → Synthesize as a single workflow, powered by pgvector and pluggable LLM backends (OpenRouter/Ollama).",
+    techStack: [
+      "Next.js",
+      "Supabase",
+      "PostgreSQL",
+      "pgvector",
+      "OpenRouter",
+      "Ollama",
+      "Docker",
+      "Python",
+    ],
+    features: [
+      "AI-native notes and workspace",
+      "Semantic search with vector memory",
+      "Knowledge graph visualization",
+      "PDF / YouTube / Web ingestion",
+      "AI summaries and long-term recall",
+      "Learning planner and schedules",
+      "Self-hosted and lightweight architecture",
+    ],
+    links: {
+      github: "https://github.com/ttqteo/neurite",
+    },
+    isFlagship: true,
+  },
+  {
     id: "vnstock-js",
     title: "vnstock-js",
     tagline: "Open-source TypeScript package for Vietnam stock market data",
@@ -71,7 +105,7 @@ const goldPrices = await commodity.gold.priceSJC();`,
   },
   {
     id: "finance-app",
-    title: "Finance App",
+    title: "finance app",
     tagline: "Full-stack finance & stock tracking platform",
     description:
       "A comprehensive finance platform for tracking stocks, analyzing market trends, and managing personal finance. Built with modern web technologies for performance and scalability.",
@@ -123,5 +157,47 @@ const goldPrices = await commodity.gold.priceSJC();`,
     links: {
       github: "https://github.com/ttqteo/crawl-news",
     },
+  },
+];
+
+import type { IndexEntry } from "@/components/portfolio/IndexTable";
+
+export const projectIndex: IndexEntry[] = [
+  {
+    year: 2026,
+    title: "neurite",
+    description:
+      "AI-native neural knowledge system combining notes, semantic search, knowledge graphs, and document ingestion into a self-hosted workspace for learning and research.",
+    stack: ["Next.js", "Supabase", "pgvector"],
+    href: "https://github.com/ttqteo/neurite",
+    external: true,
+  },
+  {
+    year: 2025,
+    title: "vnstock-js",
+    description:
+      "Open-source TypeScript package for Vietnam stock market data. Fetch historical prices, real-time boards, top movers, and commodity prices from VCI.",
+    stack: ["TypeScript", "Node"],
+    metric: "npm",
+    href: "https://www.npmjs.com/package/vnstock-js",
+    external: true,
+  },
+  {
+    year: 2025,
+    title: "finance app",
+    description:
+      "Full-stack finance platform for tracking Vietnamese stocks, managing personal portfolios, and aggregating market news in real time.",
+    stack: ["Next.js", "Prisma", "Postgres"],
+    href: "https://ttqteo-finance.vercel.app/",
+    external: true,
+  },
+  {
+    year: 2024,
+    title: "news-crawler",
+    description:
+      "Python scraper that crawls Vietnamese financial news sources, normalizes content, deduplicates, and exposes a public REST API.",
+    stack: ["Python", "FastAPI", "Postgres"],
+    href: "https://github.com/ttqteo/crawl-news",
+    external: true,
   },
 ];
