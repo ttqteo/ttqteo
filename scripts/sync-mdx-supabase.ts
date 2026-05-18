@@ -13,7 +13,7 @@ async function main() {
     console.warn(
       "[sync] missing SUPABASE env vars; skipping MDX↔Supabase sync.",
     );
-    process.exit(0);
+    return 0;
   }
 
   const supabase = createClient(url, key, {
@@ -32,10 +32,17 @@ async function main() {
     );
   }
   for (const err of res.errors) console.error(`[sync] error: ${err}`);
-  process.exit(res.errors.length > 0 ? 1 : 0);
+  return res.errors.length > 0 ? 1 : 0;
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main()
+  .then((code) => {
+    // Set exitCode and let the event loop drain naturally so any
+    // keep-alive sockets close before the process exits. Using
+    // process.exit() here triggers a libuv assertion on Windows.
+    process.exitCode = code;
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });

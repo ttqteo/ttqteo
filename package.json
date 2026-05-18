@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:bighdr": "node --max-http-header-size=32768 ./node_modules/next/dist/bin/next dev",
-    "prebuild": "tsx scripts/sync-mdx-supabase.ts || true",
+    "prebuild": "tsx scripts/sync-mdx-supabase.ts",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
