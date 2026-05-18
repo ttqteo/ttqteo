@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { title, slug, description, content, is_published, type } = body;
+  const { title, slug, description, content, is_published, type, tags } = body;
 
   if (!title || !slug) {
     return NextResponse.json(
@@ -82,10 +82,25 @@ export async function POST(request: NextRequest) {
   const tryInsert = (payload: Record<string, unknown>) =>
     supabase.from("blogs").insert(payload).select().single();
 
+  const tagsValue = typeof tags === "string" ? tags : undefined;
+
   // Use safeFetch to prevent timeout errors
   const result = await safeFetch(async () => {
-    let { data, error } = await tryInsert({ ...basePayload, type: type || "post" });
-    if (error && /'?type'? column|column .*type.* does not exist/i.test(error.message)) {
+    let payload: Record<string, unknown> = {
+      ...basePayload,
+      type: type || "post",
+      ...(tagsValue !== undefined ? { tags: tagsValue } : {}),
+    };
+    let { data, error } = await tryInsert(payload);
+    if (error && /['"]?tags['"]? column|column .*tags.* does not exist/i.test(error.message)) {
+      payload = { ...basePayload, type: type || "post" };
+      ({ data, error } = await tryInsert(payload));
+    }
+    if (error && /['"]?type['"]? column|column .*type.* does not exist/i.test(error.message)) {
+      payload = { ...basePayload, ...(tagsValue !== undefined ? { tags: tagsValue } : {}) };
+      ({ data, error } = await tryInsert(payload));
+    }
+    if (error && /column/i.test(error.message)) {
       ({ data, error } = await tryInsert(basePayload));
     }
     if (error) throw error;

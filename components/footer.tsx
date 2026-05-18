@@ -22,16 +22,16 @@ export function Footer() {
 
         <nav className="space-y-2">
           <ul className="grid grid-cols-2 gap-x-4 gap-y-1">
-            <li><Link href="/projects" className="hover:text-accent transition-colors">projects</Link></li>
-            <li><Link href="/blog" className="hover:text-accent transition-colors">blog</Link></li>
-            <li><Link href="/lab" className="hover:text-accent transition-colors">lab</Link></li>
-            <li><Link href="/about" className="hover:text-accent transition-colors">about</Link></li>
+            <li><Link href="/projects" className="hover:text-primary dark:hover:text-orange-300 transition-colors">projects</Link></li>
+            <li><Link href="/blog" className="hover:text-primary dark:hover:text-orange-300 transition-colors">blog</Link></li>
+            <li><Link href="/lab" className="hover:text-primary dark:hover:text-orange-300 transition-colors">lab</Link></li>
+            <li><Link href="/about" className="hover:text-primary dark:hover:text-orange-300 transition-colors">about</Link></li>
             <li>
               <a
                 href="https://github.com/ttqteo"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-accent transition-colors"
+                className="hover:text-primary dark:hover:text-orange-300 transition-colors"
               >
                 github
               </a>

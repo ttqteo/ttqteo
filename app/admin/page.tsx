@@ -65,11 +65,21 @@ export default async function AdminPage() {
     paper: typeCount("paper"),
   };
 
-  const recentDrafts = drafts.slice(0, 5);
-  const recentPublished = published.slice(0, 5);
+  const continueWriting = [...drafts]
+    .sort(
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    )
+    .slice(0, 6);
+  const recentPublishes = [...published]
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
+    .slice(0, 6);
 
   return (
-    <div className="max-w-3xl mx-auto py-8 space-y-8">
+    <div className="max-w-5xl mx-auto py-8 space-y-8 px-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">admin dashboard</h1>
         <div className="flex items-center gap-2">
@@ -121,20 +131,25 @@ export default async function AdminPage() {
         <span>papers <span className="text-foreground font-medium">{counts.paper}</span></span>
       </div>
 
-      <Section title="Recent drafts" emptyText="No drafts." count={drafts.length} viewAll="/admin/posts">
-        {recentDrafts.map((p) => (
-          <PostRow key={p.id} post={p} />
+      <Section
+        title="Continue writing"
+        emptyText="No drafts. Start a new post when you're ready."
+        count={drafts.length}
+        viewAll="/admin/posts"
+      >
+        {continueWriting.map((p) => (
+          <PostRow key={p.id} post={p} dateField="updatedAt" />
         ))}
       </Section>
 
       <Section
-        title="Recently updated"
+        title="Recent publishes"
         emptyText="No published posts yet."
         count={published.length}
         viewAll="/admin/posts"
       >
-        {recentPublished.map((p) => (
-          <PostRow key={p.id} post={p} />
+        {recentPublishes.map((p) => (
+          <PostRow key={p.id} post={p} dateField="createdAt" />
         ))}
       </Section>
     </div>
@@ -196,31 +211,52 @@ function Section({
       {isEmpty ? (
         <p className="text-sm text-muted-foreground">{emptyText}</p>
       ) : (
-        <div className="space-y-1.5">{children}</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">{children}</div>
       )}
     </div>
   );
 }
 
-function PostRow({ post }: { post: UnifiedPost }) {
-  const dateLabel = new Date(post.updatedAt).toLocaleDateString("en-US", {
+function PostRow({
+  post,
+  dateField = "updatedAt",
+}: {
+  post: UnifiedPost;
+  dateField?: "updatedAt" | "createdAt";
+}) {
+  const dateLabel = new Date(post[dateField]).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
+  const dateLabelPrefix = dateField === "updatedAt" ? "edited" : "published";
   const editable = post.source === "supabase";
+  const titleHref = editable
+    ? `/admin/edit/${post.id}`
+    : post.isPublished
+      ? `/blog/${post.slug}`
+      : null;
   return (
     <div className="flex items-center justify-between gap-3 px-3 py-2 border rounded-md hover:bg-muted/40 transition-colors">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="font-medium truncate">{post.title}</span>
-          {post.type !== "post" && (
-            <span className="font-mono text-[10px] text-muted-foreground">[{post.type}]</span>
+        <div className="flex items-center gap-2 min-w-0">
+          {titleHref ? (
+            <Link
+              href={titleHref}
+              className="font-medium truncate hover:underline underline-offset-2"
+            >
+              {post.title}
+            </Link>
+          ) : (
+            <span className="font-medium truncate">{post.title}</span>
           )}
-          <span className="font-mono text-[10px] text-muted-foreground">[{post.source}]</span>
+          {post.type !== "post" && (
+            <span className="font-mono text-[10px] text-muted-foreground shrink-0">[{post.type}]</span>
+          )}
+          <span className="font-mono text-[10px] text-muted-foreground shrink-0">[{post.source}]</span>
         </div>
         <div className="text-xs text-muted-foreground truncate">
-          /{post.slug} • {dateLabel}
+          /{post.slug} • {dateLabelPrefix} {dateLabel}
         </div>
       </div>
       <div className="flex gap-1.5 shrink-0">

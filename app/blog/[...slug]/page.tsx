@@ -110,6 +110,10 @@ export default async function BlogPage(props: PageProps) {
     }
     title = dbPost.title;
     dateLabel = formatDate(dbPost.createdAt);
+    tags = (dbPost.tags || "")
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
     const DAY = 24 * 60 * 60 * 1000;
     if (
       new Date(dbPost.updatedAt).getTime() -

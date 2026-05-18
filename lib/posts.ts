@@ -18,6 +18,7 @@ export type UnifiedPost = {
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
+  tags?: string;
 };
 
 export type PostsView = "active" | "trash";
@@ -45,11 +46,16 @@ export async function getSupabasePosts(view: PostsView = "active"): Promise<Unif
     return q;
   };
 
-  let { data, error } = await runQuery(`${BASE_COLUMNS}, type`);
+  let { data, error } = await runQuery(`${BASE_COLUMNS}, type, tags`);
   let hasType = true;
+  let hasTags = true;
+  if (error && /tags/i.test(error.message)) {
+    hasTags = false;
+    ({ data, error } = await runQuery(`${BASE_COLUMNS}, type`));
+  }
   if (error && /'?type'? column|column .*type.* does not exist/i.test(error.message)) {
     hasType = false;
-    ({ data, error } = await runQuery(BASE_COLUMNS));
+    ({ data, error } = await runQuery(hasTags ? `${BASE_COLUMNS}, tags` : BASE_COLUMNS));
   }
   if (error) {
     console.error("[posts] supabase error:", error.message);
@@ -68,6 +74,7 @@ export async function getSupabasePosts(view: PostsView = "active"): Promise<Unif
     createdAt: (r.created_at as string) || (r.updated_at as string) || new Date().toISOString(),
     updatedAt: (r.updated_at as string) || (r.created_at as string) || new Date().toISOString(),
     deletedAt: (r.deleted_at as string | null) ?? null,
+    tags: hasTags ? ((r.tags as string | null) ?? undefined) : undefined,
   }));
 }
 
@@ -81,6 +88,7 @@ export type SupabasePostFull = {
   type: PostType;
   createdAt: string;
   updatedAt: string;
+  tags: string | null;
 };
 
 export async function getSupabasePostBySlug(slug: string): Promise<SupabasePostFull | null> {
@@ -105,6 +113,7 @@ export async function getSupabasePostBySlug(slug: string): Promise<SupabasePostF
     type: normalizeType(r.type),
     createdAt: (r.created_at as string) || (r.updated_at as string) || new Date().toISOString(),
     updatedAt: (r.updated_at as string) || (r.created_at as string) || new Date().toISOString(),
+    tags: (r.tags as string | null) ?? null,
   };
 }
 
@@ -169,6 +178,7 @@ export async function getMdxPosts(): Promise<UnifiedPost[]> {
         createdAt: createdIso,
         updatedAt: meta.lastCommitIso ?? createdIso,
         deletedAt: null,
+        tags: (b as { tags?: string }).tags,
       };
     }),
   );

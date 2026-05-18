@@ -199,6 +199,37 @@ body.focus-mode .pt-8 {
   padding-top: 0 !important;
 }
 
+/* Blog/editor links: ensure readable contrast in both themes.
+   Old content has inline text-accent classes that look invisible in dark mode,
+   so override at prose scope. */
+.prose a,
+.prose a.text-accent {
+  color: hsl(var(--primary));
+  text-decoration-color: hsl(var(--primary) / 0.4);
+}
+.prose a:hover,
+.prose a.text-accent:hover {
+  text-decoration-color: hsl(var(--primary));
+}
+.dark .prose a,
+.dark .prose a.text-accent {
+  color: hsl(20 90% 70%);
+  text-decoration-color: hsl(20 90% 70% / 0.45);
+}
+.dark .prose a:hover,
+.dark .prose a.text-accent:hover {
+  text-decoration-color: hsl(20 90% 70%);
+}
+
+/* Utility: hide scrollbar but keep scrolling */
+.scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 /* Blog detail: sidebar width is driven by CSS based on data-toc-expanded so it can be
    set by the pre-hydration inline script — no flash on reload. */
 .blog-sidebar {
@@ -225,6 +256,18 @@ html[data-toc-expanded="1"] .blog-toc-panel {
 html:not([data-reader-hydrated="1"]) .blog-sidebar,
 html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   transition: none !important;
+}
+
+/* Remove the default smart quotes Tailwind Typography injects around blockquotes;
+   prefer the GitHub markdown style (border-left only). */
+.prose blockquote p:first-of-type::before,
+.prose blockquote p:last-of-type::after {
+  content: none !important;
+}
+.prose blockquote {
+  font-style: normal;
+  font-weight: 400;
+  quotes: none;
 }
 
 /* Reader content: scale prose typography from --reader-fs */

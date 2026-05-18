@@ -66,8 +66,8 @@ export function NavMenu({ isSheet = false }) {
             absolute
             className={
               isSheet
-                ? "text-3xl font-serif text-foreground hover:text-accent transition-colors"
-                : "flex items-center gap-1 text-sm text-muted-foreground hover:text-accent dark:hover:text-accent transition-colors"
+                ? "text-3xl font-serif text-foreground hover:text-primary dark:hover:text-orange-300 transition-colors"
+                : "flex items-center gap-1 text-sm text-muted-foreground hover:text-primary dark:hover:text-orange-300 transition-colors"
             }
             href={item.href}
           >

@@ -42,6 +42,10 @@ export default async function BlogIndexPage({
     const updatedTs = new Date(p.updatedAt).getTime();
     const createdTs = created.getTime();
     const significantlyUpdated = updatedTs - createdTs >= 7 * DAY;
+    const tags = (p.tags ?? "")
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
     const entry: IndexEntry = {
       year: formatDate(p.createdAt),
       title: p.title,
@@ -50,6 +54,7 @@ export default async function BlogIndexPage({
       draft: !p.isPublished,
       updatedLabel: significantlyUpdated ? formatDate(p.updatedAt) : undefined,
       updatedRecent: significantlyUpdated && now - updatedTs <= 30 * DAY,
+      tags,
     };
     if (!groups.has(year)) groups.set(year, []);
     groups.get(year)!.push(entry);

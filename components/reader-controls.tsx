@@ -22,7 +22,7 @@ type Prefs = {
   tocVisible: boolean;
 };
 
-const DEFAULTS: Prefs = { font: "sans", size: "base", tocVisible: true };
+const DEFAULTS: Prefs = { font: "serif", size: "lg", tocVisible: true };
 const STORAGE_KEY = "reader-prefs";
 const EVENT = "reader-prefs-change";
 
@@ -224,7 +224,7 @@ export function ReaderSidebar({
     <div
       data-has-toc={hasToc ? "1" : "0"}
       className={cn(
-        "blog-sidebar hidden lg:flex flex-col shrink-0 self-start sticky top-16 h-[calc(100vh-5rem)] py-9",
+        "blog-sidebar hidden lg:flex flex-col shrink-0 self-start sticky top-16 h-[calc(100vh-4rem)] py-3",
       )}
     >
       <div className="h-11 shrink-0" aria-hidden />

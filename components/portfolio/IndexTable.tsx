@@ -18,6 +18,7 @@ export interface IndexEntry {
   source?: "mdx" | "db";
   updatedLabel?: string;
   updatedRecent?: boolean;
+  tags?: string[];
 }
 
 const STACK_VISIBLE = 3;
@@ -80,6 +81,18 @@ function IndexRow({ entry }: { entry: IndexEntry }) {
             {entry.source === "db" && (
               <span className="ml-1 font-mono text-xs text-muted-foreground/40 border border-border px-1 py-0.5 align-middle">
                 db
+              </span>
+            )}
+            {entry.tags && entry.tags.length > 0 && (
+              <span className="ml-2 inline-flex flex-wrap gap-1 align-middle">
+                {entry.tags.map((t) => (
+                  <span
+                    key={t}
+                    className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/70 bg-muted/60 rounded px-1.5 py-0.5"
+                  >
+                    {t}
+                  </span>
+                ))}
               </span>
             )}
           </span>

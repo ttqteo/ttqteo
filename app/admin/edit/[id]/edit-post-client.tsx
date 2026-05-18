@@ -1,7 +1,9 @@
 "use client";
 
-import { useFocusMode } from "@/components/contexts/focus-mode-context";
+import { FadedScroll } from "@/components/faded-scroll";
 import { SimpleEditor } from "@/components/simple-editor";
+import { cn } from "@/lib/utils";
+import { EditorToc } from "./editor-toc";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,7 +16,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -29,10 +30,9 @@ import {
 } from "@/components/ui/tooltip";
 import {
   ArrowLeftIcon,
+  ArrowUpIcon,
   Loader2Icon,
   LogOutIcon,
-  Maximize2,
-  Minimize2,
   PenLineIcon,
   SaveIcon,
   SendIcon,
@@ -43,7 +43,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const Tldraw = dynamic(() => import("tldraw").then((m) => m.Tldraw), {
@@ -65,6 +65,9 @@ function resolveType(raw: string | undefined): PostType {
   return "post";
 }
 
+const TITLE_MAX = 160;
+const DESCRIPTION_MAX = 320;
+
 interface PostData {
   id?: string;
   title: string;
@@ -73,6 +76,7 @@ interface PostData {
   content: string;
   is_published: boolean;
   type?: PostType;
+  tags?: string;
 }
 
 const DRAFT_STORAGE_KEY = "editor-draft";
@@ -95,7 +99,6 @@ export default function EditPostClient({
   initialType?: string;
 }) {
   const router = useRouter();
-  const { focusMode, setFocusMode, toggleFocusMode } = useFocusMode();
   const { resolvedTheme } = useTheme();
 
   const [showTldraw, setShowTldraw] = useState(() => {
@@ -105,7 +108,7 @@ export default function EditPostClient({
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [type, setType] = useState<PostType>(
-    resolveType(initialData?.type ?? initialType)
+    resolveType(initialData?.type ?? initialType),
   );
   const [post, setPost] = useState<PostData>({
     title: initialData?.title || "",
@@ -113,12 +116,36 @@ export default function EditPostClient({
     description: initialData?.description || "",
     content: initialData?.content || "",
     is_published: initialData?.is_published || false,
+    tags: initialData?.tags || "",
   });
 
-  // Disable focus mode when leaving editor (entering it is opt-in via toggle)
+  // Show "scroll to top" once user has scrolled past threshold.
+  // Split mode scrolls inside a flex container; normal mode scrolls the window.
+  const editorColumnRef = useRef<HTMLDivElement | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  const scrollToTop = useCallback(() => {
+    const col = editorColumnRef.current;
+    if (col && col.scrollHeight > col.clientHeight) {
+      col.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, []);
+
   useEffect(() => {
-    return () => setFocusMode(false);
-  }, [setFocusMode]);
+    const col = editorColumnRef.current;
+    const usesColumn = !!col && col.scrollHeight > col.clientHeight;
+    const target: HTMLElement | Window = usesColumn ? col : window;
+    const getY = () =>
+      usesColumn ? (col as HTMLElement).scrollTop : window.scrollY;
+    const onScroll = () => setShowScrollTop(getY() > 400);
+    onScroll();
+    target.addEventListener("scroll", onScroll, {
+      passive: true,
+    } as AddEventListenerOptions);
+    return () => target.removeEventListener("scroll", onScroll);
+  }, [showTldraw]);
 
   // Update document title with post title
   useEffect(() => {
@@ -149,7 +176,7 @@ export default function EditPostClient({
           title: post.title,
           description: post.description,
           content: post.content,
-        })
+        }),
       );
       setLastSaved(new Date());
     }
@@ -195,7 +222,9 @@ export default function EditPostClient({
         router.refresh();
       } else {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || err.message || `Failed to delete (${res.status})`);
+        toast.error(
+          err.error || err.message || `Failed to delete (${res.status})`,
+        );
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to delete");
@@ -223,11 +252,24 @@ export default function EditPostClient({
       if (res.ok) {
         clearDraft();
         toast.success(publish ? "Post published" : "Draft saved");
-        router.push("/admin");
-        router.refresh();
+        if (isNew) {
+          // After creating a new post we want the URL to match the new id so
+          // subsequent saves use PUT, but keep the user in the editor.
+          const saved = await res.json().catch(() => null);
+          const newId = saved?.id as string | undefined;
+          if (newId) {
+            router.replace(`/admin/edit/${newId}`);
+          }
+        } else {
+          // Refresh server data (drafts list, lastSaved etc.) without leaving.
+          router.refresh();
+        }
+        setLastSaved(new Date());
       } else {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || err.message || `Failed to save (${res.status})`);
+        toast.error(
+          err.error || err.message || `Failed to save (${res.status})`,
+        );
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to save");
@@ -236,17 +278,26 @@ export default function EditPostClient({
     }
   };
 
-  const isSplit = showTldraw && !focusMode;
+  const isSplit = showTldraw;
 
   return (
-    <div className={
-      focusMode ? "fixed inset-0 z-50 bg-background flex flex-col" :
-      isSplit   ? "fixed inset-0 z-40 bg-background flex flex-col pt-[36px]" :
-                  "min-h-[80vh]"
-    }>
+    <div
+      className={
+        isSplit
+          ? "fixed inset-0 z-40 bg-background flex flex-col pt-[36px]"
+          : "min-h-[80vh]"
+      }
+    >
       {/* Sticky Top Header */}
-      <div className={`${isSplit || focusMode ? "flex-shrink-0" : "sticky top-[36px]"} bg-background/95 backdrop-blur border-b z-[55] focus-mode-hidden`}>
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div
+        className={`${isSplit ? "flex-shrink-0" : "sticky top-[36px]"} bg-background/95 backdrop-blur border-b z-[55]`}
+      >
+        <div
+          className={cn(
+            "px-4 py-3 flex items-center justify-between",
+            isSplit ? "w-full" : "max-w-[1280px] mx-auto w-full",
+          )}
+        >
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" asChild>
               <Link href="/admin">
@@ -361,90 +412,114 @@ export default function EditPostClient({
 
       {/* Bottom-right controls — always visible */}
       <div className="fixed bottom-4 right-4 z-[51] flex flex-col gap-2">
-        {!focusMode && (
+        {showScrollTop && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 type="button"
-                variant={showTldraw ? "default" : "outline"}
+                variant="outline"
                 size="sm"
-                onClick={() => setShowTldraw((v) => {
-                  const next = !v;
-                  localStorage.setItem("editor-show-tldraw", String(next));
-                  return next;
-                })}
-                aria-label="Toggle tldraw"
+                onClick={scrollToTop}
+                aria-label="Scroll to top"
               >
-                <PenLineIcon className="w-4 h-4" />
+                <ArrowUpIcon className="w-4 h-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="left">
-              {showTldraw ? "Hide drawing board" : "Show drawing board"}
-            </TooltipContent>
+            <TooltipContent side="left">Scroll to top</TooltipContent>
           </Tooltip>
         )}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               type="button"
-              variant={focusMode ? "default" : "outline"}
+              variant={showTldraw ? "default" : "outline"}
               size="sm"
-              onClick={() => {
-                if (!focusMode) {
-                  setShowTldraw(false);
-                  localStorage.setItem("editor-show-tldraw", "false");
-                }
-                toggleFocusMode();
-              }}
-              aria-label="Toggle focus mode"
+              onClick={() =>
+                setShowTldraw((v) => {
+                  const next = !v;
+                  localStorage.setItem("editor-show-tldraw", String(next));
+                  return next;
+                })
+              }
+              aria-label="Toggle tldraw"
             >
-              {focusMode ? (
-                <Minimize2 className="w-4 h-4" />
-              ) : (
-                <Maximize2 className="w-4 h-4" />
-              )}
+              <PenLineIcon className="w-4 h-4" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="left">
-            {focusMode ? "Exit focus mode" : "Focus mode"}
+            {showTldraw ? "Hide drawing board" : "Show drawing board"}
           </TooltipContent>
         </Tooltip>
       </div>
 
       {/* Main Content */}
-      <div className={
-        isSplit || focusMode ? "flex flex-1 overflow-hidden" :
-                               "py-8"
-      }>
+      <div
+        className={
+          isSplit
+            ? "flex flex-1 overflow-hidden"
+            : "py-8 mx-auto max-w-[1280px] w-full px-4 flex gap-10"
+        }
+      >
         {/* Editor column */}
-        <div className={
-          isSplit   ? "w-[55%] overflow-auto py-8 px-8 space-y-6" :
-          focusMode ? "flex-1 overflow-auto max-w-2xl mx-auto px-8 py-16 space-y-6 w-full" :
-                      "max-w-3xl mx-auto px-4 space-y-6"
-        }>
+        <div
+          ref={editorColumnRef}
+          className={
+            isSplit
+              ? "w-[55%] overflow-auto py-8 px-8 space-y-6"
+              : "flex-1 min-w-0 max-w-[920px] mx-auto lg:mx-0 space-y-6"
+          }
+        >
           {/* Title */}
-          <Input
-            type="text"
-            value={post.title}
-            onChange={(e) => setPost({ ...post, title: e.target.value })}
-            placeholder="Title"
-            className="text-4xl font-serif font-bold h-auto py-2 border-none shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/50"
-          />
+          <div className="space-y-1">
+            <div className="flex justify-end font-mono text-[10px] text-muted-foreground/60 tabular-nums">
+              <span
+                className={
+                  post.title.length > TITLE_MAX * 0.9 ? "text-amber-500" : ""
+                }
+              >
+                {post.title.length}/{TITLE_MAX}
+              </span>
+            </div>
+            <textarea
+              value={post.title}
+              onChange={(e) => setPost({ ...post, title: e.target.value })}
+              placeholder="Title"
+              maxLength={TITLE_MAX}
+              rows={1}
+              className="block w-full text-4xl font-serif font-bold py-2 bg-transparent border-none shadow-none outline-none resize-none leading-tight placeholder:text-muted-foreground/50 [field-sizing:content]"
+            />
+          </div>
 
           {/* Description / Subtitle */}
-          <Input
-            type="text"
-            value={post.description}
-            onChange={(e) => setPost({ ...post, description: e.target.value })}
-            placeholder="Add a subtitle..."
-            className="text-lg text-muted-foreground border-none shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/40"
-          />
+          <div className="space-y-1">
+            <div className="flex justify-end font-mono text-[10px] text-muted-foreground/60 tabular-nums">
+              <span
+                className={
+                  post.description.length > DESCRIPTION_MAX * 0.9
+                    ? "text-amber-500"
+                    : ""
+                }
+              >
+                {post.description.length}/{DESCRIPTION_MAX}
+              </span>
+            </div>
+            <textarea
+              value={post.description}
+              onChange={(e) =>
+                setPost({ ...post, description: e.target.value })
+              }
+              placeholder="Add a subtitle..."
+              maxLength={DESCRIPTION_MAX}
+              rows={1}
+              className="block w-full text-lg text-muted-foreground bg-transparent border-none shadow-none outline-none resize-none leading-snug placeholder:text-muted-foreground/40 [field-sizing:content]"
+            />
+          </div>
 
           {/* Slug Preview */}
           {(() => {
             const now = new Date();
             const datePrefix = `${now.getFullYear()}/${String(
-              now.getMonth() + 1
+              now.getMonth() + 1,
             ).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
             const slugName = post.title
               ? removeVietnameseTones(post.title)
@@ -461,27 +536,63 @@ export default function EditPostClient({
             );
           })()}
 
-          {/* Type Selector */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium">Type</label>
-            <Select value={type} onValueChange={(v) => setType(v as PostType)}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="post">Post</SelectItem>
-                <SelectItem value="note">Note</SelectItem>
-                <SelectItem value="reading">Reading</SelectItem>
-                <SelectItem value="paper">Paper</SelectItem>
-              </SelectContent>
-            </Select>
+          {/* Type + Tags */}
+          <div className="flex flex-wrap gap-6 items-start">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium">Type</label>
+              <Select
+                value={type}
+                onValueChange={(v) => setType(v as PostType)}
+              >
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="post">Post</SelectItem>
+                  <SelectItem value="note">Note</SelectItem>
+                  <SelectItem value="reading">Reading</SelectItem>
+                  <SelectItem value="paper">Paper</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+              <label className="text-sm font-medium">
+                Tags
+                <span className="ml-2 font-normal text-xs text-muted-foreground">
+                  cách nhau bằng dấu phẩy
+                </span>
+              </label>
+              <input
+                type="text"
+                value={post.tags ?? ""}
+                onChange={(e) => setPost({ ...post, tags: e.target.value })}
+                placeholder="sưu tầm, ai, tech…"
+                className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground"
+              />
+              {post.tags && (
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {post.tags
+                    .split(",")
+                    .map((t) => t.trim())
+                    .filter(Boolean)
+                    .map((t) => (
+                      <span
+                        key={t}
+                        className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/70 bg-muted/60 rounded px-1.5 py-0.5"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* WYSIWYG Editor */}
           <SimpleEditor
             content={post.content}
             onChange={(content) => setPost({ ...post, content })}
-            stickyTop={focusMode || isSplit ? "0px" : null}
+            stickyTop={isSplit ? "0px" : "100px"}
           />
         </div>
 
@@ -493,6 +604,18 @@ export default function EditPostClient({
               colorScheme={resolvedTheme === "dark" ? "dark" : "light"}
             />
           </div>
+        )}
+
+        {/* TOC sidebar (only in normal mode) */}
+        {!isSplit && (
+          <aside className="hidden lg:flex flex-col shrink-0 self-start sticky top-20 w-[220px] max-h-[calc(100vh-6rem)]">
+            <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-3 shrink-0">
+              Mục lục
+            </h3>
+            <FadedScroll className="flex-1 min-h-0 pr-2">
+              <EditorToc content={post.content} />
+            </FadedScroll>
+          </aside>
         )}
       </div>
     </div>

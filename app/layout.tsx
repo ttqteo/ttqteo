@@ -71,7 +71,7 @@ export default function RootLayout({
             <TooltipProvider delayDuration={0}>
               <KeyboardNav />
               {children}
-              <Toaster richColors closeButton position="top-right" />
+              <Toaster richColors closeButton position="bottom-right" />
             </TooltipProvider>
           </FocusModeProvider>
         </ThemeProvider>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
+import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
@@ -24,6 +25,8 @@ import {
   Code2,
   ImageIcon,
   Loader2,
+  ExternalLink,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,7 +34,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useImageUpload } from "./use-image-upload";
 
 interface SimpleEditorProps {
@@ -50,10 +53,18 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
         heading: {
           levels: [1, 2, 3],
         },
+        link: false,
+        underline: false,
       }),
       Link.configure({
         openOnClick: false,
         autolink: true,
+        HTMLAttributes: {
+          class:
+            "underline underline-offset-2 cursor-pointer",
+          rel: "noopener noreferrer",
+          target: "_blank",
+        },
       }),
       Underline,
       Image.configure({
@@ -87,10 +98,19 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
   }
 
   const addLink = () => {
-    const url = window.prompt("Enter URL:");
-    if (url) {
-      editor.chain().focus().setLink({ href: url }).run();
+    const previous = editor.getAttributes("link").href as string | undefined;
+    const url = window.prompt("URL (để trống để xoá link):", previous ?? "");
+    if (url === null) return;
+    if (url === "") {
+      editor.chain().focus().extendMarkRange("link").unsetLink().run();
+      return;
     }
+    editor
+      .chain()
+      .focus()
+      .extendMarkRange("link")
+      .setLink({ href: url })
+      .run();
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -312,6 +332,207 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
 
       {/* Editor */}
       <EditorContent editor={editor} />
+
+      <LinkBubble editor={editor} />
     </div>
+  );
+}
+
+function LinkBubble({ editor }: { editor: Editor }) {
+  const [href, setHref] = useState("");
+  const [text, setText] = useState("");
+
+  const shouldShow = ({ editor: e }: { editor: Editor }) =>
+    e.isEditable && e.isActive("link");
+
+  const lastLinkKeyRef = useRef<string>("");
+  useEffect(() => {
+    const sync = () => {
+      if (!editor.isActive("link")) {
+        lastLinkKeyRef.current = "";
+        return;
+      }
+      const markType = editor.schema.marks.link;
+      if (!markType) return;
+      const doc = editor.state.doc;
+      const pos = editor.state.selection.$from.pos;
+      let from = pos;
+      while (from > 0 && doc.rangeHasMark(from - 1, from, markType)) {
+        from -= 1;
+      }
+      let to = pos;
+      const size = doc.content.size;
+      while (to < size && doc.rangeHasMark(to, to + 1, markType)) {
+        to += 1;
+      }
+      // Only re-sync inputs when entering a different link range
+      // (otherwise we'd overwrite the user's in-progress edits)
+      const key = `${from}-${to}`;
+      if (key === lastLinkKeyRef.current) return;
+      lastLinkKeyRef.current = key;
+      const attrs = editor.getAttributes("link");
+      setHref((attrs.href as string) ?? "");
+      setText(doc.textBetween(from, to, " "));
+    };
+    sync();
+    editor.on("selectionUpdate", sync);
+    return () => {
+      editor.off("selectionUpdate", sync);
+    };
+  }, [editor]);
+
+  const apply = () => {
+    const trimmed = href.trim();
+    if (!trimmed) {
+      remove();
+      return;
+    }
+
+    // Find the link range from current selection without relying on focus state
+    const markType = editor.schema.marks.link;
+    if (!markType) return;
+    const doc = editor.state.doc;
+    const pos = editor.state.selection.$from.pos;
+    let from = pos;
+    while (from > 0 && doc.rangeHasMark(from - 1, from, markType)) {
+      from -= 1;
+    }
+    let to = pos;
+    const size = doc.content.size;
+    while (to < size && doc.rangeHasMark(to, to + 1, markType)) {
+      to += 1;
+    }
+
+    const newText = text.trim();
+    if (newText) {
+      // Replace the link range with new text and apply link mark to it,
+      // then move cursor just past the link so BubbleMenu auto-hides.
+      const endPos = from + newText.length;
+      const docSize = editor.state.doc.content.size;
+      editor
+        .chain()
+        .focus()
+        .setTextSelection({ from, to })
+        .insertContent(newText)
+        .setTextSelection({ from, to: endPos })
+        .setLink({ href: trimmed })
+        .setTextSelection(Math.min(endPos + 1, docSize))
+        .run();
+    } else {
+      const docSize = editor.state.doc.content.size;
+      editor
+        .chain()
+        .focus()
+        .setTextSelection({ from, to })
+        .setLink({ href: trimmed })
+        .setTextSelection(Math.min(to + 1, docSize))
+        .run();
+    }
+    lastLinkKeyRef.current = "";
+  };
+
+  const remove = () => {
+    const markType = editor.schema.marks.link;
+    if (!markType) return;
+    const doc = editor.state.doc;
+    const pos = editor.state.selection.$from.pos;
+    let from = pos;
+    while (from > 0 && doc.rangeHasMark(from - 1, from, markType)) {
+      from -= 1;
+    }
+    let to = pos;
+    const size = doc.content.size;
+    while (to < size && doc.rangeHasMark(to, to + 1, markType)) {
+      to += 1;
+    }
+    editor
+      .chain()
+      .focus()
+      .setTextSelection({ from, to })
+      .unsetLink()
+      .setTextSelection(to)
+      .run();
+    lastLinkKeyRef.current = "";
+  };
+
+  const openExternal = () => {
+    if (!href) return;
+    window.open(href, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <BubbleMenu
+      editor={editor}
+      shouldShow={shouldShow}
+      options={{ placement: "bottom" }}
+    >
+      <div
+        className="flex flex-col gap-2 rounded-md border bg-popover p-2 shadow-md w-96"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-2">
+          <span className="font-mono text-[10px] text-muted-foreground w-10 shrink-0 pt-1.5">
+            link
+          </span>
+          <textarea
+            value={href}
+            onChange={(e) => setHref(e.target.value)}
+            placeholder="https://..."
+            rows={1}
+            className="flex-1 min-w-0 rounded-md border border-input bg-transparent px-2 py-1 text-xs shadow-xs outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none break-all [field-sizing:content]"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                apply();
+              }
+            }}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 shrink-0"
+            onClick={openExternal}
+            disabled={!href}
+            title="Mở link"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+        <div className="flex items-start gap-2">
+          <span className="font-mono text-[10px] text-muted-foreground w-10 shrink-0 pt-1.5">
+            text
+          </span>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Display text"
+            rows={1}
+            className="flex-1 min-w-0 rounded-md border border-input bg-transparent px-2 py-1 text-xs shadow-xs outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none [field-sizing:content]"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                apply();
+              }
+            }}
+          />
+        </div>
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-destructive hover:text-destructive"
+            onClick={remove}
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1" />
+            Remove
+          </Button>
+          <Button type="button" size="sm" className="h-7 text-xs" onClick={apply}>
+            Apply
+          </Button>
+        </div>
+      </div>
+    </BubbleMenu>
   );
 }

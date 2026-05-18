@@ -42,7 +42,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 
   const body = await request.json();
-  const { title, slug, description, content, is_published, deleted_at, type } = body;
+  const { title, slug, description, content, is_published, deleted_at, type, tags } = body;
 
   const supabase = await createSupabaseServerClient();
 
@@ -59,12 +59,24 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   const tryUpdate = (payload: Record<string, unknown>) =>
     supabase.from("blogs").update(payload).eq("id", id).select().single();
 
-  let { data, error } =
-    type !== undefined
-      ? await tryUpdate({ ...basePayload, type })
-      : await tryUpdate(basePayload);
+  const withType = type !== undefined ? { type } : {};
+  const withTags = typeof tags === "string" ? { tags } : {};
 
-  if (error && /'?type'? column|column .*type.* does not exist/i.test(error.message)) {
+  let { data, error } = await tryUpdate({
+    ...basePayload,
+    ...withType,
+    ...withTags,
+  });
+
+  // Retry strategy when PostgREST schema cache is stale or columns are missing.
+  if (error && /['"]?tags['"]? column|column .*tags.* does not exist/i.test(error.message)) {
+    ({ data, error } = await tryUpdate({ ...basePayload, ...withType }));
+  }
+  if (error && /['"]?type['"]? column|column .*type.* does not exist/i.test(error.message)) {
+    ({ data, error } = await tryUpdate({ ...basePayload, ...withTags }));
+  }
+  if (error && /column/i.test(error.message)) {
+    // Last resort: drop both optional columns
     ({ data, error } = await tryUpdate(basePayload));
   }
 

@@ -46,7 +46,7 @@ export function FadedScroll({
   return (
     <div
       ref={ref}
-      className={className}
+      className={`scrollbar-hidden ${className ?? ""}`}
       style={{ overflowY: "auto", maskImage: mask, WebkitMaskImage: mask }}
     >
       {children}
