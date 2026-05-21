@@ -1,8 +1,10 @@
 import { FocusModeProvider } from "@/components/contexts/focus-mode-context";
 import { ThemeProvider } from "@/components/contexts/theme-provider";
+import { ResumeOrchestrator } from "@/components/resume/resume-orchestrator";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { KeyboardNav } from "@/lib/keyboard-nav";
+import { isAdmin } from "@/lib/supabase-server";
 import type { Metadata } from "next";
 import { Inter, Newsreader } from "next/font/google";
 import "./globals.css";
@@ -43,11 +45,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const admin = await isAdmin();
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -70,6 +73,7 @@ export default function RootLayout({
           <FocusModeProvider>
             <TooltipProvider delayDuration={0}>
               <KeyboardNav />
+              <ResumeOrchestrator isAdmin={admin} />
               {children}
               <Toaster richColors closeButton position="bottom-right" />
             </TooltipProvider>

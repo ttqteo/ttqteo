@@ -2,6 +2,7 @@
 
 import { FadedScroll } from "@/components/faded-scroll";
 import { SimpleEditor } from "@/components/simple-editor";
+import { clearWriterResume, setWriterResume } from "@/lib/resume-storage";
 import { cn } from "@/lib/utils";
 import { EditorToc } from "./editor-toc";
 import {
@@ -186,6 +187,21 @@ export default function EditPostClient({
     saveDraft();
   }, [saveDraft]);
 
+  // Track writer resume for existing posts (debounced).
+  useEffect(() => {
+    const id = initialData?.id;
+    if (isNew || !id) return;
+    const t = window.setTimeout(() => {
+      setWriterResume({
+        postId: id,
+        title: post.title,
+        route: `/admin/edit/${id}`,
+        updatedAt: Date.now(),
+      });
+    }, 2000);
+    return () => window.clearTimeout(t);
+  }, [isNew, initialData?.id, post.title, post.description, post.content]);
+
   // Clear draft after successful save
   const clearDraft = () => {
     sessionStorage.removeItem(DRAFT_STORAGE_KEY);
@@ -217,6 +233,7 @@ export default function EditPostClient({
       });
 
       if (res.ok) {
+        clearWriterResume();
         toast.success("Post moved to trash");
         router.push("/admin");
         router.refresh();
@@ -251,6 +268,7 @@ export default function EditPostClient({
 
       if (res.ok) {
         clearDraft();
+        if (publish) clearWriterResume();
         toast.success(publish ? "Post published" : "Draft saved");
         if (isNew) {
           // After creating a new post we want the URL to match the new id so

@@ -1,8 +1,9 @@
 import { isAdmin } from "@/lib/supabase-server";
-import { FileTextIcon, LayoutDashboardIcon, LogOutIcon, PencilIcon } from "lucide-react";
+import { FileTextIcon, LayoutDashboardIcon, PencilIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { AdminNavLink } from "@/components/admin-nav-link";
+import { LogoutForm } from "@/components/admin/logout-form";
 
 interface AdminToolbarProps {
   editPostId?: string;
@@ -54,15 +55,7 @@ export async function AdminToolbar({ editPostId }: AdminToolbarProps) {
             <span>+ new blog</span>
           </Link>
           •
-          <form action="/api/auth/logout" method="POST">
-            <button
-              type="submit"
-              className="flex items-center gap-1.5 hover:text-zinc-300 transition-colors"
-            >
-              <LogOutIcon className="w-3.5 h-3.5" />
-              <span>logout</span>
-            </button>
-          </form>
+          <LogoutForm />
         </div>
       </div>
     </div>

@@ -11,6 +11,8 @@ import {
   ScrollToTopButton,
 } from "@/components/reader-controls";
 import { FadedScroll } from "@/components/faded-scroll";
+import { ReaderProgressTracker } from "@/components/resume/reader-progress-tracker";
+import { ScrollRestorer } from "@/components/resume/scroll-restorer";
 import TocObserver from "@/components/toc-observer";
 import { buildGitHubFileUrl, getGitFileMeta } from "@/lib/git-meta";
 import { formatDate, stringToDate } from "@/lib/utils";
@@ -202,6 +204,8 @@ export default async function BlogPage(props: PageProps) {
         </FadedScroll>
       </ReaderSidebar>
       <ScrollToTopButton />
+      <ReaderProgressTracker slug={slug} title={title} />
+      <ScrollRestorer slug={slug} />
     </div>
   );
 }
