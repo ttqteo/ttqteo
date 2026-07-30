@@ -1,7 +1,7 @@
 "use client";
 
 import { useIsAdmin } from "@/components/contexts/admin-context";
-import { FileTextIcon, LayoutDashboardIcon, PencilIcon } from "lucide-react";
+import { FileTextIcon, PencilIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { AdminNavLink } from "@/components/admin-nav-link";
@@ -34,11 +34,8 @@ export function AdminToolbar({ editPostId }: AdminToolbarProps) {
             <span className="font-semibold">ttqteo</span>
           </Link>
           <div className="w-px h-4 bg-zinc-700 mx-1" />
+          {/* /admin is the post list now, so dashboard and posts are one item. */}
           <AdminNavLink href="/admin" exact>
-            <LayoutDashboardIcon className="w-3.5 h-3.5" />
-            <span>dashboard</span>
-          </AdminNavLink>
-          <AdminNavLink href="/admin/posts">
             <FileTextIcon className="w-3.5 h-3.5" />
             <span>posts</span>
           </AdminNavLink>

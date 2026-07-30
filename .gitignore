@@ -38,3 +38,7 @@ next-env.d.ts
 .local
 # Claude Code settings
 .claude/
+
+# local dev server logs
+.next-server.log
+.next-server.err.log
