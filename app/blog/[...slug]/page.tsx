@@ -3,7 +3,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Author, getAllBlogStaticPaths, getBlogForSlug, getBlogTocs } from "@/lib/markdown";
-import { extractTocFromHtml, getSupabasePostBySlug, injectHeadingIds } from "@/lib/posts";
+import {
+  extractTocFromHtml,
+  getPublishedSupabasePosts,
+  getPublishedSupabasePostBySlug,
+  injectHeadingIds,
+} from "@/lib/posts";
 import {
   ReaderContent,
   ReaderControlsAnchor,
@@ -23,8 +28,10 @@ import { notFound } from "next/navigation";
 import path from "path";
 import { AdminEditButton } from "./admin-edit-button";
 
-// MDX paths are pre-rendered via generateStaticParams; supabase paths render on-demand.
+// MDX + published supabase paths are pre-rendered via generateStaticParams;
+// anything newer renders on demand and is then cached for `revalidate` seconds.
 export const dynamicParams = true;
+export const revalidate = 300;
 
 type PageProps = {
   params: Promise<{ slug: string[] }>;
@@ -43,7 +50,7 @@ export async function generateMetadata(props: PageProps) {
     };
   }
 
-  const dbPost = await getSupabasePostBySlug(slug);
+  const dbPost = await getPublishedSupabasePostBySlug(slug);
   if (dbPost) {
     return {
       title: `${!dbPost.isPublished ? "[draft] " : ""}${dbPost.title}`,
@@ -55,9 +62,17 @@ export async function generateMetadata(props: PageProps) {
 }
 
 export async function generateStaticParams() {
-  const val = await getAllBlogStaticPaths();
-  if (!val) return [];
-  return val.map((it) => ({ slug: it.split("/") }));
+  const [mdxPaths, dbPosts] = await Promise.all([
+    getAllBlogStaticPaths(),
+    getPublishedSupabasePosts(),
+  ]);
+
+  const slugs = new Set(mdxPaths ?? []);
+  for (const post of dbPosts) {
+    if (post.type === "post") slugs.add(post.slug);
+  }
+
+  return [...slugs].map((it) => ({ slug: it.split("/") }));
 }
 
 export default async function BlogPage(props: PageProps) {
@@ -106,7 +121,7 @@ export default async function BlogPage(props: PageProps) {
       view: "history",
     });
   } else {
-    const dbPost = await getSupabasePostBySlug(slug);
+    const dbPost = await getPublishedSupabasePostBySlug(slug);
     if (!dbPost || !dbPost.isPublished) {
       notFound();
     }

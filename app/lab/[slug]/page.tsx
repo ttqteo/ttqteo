@@ -1,27 +1,78 @@
 import { Typography } from "@/components/typography";
 import { buttonVariants } from "@/components/ui/button";
+import { supabasePublic } from "@/lib/supabase-public";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { formatDate } from "@/lib/utils";
 import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
+export const dynamicParams = true;
+
+const LAB_TYPES = ["note", "reading", "paper"];
+const ENTRY_COLUMNS =
+  "slug, title, description, content, cover, is_published, type, created_at, updated_at";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
 };
 
+type LabEntry = {
+  slug: string;
+  title: string | null;
+  description: string | null;
+  content: string | null;
+  cover: string | null;
+  is_published: boolean | null;
+  type: string | null;
+  created_at: string;
+  updated_at: string | null;
+};
+
+export async function generateStaticParams() {
+  const { data } = await supabasePublic
+    .from("blogs")
+    .select("slug")
+    .in("type", LAB_TYPES)
+    .eq("is_published", true)
+    .is("deleted_at", null);
+
+  return (data ?? []).map((r) => ({ slug: r.slug as string }));
+}
+
+/**
+ * Published entries are read through the cookie-free client so they can be
+ * prerendered. Only a draft preview falls back to the cookie-bound client,
+ * which is what makes that single render dynamic.
+ */
+async function getLabEntry(slug: string): Promise<LabEntry | null> {
+  const { data } = await supabasePublic
+    .from("blogs")
+    .select(ENTRY_COLUMNS)
+    .eq("slug", slug)
+    .in("type", LAB_TYPES)
+    .eq("is_published", true)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (data) return data as unknown as LabEntry;
+
+  const supabase = await createSupabaseServerClient();
+  const { data: draft } = await supabase
+    .from("blogs")
+    .select(ENTRY_COLUMNS)
+    .eq("slug", slug)
+    .in("type", LAB_TYPES)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  return (draft as unknown as LabEntry) ?? null;
+}
+
 export async function generateMetadata(props: PageProps) {
   const { slug } = await props.params;
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("blogs")
-    .select("title, description, is_published")
-    .eq("slug", slug)
-    .in("type", ["note", "reading", "paper"])
-    .is("deleted_at", null)
-    .single();
+  const data = await getLabEntry(slug);
 
   if (!data) return {};
 
@@ -33,14 +84,7 @@ export async function generateMetadata(props: PageProps) {
 
 export default async function LabSlugPage(props: PageProps) {
   const { slug } = await props.params;
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("blogs")
-    .select("slug, title, description, content, cover, is_published, type, created_at, updated_at")
-    .eq("slug", slug)
-    .in("type", ["note", "reading", "paper"])
-    .is("deleted_at", null)
-    .single();
+  const data = await getLabEntry(slug);
 
   if (!data) {
     notFound();

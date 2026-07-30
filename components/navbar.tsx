@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import Anchor from "./anchor";
 import { SheetLeftbar } from "./leftbar";
-import { isAdmin } from "@/lib/supabase-server";
 
 export const NAVLINKS = [
   { title: "projects", href: "/projects" },
@@ -13,15 +12,11 @@ export const NAVLINKS = [
   { title: "about", href: "/about" },
 ];
 
-export async function Navbar() {
-  const admin = await isAdmin();
-
+export function Navbar() {
   return (
-    <nav
-      className={`w-full border-b h-14 sticky z-50 bg-background ${
-        admin ? "top-8" : "top-0"
-      }`}
-    >
+    // `site-navbar` lets globals.css push it below the admin toolbar; keeping
+    // this a static server component is what makes the shell prerenderable.
+    <nav className="site-navbar w-full border-b h-14 sticky top-0 z-50 bg-background">
       <div className="sm:container px-2 mx-auto w-[95vw] h-full flex items-center justify-between md:gap-2">
         <div className="flex items-center gap-5">
           <div className="flex items-center gap-6">

@@ -1,10 +1,13 @@
+import { AdminProvider } from "@/components/contexts/admin-context";
 import { FocusModeProvider } from "@/components/contexts/focus-mode-context";
 import { ThemeProvider } from "@/components/contexts/theme-provider";
+import { AdminToolbar } from "@/components/admin-toolbar";
+import { Footer } from "@/components/footer";
+import { Navbar } from "@/components/navbar";
 import { ResumeOrchestrator } from "@/components/resume/resume-orchestrator";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { KeyboardNav } from "@/lib/keyboard-nav";
-import { isAdmin } from "@/lib/supabase-server";
 import type { Metadata } from "next";
 import { Inter, Newsreader } from "next/font/google";
 import "./globals.css";
@@ -45,20 +48,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const admin = await isAdmin();
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link
-          rel="stylesheet"
-          type="text/css"
-          href="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/devicon.min.css"
-        />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var r=document.documentElement;var p=localStorage.getItem('reader-prefs');var visible=true;if(p){var o=JSON.parse(p);if(o&&typeof o.tocVisible==='boolean')visible=o.tocVisible;}r.dataset.tocExpanded=visible?'1':'0';}catch(e){}})();`,
@@ -70,14 +67,29 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <FocusModeProvider>
-            <TooltipProvider delayDuration={0}>
-              <KeyboardNav />
-              <ResumeOrchestrator isAdmin={admin} />
-              {children}
-              <Toaster richColors closeButton position="bottom-right" />
-            </TooltipProvider>
-          </FocusModeProvider>
+          <AdminProvider>
+            <FocusModeProvider>
+              <TooltipProvider delayDuration={0}>
+                <KeyboardNav />
+                <ResumeOrchestrator />
+                <div className="app-shell min-h-screen flex flex-col">
+                  <div className="focus-mode-hidden">
+                    <AdminToolbar />
+                  </div>
+                  <div className="focus-mode-hidden">
+                    <Navbar />
+                  </div>
+                  <main className="sm:container mx-auto w-[90vw] h-auto scroll-smooth flex-1">
+                    {children}
+                  </main>
+                  <div className="site-footer focus-mode-hidden">
+                    <Footer />
+                  </div>
+                </div>
+                <Toaster richColors closeButton position="bottom-right" />
+              </TooltipProvider>
+            </FocusModeProvider>
+          </AdminProvider>
         </ThemeProvider>
       </body>
     </html>

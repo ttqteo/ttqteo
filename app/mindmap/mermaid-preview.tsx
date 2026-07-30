@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import mermaid from "mermaid";
 import { ZoomIn, ZoomOut, RotateCcw, Move } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MindmapNode } from "./types";
@@ -45,17 +44,33 @@ const CUSTOM_THEME = {
   },
 };
 
-// Initialize mermaid with custom config
-mermaid.initialize({
-  startOnLoad: false,
-  theme: "base",
-  themeVariables: CUSTOM_THEME.themeVariables,
-  mindmap: {
-    useMaxWidth: false,
-    padding: 20,
-  },
-  securityLevel: "loose",
-});
+type Mermaid = typeof import("mermaid").default;
+
+let mermaidPromise: Promise<Mermaid> | null = null;
+
+/**
+ * Mermaid is ~1MB of JS. Loading it on first render instead of at import time
+ * keeps it out of the route's initial bundle; the promise is cached so the
+ * config is applied exactly once.
+ */
+function loadMermaid(): Promise<Mermaid> {
+  if (!mermaidPromise) {
+    mermaidPromise = import("mermaid").then(({ default: mermaid }) => {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: "base",
+        themeVariables: CUSTOM_THEME.themeVariables,
+        mindmap: {
+          useMaxWidth: false,
+          padding: 20,
+        },
+        securityLevel: "loose",
+      });
+      return mermaid;
+    });
+  }
+  return mermaidPromise;
+}
 
 /**
  * MermaidPreview - Interactive Mermaid SVG renderer with click-to-edit
@@ -119,6 +134,7 @@ export function MermaidPreview({
       setError(null);
 
       try {
+        const mermaid = await loadMermaid();
         const id = `mermaid-${Date.now()}`;
         const { svg } = await mermaid.render(id, code);
         setSvgContent(svg);

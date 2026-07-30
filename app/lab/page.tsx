@@ -4,14 +4,15 @@ import type {
   IndexEntryType,
 } from "@/components/portfolio/IndexTable";
 import { labStaticIndex } from "@/data/lab";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { supabasePublic } from "@/lib/supabase-public";
 
-export const dynamic = "force-dynamic";
+// Published-only listing: ISR instead of force-dynamic, so navigating here is
+// served from the cache rather than a fresh render on every visit.
+export const revalidate = 300;
 export const metadata = { title: "lab" };
 
 export default async function LabPage() {
-  const supabase = await createSupabaseServerClient();
-  const { data: rows } = await supabase
+  const { data: rows } = await supabasePublic
     .from("blogs")
     .select("slug, title, type, updated_at, created_at")
     .in("type", ["note", "reading", "paper"])
