@@ -106,6 +106,12 @@ export default function EditPostClient({
     if (typeof window === "undefined") return false;
     return localStorage.getItem("editor-show-tldraw") === "true";
   });
+  // `showTldraw` is the intent; these two are what the DOM needs to animate.
+  // The panel has to outlive the intent by one transition so closing slides out
+  // instead of vanishing, and it has to mount one frame *before* opening or the
+  // browser has no start value to transition from.
+  const [panelMounted, setPanelMounted] = useState(showTldraw);
+  const [panelOpen, setPanelOpen] = useState(showTldraw);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [type, setType] = useState<PostType>(
@@ -119,6 +125,20 @@ export default function EditPostClient({
     is_published: initialData?.is_published || false,
     tags: initialData?.tags || "",
   });
+
+  const PANEL_MS = 300;
+
+  useEffect(() => {
+    if (showTldraw) {
+      setPanelMounted(true);
+      // Opening on the next frame gives the transition a `w-0` to start from.
+      const frame = requestAnimationFrame(() => setPanelOpen(true));
+      return () => cancelAnimationFrame(frame);
+    }
+    setPanelOpen(false);
+    const timer = setTimeout(() => setPanelMounted(false), PANEL_MS);
+    return () => clearTimeout(timer);
+  }, [showTldraw]);
 
   // Show "scroll to top" once user has scrolled past threshold.
   // Split mode scrolls inside a flex container; normal mode scrolls the window.
@@ -296,7 +316,9 @@ export default function EditPostClient({
     }
   };
 
-  const isSplit = showTldraw;
+  // Stay in split layout until the panel has finished sliding out, otherwise the
+  // editor would snap back to full width while the board is still on screen.
+  const isSplit = showTldraw || panelMounted;
 
   return (
     <div
@@ -428,8 +450,15 @@ export default function EditPostClient({
         </div>
       </div>
 
-      {/* Bottom-right controls — always visible */}
-      <div className="fixed bottom-4 right-4 z-[51] flex flex-col gap-2">
+      {/* Bottom-right controls — always visible. In split mode they step left of
+          the board, because tldraw parks its own watermark in that corner and
+          the two were sitting on top of each other. */}
+      <div
+        className={cn(
+          "fixed bottom-4 z-[51] flex flex-col gap-2 transition-[right] duration-300 ease-out motion-reduce:transition-none",
+          isSplit && panelOpen ? "right-[calc(45%+1rem)]" : "right-4",
+        )}
+      >
         {showScrollTop && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -461,7 +490,12 @@ export default function EditPostClient({
               }
               aria-label="Toggle tldraw"
             >
-              <PenLineIcon className="w-4 h-4" />
+              <PenLineIcon
+                className={cn(
+                  "w-4 h-4 transition-transform duration-300 ease-out motion-reduce:transition-none",
+                  showTldraw && "-rotate-12",
+                )}
+              />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="left">
@@ -474,21 +508,28 @@ export default function EditPostClient({
       <div
         className={
           isSplit
-            ? "flex flex-1 overflow-hidden"
+            ? "relative flex flex-1 overflow-hidden"
             : "py-8 mx-auto max-w-[1280px] w-full px-4 flex gap-10"
         }
       >
         {/* Editor column */}
         <div
           ref={editorColumnRef}
-          className={
+          className={cn(
+            "transition-[width] duration-300 ease-out motion-reduce:transition-none",
+            // No top padding in split mode: it sits inside the scrollport, so a
+            // `sticky top-0` toolbar parks *below* it and leaves a strip where
+            // text scrolls past in plain view. The spacing moves onto the first
+            // block instead, where it scrolls away like normal content.
             isSplit
-              ? "w-[55%] overflow-auto py-8 px-8 space-y-6"
-              : "flex-1 min-w-0 max-w-[920px] mx-auto lg:mx-0 space-y-6"
-          }
+              ? panelOpen
+                ? "w-[55%] overflow-auto pt-0 pb-8 px-8 space-y-6"
+                : "w-full overflow-auto pt-0 pb-8 px-8 space-y-6"
+              : "flex-1 min-w-0 max-w-[920px] mx-auto lg:mx-0 space-y-6",
+          )}
         >
           {/* Title */}
-          <div className="space-y-1">
+          <div className={cn("space-y-1", isSplit && "pt-8")}>
             <div className="flex justify-end font-mono text-[10px] text-muted-foreground/60 tabular-nums">
               <span
                 className={
@@ -614,9 +655,19 @@ export default function EditPostClient({
           />
         </div>
 
-        {/* tldraw panel */}
-        {isSplit && (
-          <div className="w-[45%] border-l h-full overflow-hidden">
+        {/* tldraw panel — absolutely positioned and slid in with `transform`
+            rather than animated by width. Animating width made tldraw re-measure
+            its canvas every frame, and the fixed-width inner wrapper that worked
+            around that was sized in `vw`, which counts the page scrollbar the
+            `%` container doesn't — so the board ended up a few px wider than its
+            clip and tldraw's right-hand panel got cut off. */}
+        {panelMounted && (
+          <div
+            className={cn(
+              "absolute inset-y-0 right-0 w-[45%] border-l bg-background transition-transform duration-300 ease-out motion-reduce:transition-none",
+              panelOpen ? "translate-x-0" : "translate-x-full",
+            )}
+          >
             <Tldraw
               persistenceKey={`editor-${initialData?.id ?? "new"}`}
               colorScheme={resolvedTheme === "dark" ? "dark" : "light"}

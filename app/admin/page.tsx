@@ -60,7 +60,9 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const query = parseQuery(await searchParams);
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 space-y-6">
+    // Extra top padding because this page hides the site navbar: without it the
+    // heading starts 36px under the toolbar, tighter than every other page.
+    <div className="max-w-6xl mx-auto pt-12 pb-8 px-4 space-y-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">posts</h1>
         <div className="flex items-center gap-2">

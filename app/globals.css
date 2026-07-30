@@ -187,11 +187,18 @@ pre > code {
 
 /* Admin chrome offsets. `is-admin` is set on <html> by AdminProvider once the
    owner is identified client-side, which keeps the shell statically rendered. */
+.admin-toolbar {
+  display: none;
+}
+html.is-admin .admin-toolbar {
+  display: block;
+}
 html.is-admin .app-shell {
   padding-top: 36px;
 }
 html.is-admin .site-navbar {
-  top: 2rem;
+  /* The toolbar is 36px tall, so 2rem left 4px of the navbar tucked under it. */
+  top: 36px;
 }
 html.is-admin .site-footer {
   display: none;

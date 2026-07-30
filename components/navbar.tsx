@@ -39,12 +39,25 @@ export function Navbar() {
 export function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2.5">
+      {/* logo.png is a full-bleed square; `rounded-full` cropped it into a
+          circle and pushed its off-centre glyph against the edge. These two are
+          drawn as circles already, so nothing gets clipped. */}
       <Image
-        src="/images/logo.png"
+        src="/images/logo-dark-circle.png"
         width={32}
         height={32}
         alt="ttqteo"
-        className="rounded-full"
+        className="dark:hidden"
+        priority
+      />
+      <Image
+        src="/images/logo-light-circle.png"
+        width={32}
+        height={32}
+        alt=""
+        aria-hidden
+        className="hidden dark:block"
+        priority
       />
       <h2 className="text-lg font-bold hidden sm:block tracking-tight text-foreground">
         ttqteo

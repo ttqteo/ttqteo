@@ -132,7 +132,7 @@ const goldPrices = await commodity.gold.priceSJC();`,
     ],
     links: {
       github: "https://github.com/ttqteo/finance-app",
-      live: "https://ttqteo-finance.vercel.app/",
+      live: "https://finance.ttqteo.dev/",
     },
   },
   {
@@ -188,7 +188,7 @@ export const projectIndex: IndexEntry[] = [
     description:
       "Full-stack finance platform for tracking Vietnamese stocks, managing personal portfolios, and aggregating market news in real time.",
     stack: ["Next.js", "Prisma", "Postgres"],
-    href: "https://ttqteo-finance.vercel.app/",
+    href: "https://finance.ttqteo.dev/",
     external: true,
   },
   {

@@ -76,7 +76,11 @@ export default function RootLayout({
                   <div className="focus-mode-hidden">
                     <AdminToolbar />
                   </div>
-                  <div className="focus-mode-hidden">
+                  {/* `contents` keeps this wrapper from generating a box: the
+                      navbar is `sticky`, and a wrapper exactly its own height
+                      gives it zero room to stick, so it scrolled away instantly.
+                      Focus mode's `display: none !important` still wins. */}
+                  <div className="contents focus-mode-hidden">
                     <Navbar />
                   </div>
                   <main className="sm:container mx-auto w-[90vw] h-auto scroll-smooth flex-1">
