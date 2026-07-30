@@ -52,6 +52,8 @@ export default async function EditPostPage({ params, searchParams }: PageProps) 
         is_published: post.is_published,
         type: post.type || "post",
         tags: post.tags || "",
+        guide_section: post.guide_section ?? null,
+        guide_order: post.guide_order != null ? Number(post.guide_order) : null,
       }}
     />
   );
