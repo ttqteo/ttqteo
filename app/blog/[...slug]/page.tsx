@@ -10,10 +10,11 @@ import {
 } from "@/lib/posts";
 import { buildGitHubFileUrl, getGitFileMeta } from "@/lib/git-meta";
 import { formatDate, stringToDate } from "@/lib/utils";
+import { GUIDE_SERIES, hasTag } from "@/lib/guides";
 import { History } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import path from "path";
 import { AdminEditButton } from "./admin-edit-button";
 
@@ -111,6 +112,14 @@ export default async function BlogPage(props: PageProps) {
     });
   } else {
     const dbPost = await getPublishedSupabasePostBySlug(slug);
+    // Guide chapters have one canonical URL under their series hub.
+    if (dbPost && dbPost.type === "guide") {
+      const series = GUIDE_SERIES.find((s) =>
+        hasTag({ tags: dbPost.tags ?? undefined }, s.tag),
+      );
+      if (series) redirect(`/${series.tag}/${slug}`);
+      notFound();
+    }
     if (!dbPost || !dbPost.isPublished) {
       notFound();
     }

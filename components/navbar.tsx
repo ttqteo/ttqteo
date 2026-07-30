@@ -8,6 +8,7 @@ import { SheetLeftbar } from "./leftbar";
 export const NAVLINKS = [
   { title: "projects", href: "/projects" },
   { title: "blog", href: "/blog" },
+  { title: "system design", href: "/system-design" },
   { title: "lab", href: "/lab" },
   { title: "about", href: "/about" },
 ];

@@ -11,12 +11,14 @@ import { getPublishedPosts } from "@/lib/posts";
 export const revalidate = 300;
 export const metadata = { title: "lab" };
 
+const LAB_TYPES = ["note", "reading", "paper"];
+
 export default async function LabPage() {
   // Covers both sources: MDX posts with `type: reading|note|paper` in their
-  // frontmatter and supabase rows with the same type. Anything typed `post`
-  // belongs on /blog instead.
+  // frontmatter and supabase rows with the same type. `post` belongs on /blog,
+  // `guide` belongs to its series hub, so lab keeps an explicit whitelist.
   const posts = await getPublishedPosts();
-  const labPosts = posts.filter((p) => p.type !== "post");
+  const labPosts = posts.filter((p) => LAB_TYPES.includes(p.type));
 
   const postEntries: IndexEntry[] = labPosts.map((p) => ({
     year: new Date(p.createdAt).getFullYear(),
