@@ -1,7 +1,6 @@
+import { ReaderArticle, type ReaderToc } from "@/components/reader-article";
 import { Typography } from "@/components/typography";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { Author, getAllBlogStaticPaths, getBlogForSlug, getBlogTocs } from "@/lib/markdown";
 import {
   extractTocFromHtml,
@@ -9,19 +8,9 @@ import {
   getPublishedSupabasePostBySlug,
   injectHeadingIds,
 } from "@/lib/posts";
-import {
-  ReaderContent,
-  ReaderControlsAnchor,
-  ReaderSidebar,
-  ScrollToTopButton,
-} from "@/components/reader-controls";
-import { FadedScroll } from "@/components/faded-scroll";
-import { ReaderProgressTracker } from "@/components/resume/reader-progress-tracker";
-import { ScrollRestorer } from "@/components/resume/scroll-restorer";
-import TocObserver from "@/components/toc-observer";
 import { buildGitHubFileUrl, getGitFileMeta } from "@/lib/git-meta";
 import { formatDate, stringToDate } from "@/lib/utils";
-import { ArrowLeftIcon, History } from "lucide-react";
+import { History } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -88,7 +77,7 @@ export default async function BlogPage(props: PageProps) {
   let authors: Author[] = [];
   let cover: string | null = null;
   let tags: string[] = [];
-  let tocs: { level: number; text: string; href: string }[] = [];
+  let tocs: ReaderToc[] = [];
   let body: React.ReactNode;
 
   if (mdxRes) {
@@ -150,34 +139,16 @@ export default async function BlogPage(props: PageProps) {
   }
 
   return (
-    <div className="relative w-full mx-auto sm:min-h-[78vh] min-h-[76vh] flex gap-10 max-w-[1280px] px-4">
-      <ReaderControlsAnchor hasToc={tocs.length > 0} />
-      <article className="flex-1 min-w-0 max-w-[920px] mx-auto lg:mx-0">
-        <div className="flex items-center justify-between mb-7">
-          <Link
-            className={buttonVariants({
-              variant: "link",
-              className: "!mx-0 !px-0 !-ml-1",
-            })}
-            href="/blog"
-          >
-            <ArrowLeftIcon className="w-4 h-4 mr-1.5" /> back to blog
-          </Link>
-          <AdminEditButton slug={slug} />
-        </div>
-        <div className="flex flex-col gap-3 pb-2 w-full mb-2">
-          <h1 className="sm:text-3xl text-3xl font-semibold mb-2 leading-tight">
-            {title}
-          </h1>
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 -mt-1 mb-1">
-              {tags.map((t) => (
-                <Badge key={t} variant="secondary" className="font-mono text-xs">
-                  {t}
-                </Badge>
-              ))}
-            </div>
-          )}
+    <ReaderArticle
+      slug={slug}
+      title={title}
+      backHref="/blog"
+      backLabel="back to blog"
+      headerAction={<AdminEditButton slug={slug} />}
+      tags={tags}
+      tocs={tocs}
+      meta={
+        <>
           <Authors authors={authors} date={dateLabel} />
           {updatedLabel && (
             <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
@@ -195,33 +166,22 @@ export default async function BlogPage(props: PageProps) {
               )}
             </div>
           )}
+        </>
+      }
+    >
+      {cover && (
+        <div className="w-full mb-7">
+          <Image
+            src={cover}
+            alt="cover"
+            width={700}
+            height={400}
+            className="w-full h-[400px] rounded-md border object-contain bg-white"
+          />
         </div>
-
-        <div className="!w-full prose-h2:text-2xl prose-h3:text-xl prose-h4:text-lg prose-h2:font-semibold prose-h3:font-semibold prose-h4:font-semibold prose-h2:mt-10 prose-h2:mb-3 prose-h3:mt-6 prose-h3:mb-2">
-          {cover && (
-            <div className="w-full mb-7">
-              <Image
-                src={cover}
-                alt="cover"
-                width={700}
-                height={400}
-                className="w-full h-[400px] rounded-md border object-contain bg-white"
-              />
-            </div>
-          )}
-          <ReaderContent>{body}</ReaderContent>
-        </div>
-      </article>
-
-      <ReaderSidebar hasToc={tocs.length > 0}>
-        <FadedScroll className="flex-1 min-h-0 pb-2 pt-0.5 pr-2">
-          <TocObserver data={tocs} />
-        </FadedScroll>
-      </ReaderSidebar>
-      <ScrollToTopButton />
-      <ReaderProgressTracker slug={slug} title={title} />
-      <ScrollRestorer slug={slug} />
-    </div>
+      )}
+      {body}
+    </ReaderArticle>
   );
 }
 
