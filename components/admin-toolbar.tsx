@@ -1,4 +1,6 @@
-import { isAdmin } from "@/lib/supabase-server";
+"use client";
+
+import { useIsAdmin } from "@/components/contexts/admin-context";
 import { FileTextIcon, LayoutDashboardIcon, PencilIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -9,8 +11,8 @@ interface AdminToolbarProps {
   editPostId?: string;
 }
 
-export async function AdminToolbar({ editPostId }: AdminToolbarProps) {
-  const admin = await isAdmin();
+export function AdminToolbar({ editPostId }: AdminToolbarProps) {
+  const admin = useIsAdmin();
 
   if (!admin) return null;
 

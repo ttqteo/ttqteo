@@ -1,7 +1,7 @@
 import { Hero } from "@/components/portfolio/Hero";
 import { IndexTable } from "@/components/portfolio/IndexTable";
 import { projectIndex } from "@/data/projects";
-import { getAllPosts } from "@/lib/posts";
+import { getPublishedPosts } from "@/lib/posts";
 import Link from "next/link";
 
 export const revalidate = 300;
@@ -23,9 +23,9 @@ function SectionHeader({ title, href }: { title: string; href: string }) {
 }
 
 export default async function Home() {
-  const posts = await getAllPosts({ view: "active" });
+  const posts = await getPublishedPosts();
   const recentBlogs = posts
-    .filter((p) => p.type === "post" && p.isPublished)
+    .filter((p) => p.type === "post")
     .slice(0, 3)
     .map((p) => ({
       year: new Date(p.createdAt).getFullYear(),

@@ -1,5 +1,6 @@
 import { getAllBlogs } from "@/lib/markdown";
 import { getGitFileMeta } from "@/lib/git-meta";
+import { supabasePublic } from "@/lib/supabase-public";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { stringToDate } from "@/lib/utils";
 import path from "path";
@@ -34,18 +35,15 @@ const normalizeType = (t: unknown): PostType =>
 
 const BASE_COLUMNS = "id, slug, title, description, is_published, created_at, updated_at, deleted_at";
 
-export async function getSupabasePosts(view: PostsView = "active"): Promise<UnifiedPost[]> {
-  const supabase = await createSupabaseServerClient();
+type PostRowQuery = (
+  columns: string
+) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
 
-  const runQuery = async (columns: string) => {
-    let q = supabase
-      .from("blogs")
-      .select(columns)
-      .order("updated_at", { ascending: false });
-    q = view === "trash" ? q.not("deleted_at", "is", null) : q.is("deleted_at", null);
-    return q;
-  };
-
+/**
+ * Runs `runQuery` with progressively fewer optional columns, so the site keeps
+ * working against a DB that predates the `type` / `tags` migrations.
+ */
+async function selectPostRows(runQuery: PostRowQuery): Promise<UnifiedPost[]> {
   let { data, error } = await runQuery(`${BASE_COLUMNS}, type, tags`);
   let hasType = true;
   let hasTags = true;
@@ -78,6 +76,33 @@ export async function getSupabasePosts(view: PostsView = "active"): Promise<Unif
   }));
 }
 
+export async function getSupabasePosts(view: PostsView = "active"): Promise<UnifiedPost[]> {
+  const supabase = await createSupabaseServerClient();
+
+  return selectPostRows((columns) => {
+    const q = supabase
+      .from("blogs")
+      .select(columns)
+      .order("updated_at", { ascending: false });
+    return view === "trash" ? q.not("deleted_at", "is", null) : q.is("deleted_at", null);
+  });
+}
+
+/**
+ * Published posts read through the cookie-free client, so pages using it stay
+ * statically renderable. Admin views must keep using `getSupabasePosts()`.
+ */
+export async function getPublishedSupabasePosts(): Promise<UnifiedPost[]> {
+  return selectPostRows((columns) =>
+    supabasePublic
+      .from("blogs")
+      .select(columns)
+      .eq("is_published", true)
+      .is("deleted_at", null)
+      .order("updated_at", { ascending: false })
+  );
+}
+
 export type SupabasePostFull = {
   id: string;
   slug: string;
@@ -100,6 +125,32 @@ export async function getSupabasePostBySlug(slug: string): Promise<SupabasePostF
     .is("deleted_at", null)
     .maybeSingle();
 
+  return mapPostRow(data, error);
+}
+
+/**
+ * Published-only lookup through the cookie-free client. Public pages should try
+ * this first and only fall back to `getSupabasePostBySlug()` (which reads
+ * cookies, forcing a dynamic render) when previewing an unpublished draft.
+ */
+export async function getPublishedSupabasePostBySlug(
+  slug: string
+): Promise<SupabasePostFull | null> {
+  const { data, error } = await supabasePublic
+    .from("blogs")
+    .select("*")
+    .eq("slug", slug)
+    .eq("is_published", true)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  return mapPostRow(data, error);
+}
+
+function mapPostRow(
+  data: unknown,
+  error: { message: string } | null
+): SupabasePostFull | null {
   if (error || !data) return null;
 
   const r = data as Record<string, unknown>;
@@ -194,6 +245,27 @@ export async function getAllPosts(opts: GetAllPostsOptions = {}): Promise<Unifie
   const dedupedDb = dbPosts.filter((p) => !mdxSlugs.has(p.slug));
 
   return [...dedupedDb, ...mdxPosts].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+/**
+ * Published DB posts + published MDX posts, without touching `cookies()`.
+ * This is what public listing pages (`/`, `/blog`) should use.
+ */
+export async function getPublishedPosts(): Promise<UnifiedPost[]> {
+  const [dbPosts, mdxPosts] = await Promise.all([
+    getPublishedSupabasePosts(),
+    getMdxPosts(),
+  ]);
+
+  const publishedMdx = mdxPosts.filter((p) => p.isPublished);
+
+  // MDX is source of truth: if a slug exists in both, drop the DB copy.
+  const mdxSlugs = new Set(publishedMdx.map((p) => p.slug));
+  const dedupedDb = dbPosts.filter((p) => !mdxSlugs.has(p.slug));
+
+  return [...dedupedDb, ...publishedMdx].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useIsAdmin } from "@/components/contexts/admin-context";
 import {
   getReaderResume,
   getWriterResume,
@@ -14,9 +15,8 @@ import { ResumeReaderToast } from "./resume-reader-dialog";
 import { ResumeWriterToast } from "./resume-writer-dialog";
 import { markResumePending } from "./scroll-restorer";
 
-type Props = { isAdmin: boolean };
-
-export function ResumeOrchestrator({ isAdmin }: Props) {
+export function ResumeOrchestrator() {
+  const isAdmin = useIsAdmin();
   const router = useRouter();
   const pathname = usePathname();
   const [reader, setReader] = useState<ReaderResume | null>(null);

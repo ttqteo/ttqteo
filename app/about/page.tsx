@@ -2,12 +2,83 @@ import { CurrentlyBlock } from "@/components/portfolio/CurrentlyBlock";
 
 export const metadata = { title: "about" };
 
+const SKILL_GROUPS: { label: string; items: string[] }[] = [
+  { label: "languages", items: ["TypeScript", "Python", "Go", "Java"] },
+  {
+    label: "backend",
+    items: [
+      "Spring Boot",
+      "NestJS",
+      "FastAPI",
+      "Express",
+      "JPA/Hibernate",
+      "REST/OpenAPI",
+    ],
+  },
+  { label: "frontend", items: ["Next.js", "React", "React Native"] },
+  {
+    label: "security & access",
+    items: [
+      "OAuth2/JWT",
+      "RBAC/ABAC",
+      "Ory Keto/Oathkeeper",
+      "audit logging",
+      "SIEM/SOC",
+    ],
+  },
+  {
+    label: "data & messaging",
+    items: [
+      "Postgres",
+      "MongoDB",
+      "Redis",
+      "Kafka",
+      "Pulsar",
+      "Socket.IO",
+      "LiveKit",
+    ],
+  },
+  {
+    label: "infra",
+    items: [
+      "Docker",
+      "Kubernetes",
+      "Helm",
+      "ArgoCD",
+      "GitHub Actions",
+      "Prometheus/Grafana",
+      "ELK",
+      "AWS",
+      "Nginx",
+      "Linux",
+    ],
+  },
+  {
+    label: "architecture",
+    items: [
+      "microservices",
+      "event-driven",
+      "multi-tenant SaaS",
+      "real-time systems",
+      "observability",
+      "system design",
+    ],
+  },
+];
+
 export default function AboutPage() {
   return (
     <article className="max-w-[680px] mx-auto px-4 py-12 prose dark:prose-invert">
       <h1 className="text-4xl mb-6 not-prose">About</h1>
 
       <p>I&apos;m Tran Tu Quang.</p>
+
+      <p>
+        Backend engineer, 4+ years on distributed and real-time systems:
+        cybersecurity, IAM, IoT, product platforms. Mostly Java/Spring Boot and
+        Go, event-driven with Kafka, OAuth2/JWT and fine-grained authorization,
+        ELK-based observability, plus the frontend work when a feature needs it.
+      </p>
 
       <CurrentlyBlock />
 
@@ -28,11 +99,17 @@ export default function AboutPage() {
       </ul>
 
       <h2 className="not-prose text-2xl mt-12 mb-4">Skills</h2>
-      <p className="font-mono text-sm not-prose leading-relaxed">
-        TypeScript · Python · Go · Java · Next.js · NestJS · React Native ·
-        Spring Boot · FastAPI · Postgres · MongoDB · Redis · Kafka · Pulsar ·
-        Socket.IO · LiveKit · Docker · Kubernetes · AWS
-      </p>
+      <dl className="font-mono text-sm not-prose space-y-3">
+        {SKILL_GROUPS.map((group) => (
+          <div
+            key={group.label}
+            className="sm:grid sm:grid-cols-[9rem_1fr] sm:gap-4"
+          >
+            <dt className="text-muted-foreground">{group.label}</dt>
+            <dd className="ml-0 leading-relaxed">{group.items.join(" · ")}</dd>
+          </div>
+        ))}
+      </dl>
 
       <h2 className="not-prose text-2xl mt-12 mb-4">Contact</h2>
       <ul className="not-prose space-y-1">

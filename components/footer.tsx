@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { version } from "@/package.json";
 
 const QUOTES = [
   "keep it simple, stupid.",
@@ -15,7 +16,8 @@ export function Footer() {
       <div className="max-w-[720px] mx-auto px-4 py-10 grid grid-cols-2 gap-8 text-sm">
         <div className="space-y-2">
           <p className="font-mono text-xs tracking-widest text-muted-foreground">
-            ttqteo
+            ttqteo{" "}
+            <span className="tracking-normal opacity-60">v{version}</span>
           </p>
           <p className="text-muted-foreground italic">— {quote}</p>
         </div>

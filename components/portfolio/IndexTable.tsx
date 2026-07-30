@@ -5,7 +5,10 @@ import { cn } from "@/lib/utils";
 export type IndexEntryType = "experiment" | "note" | "reading" | "paper";
 
 export interface IndexEntry {
+  /** Displayed in the left column; may be a formatted date rather than a year. */
   year: number | string;
+  /** Year used for grouping when `year` holds a formatted date. */
+  groupYear?: number;
   title: string;
   description?: string;
   role?: "solo" | "lead" | "team";
