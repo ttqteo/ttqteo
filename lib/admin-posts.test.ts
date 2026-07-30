@@ -94,6 +94,7 @@ describe("countPosts", () => {
       note: 1,
       reading: 1,
       paper: 0,
+      guide: 0,
       supabase: 2,
       mdx: 1,
     });
@@ -162,6 +163,16 @@ describe("filterAndSortPosts", () => {
     const original = [...posts];
     filterAndSortPosts(posts, query({ sort: "title" }));
     expect(posts).toEqual(original);
+  });
+});
+
+describe("guide view", () => {
+  it("counts and filters the guide view", () => {
+    const guides = [post({ id: "g1", type: "guide" }), post({ id: "p1" })];
+    expect(countPosts(guides, []).guide).toBe(1);
+    expect(
+      filterAndSortPosts(guides, query({ view: "guide" })).map((p) => p.id),
+    ).toEqual(["g1"]);
   });
 });
 

@@ -9,7 +9,7 @@ import { loadAdminPosts } from "./posts-data";
 
 const GROUPS: { label: string; views: ViewKey[] }[] = [
   { label: "status", views: ["all", "published", "draft", "trash"] },
-  { label: "type", views: ["post", "note", "reading", "paper"] },
+  { label: "type", views: ["post", "note", "reading", "paper", "guide"] },
   { label: "source", views: ["supabase", "mdx"] },
 ];
 
