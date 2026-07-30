@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 
 const ROUTES: Record<string, string> = {
   h: "/",
-  w: "/work",
   p: "/projects",
   b: "/blog",
   l: "/lab",

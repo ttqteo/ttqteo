@@ -280,10 +280,21 @@ export async function getBlogTocs(slug: string) {
 
 export async function getBlogForSlug(slug: string) {
   const blogFile = path.join(process.cwd(), "/contents/blogs/", `${slug}.mdx`);
+
+  let rawMdx: string;
   try {
-    const rawMdx = await fs.readFile(blogFile, "utf-8");
-    return await parseMdx<BlogMdxFrontmatter>(rawMdx);
+    rawMdx = await fs.readFile(blogFile, "utf-8");
   } catch {
+    // No MDX file for this slug; the caller falls back to the DB.
+    return undefined;
+  }
+
+  try {
+    return await parseMdx<BlogMdxFrontmatter>(rawMdx);
+  } catch (err) {
+    // A compile error here used to be indistinguishable from "no such post",
+    // so a malformed .mdx file 404'd silently. Keep the 404 but make it loud.
+    console.error(`[markdown] failed to compile ${slug}.mdx:`, err);
     return undefined;
   }
 }

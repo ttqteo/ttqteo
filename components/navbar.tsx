@@ -27,7 +27,10 @@ export function Navbar() {
           </div>
         </div>
 
-        <SheetLeftbar />
+        <div className="flex items-center gap-1">
+          <ModeToggle />
+          <SheetLeftbar />
+        </div>
       </div>
     </nav>
   );

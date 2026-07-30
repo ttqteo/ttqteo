@@ -58,7 +58,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var r=document.documentElement;var p=localStorage.getItem('reader-prefs');var visible=true;if(p){var o=JSON.parse(p);if(o&&typeof o.tocVisible==='boolean')visible=o.tocVisible;}r.dataset.tocExpanded=visible?'1':'0';}catch(e){}})();`,
+            __html: `(function(){try{var r=document.documentElement;var p=localStorage.getItem('reader-prefs');var visible=true;if(p){var o=JSON.parse(p);if(o&&typeof o.tocVisible==='boolean')visible=o.tocVisible;}r.dataset.tocExpanded=visible?'1':'0';if(/(^|;\\s*)sb-[^=]*-auth-token/.test(document.cookie))r.classList.add('is-admin');}catch(e){}})();`,
           }}
         />
       </head>

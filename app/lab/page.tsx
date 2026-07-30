@@ -4,7 +4,7 @@ import type {
   IndexEntryType,
 } from "@/components/portfolio/IndexTable";
 import { labStaticIndex } from "@/data/lab";
-import { supabasePublic } from "@/lib/supabase-public";
+import { getPublishedPosts } from "@/lib/posts";
 
 // Published-only listing: ISR instead of force-dynamic, so navigating here is
 // served from the cache rather than a fresh render on every visit.
@@ -12,22 +12,23 @@ export const revalidate = 300;
 export const metadata = { title: "lab" };
 
 export default async function LabPage() {
-  const { data: rows } = await supabasePublic
-    .from("blogs")
-    .select("slug, title, type, updated_at, created_at")
-    .in("type", ["note", "reading", "paper"])
-    .eq("is_published", true)
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: false });
+  // Covers both sources: MDX posts with `type: reading|note|paper` in their
+  // frontmatter and supabase rows with the same type. Anything typed `post`
+  // belongs on /blog instead.
+  const posts = await getPublishedPosts();
+  const labPosts = posts.filter((p) => p.type !== "post");
 
-  const dbEntries: IndexEntry[] = (rows ?? []).map((r) => ({
-    year: new Date(r.updated_at ?? r.created_at).getFullYear(),
-    title: r.title ?? "Untitled",
-    href: `/lab/${r.slug}`,
-    type: r.type as IndexEntryType,
+  const postEntries: IndexEntry[] = labPosts.map((p) => ({
+    year: new Date(p.createdAt).getFullYear(),
+    title: p.title,
+    description: p.description,
+    // MDX lab content is still rendered by the /blog route; only supabase-backed
+    // entries have their own /lab page.
+    href: p.source === "mdx" ? `/blog/${p.slug}` : `/lab/${p.slug}`,
+    type: p.type as IndexEntryType,
   }));
 
-  const merged = [...dbEntries, ...labStaticIndex].sort((a, b) =>
+  const merged = [...postEntries, ...labStaticIndex].sort((a, b) =>
     String(b.year).localeCompare(String(a.year)),
   );
 
