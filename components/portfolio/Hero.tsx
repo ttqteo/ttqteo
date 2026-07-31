@@ -50,11 +50,6 @@ export function Hero() {
         </h2>
         <ul className="space-y-2 text-base text-foreground/90">
           <li>
-            — building{" "}
-            <Ext href="https://github.com/ttqteo/neurite">neurite</Ext>, an
-            AI-native knowledge workspace
-          </li>
-          <li>
             — shipping an IAM platform: fine-grained RBAC/ABAC on Ory Keto, in Go
           </li>
           <li>

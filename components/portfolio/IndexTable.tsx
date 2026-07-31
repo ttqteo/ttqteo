@@ -15,6 +15,8 @@ export interface IndexEntry {
   stack?: string[];
   metric?: string;
   href: string;
+  /** Shown in the meta row as plain text — the row itself is already the link. */
+  urlLabel?: string;
   external?: boolean;
   type?: IndexEntryType;
   draft?: boolean;
@@ -115,6 +117,11 @@ function IndexRow({ entry }: { entry: IndexEntry }) {
             </span>
           )}
           {entry.metric && <span>{entry.metric}</span>}
+          {entry.urlLabel && (
+            <span className="text-muted-foreground/60 group-hover:text-accent transition-colors">
+              {entry.urlLabel}
+            </span>
+          )}
         </div>
       </div>
     </div>

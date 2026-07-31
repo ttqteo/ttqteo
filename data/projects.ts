@@ -162,7 +162,10 @@ const goldPrices = await commodity.gold.priceSJC();`,
 
 import type { IndexEntry } from "@/components/portfolio/IndexTable";
 
-export const projectIndex: IndexEntry[] = [
+/** `hidden` keeps an entry in the file but off both the homepage and /projects. */
+type ProjectIndexEntry = IndexEntry & { hidden?: boolean };
+
+const ALL_PROJECTS: ProjectIndexEntry[] = [
   {
     year: 2026,
     title: "neurite",
@@ -171,6 +174,7 @@ export const projectIndex: IndexEntry[] = [
     stack: ["Next.js", "Supabase", "pgvector"],
     href: "https://github.com/ttqteo/neurite",
     external: true,
+    hidden: true,
   },
   {
     year: 2025,
@@ -178,8 +182,18 @@ export const projectIndex: IndexEntry[] = [
     description:
       "Open-source TypeScript package for Vietnam stock market data. Fetch historical prices, real-time boards, top movers, and commodity prices from VCI.",
     stack: ["TypeScript", "Node"],
-    metric: "npm",
+    urlLabel: "npmjs.com/package/vnstock-js",
     href: "https://www.npmjs.com/package/vnstock-js",
+    external: true,
+  },
+  {
+    year: 2025,
+    title: "vnstock-js docs",
+    description:
+      "Documentation site for vnstock-js: API reference, guides, and runnable examples for every data source the package covers.",
+    stack: ["Next.js", "MDX"],
+    urlLabel: "vnstock-js-docs.vercel.app",
+    href: "https://vnstock-js-docs.vercel.app/",
     external: true,
   },
   {
@@ -188,6 +202,7 @@ export const projectIndex: IndexEntry[] = [
     description:
       "Full-stack finance platform for tracking Vietnamese stocks, managing personal portfolios, and aggregating market news in real time.",
     stack: ["Next.js", "Prisma", "Postgres"],
+    urlLabel: "finance.ttqteo.dev",
     href: "https://finance.ttqteo.dev/",
     external: true,
   },
@@ -201,3 +216,5 @@ export const projectIndex: IndexEntry[] = [
     external: true,
   },
 ];
+
+export const projectIndex: IndexEntry[] = ALL_PROJECTS.filter((p) => !p.hidden);
