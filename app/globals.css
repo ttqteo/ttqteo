@@ -244,6 +244,16 @@ body.focus-mode .pt-8 {
   text-decoration-color: hsl(20 90% 70%);
 }
 
+/* `--accent` is a near-black surface colour in dark mode: right for `bg-accent`,
+   unreadable as text — `hover:text-accent` was erasing links on hover. Give the
+   text utilities the same legible orange the prose links use. The selectors are
+   deliberately one step more specific than Tailwind's own so they win. */
+.dark .text-accent,
+.dark .hover\:text-accent:hover,
+.dark .group:hover .group-hover\:text-accent {
+  color: hsl(20 90% 70%);
+}
+
 /* Utility: hide scrollbar but keep scrolling */
 .scrollbar-hidden {
   scrollbar-width: none;
