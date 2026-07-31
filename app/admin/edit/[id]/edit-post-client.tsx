@@ -57,7 +57,7 @@ const Tldraw = dynamic(() => import("tldraw").then((m) => m.Tldraw), {
   ),
 });
 
-const ALLOWED_TYPES = ["post", "note", "reading", "paper", "guide"] as const;
+const ALLOWED_TYPES = ["post", "reading", "paper", "guide"] as const;
 type PostType = (typeof ALLOWED_TYPES)[number];
 
 function resolveType(raw: string | undefined): PostType {
@@ -649,7 +649,6 @@ export default function EditPostClient({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="post">Post</SelectItem>
-                  <SelectItem value="note">Note</SelectItem>
                   <SelectItem value="reading">Reading</SelectItem>
                   <SelectItem value="paper">Paper</SelectItem>
                   <SelectItem value="guide">Guide</SelectItem>

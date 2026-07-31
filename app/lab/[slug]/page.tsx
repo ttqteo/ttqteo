@@ -10,7 +10,7 @@ import { notFound } from "next/navigation";
 export const revalidate = 300;
 export const dynamicParams = true;
 
-const LAB_TYPES = ["note", "reading", "paper"];
+const LAB_TYPES = ["reading", "paper"];
 const ENTRY_COLUMNS =
   "slug, title, description, content, cover, is_published, type, created_at, updated_at";
 

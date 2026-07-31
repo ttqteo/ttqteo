@@ -14,7 +14,6 @@ export type ViewKey =
   | "draft"
   | "trash"
   | "post"
-  | "note"
   | "reading"
   | "paper"
   | "guide"
@@ -37,7 +36,6 @@ export const VIEWS: ViewKey[] = [
   "draft",
   "trash",
   "post",
-  "note",
   "reading",
   "paper",
   "guide",

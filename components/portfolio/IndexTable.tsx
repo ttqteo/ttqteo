@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type IndexEntryType = "experiment" | "note" | "reading" | "paper";
+export type IndexEntryType = "experiment" | "reading" | "paper";
 
 export interface IndexEntry {
   /** Displayed in the left column; may be a formatted date rather than a year. */

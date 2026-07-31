@@ -79,9 +79,6 @@ export default async function AdminPage({ searchParams }: PageProps) {
                 <Link href="/admin/edit/new?type=post">Post</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/admin/edit/new?type=note">Note</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
                 <Link href="/admin/edit/new?type=reading">Reading</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>

@@ -11,7 +11,7 @@ import { getPublishedPosts } from "@/lib/posts";
 export const revalidate = 300;
 export const metadata = { title: "lab" };
 
-const LAB_TYPES = ["note", "reading", "paper"];
+const LAB_TYPES = ["reading", "paper"];
 
 export default async function LabPage() {
   // Covers both sources: MDX posts with `type: reading|note|paper` in their

@@ -6,7 +6,7 @@ import { stringToDate } from "@/lib/utils";
 import path from "path";
 
 export type PostSource = "mdx" | "supabase";
-export type PostType = "post" | "note" | "reading" | "paper" | "guide";
+export type PostType = "post" | "reading" | "paper" | "guide";
 
 export type UnifiedPost = {
   id: string;
@@ -31,7 +31,7 @@ export type GetAllPostsOptions = {
   includeMdx?: boolean;
 };
 
-const ALLOWED_TYPES: PostType[] = ["post", "note", "reading", "paper", "guide"];
+const ALLOWED_TYPES: PostType[] = ["post", "reading", "paper", "guide"];
 const normalizeType = (t: unknown): PostType =>
   ALLOWED_TYPES.includes(t as PostType) ? (t as PostType) : "post";
 

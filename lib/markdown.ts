@@ -196,7 +196,7 @@ export type BlogMdxFrontmatter = BaseMdxFrontmatter & {
   cover: string;
   isPublished: boolean;
   tags: string;
-  type?: "post" | "note" | "reading" | "paper";
+  type?: "post" | "reading" | "paper";
 };
 
 export async function getAllBlogStaticPaths() {
@@ -207,7 +207,7 @@ export async function getAllBlogStaticPaths() {
     console.log(err);
   }
 }
-const ALLOWED_BLOG_TYPES = ["post", "note", "reading", "paper"] as const;
+const ALLOWED_BLOG_TYPES = ["post", "reading", "paper"] as const;
 
 async function walkMdxFiles(dir: string, base: string): Promise<string[]> {
   const out: string[] = [];
@@ -237,7 +237,7 @@ export async function getAllBlogs() {
       const rawMdx = await fs.readFile(filepath, "utf-8");
       const frontmatter = justGetFrontmatterFromMD<BlogMdxFrontmatter>(rawMdx);
       const rawType = (frontmatter as any).type;
-      const type: "post" | "note" | "reading" | "paper" = ALLOWED_BLOG_TYPES.includes(rawType)
+      const type: "post" | "reading" | "paper" = ALLOWED_BLOG_TYPES.includes(rawType)
         ? rawType
         : "post";
       return {
