@@ -6,7 +6,7 @@ import { stringToDate } from "@/lib/utils";
 import path from "path";
 
 export type PostSource = "mdx" | "supabase";
-export type PostType = "post" | "note" | "reading" | "paper";
+export type PostType = "post" | "note" | "reading" | "paper" | "guide";
 
 export type UnifiedPost = {
   id: string;
@@ -20,6 +20,8 @@ export type UnifiedPost = {
   updatedAt: string;
   deletedAt?: string | null;
   tags?: string;
+  guideSection?: string;
+  guideOrder?: number;
 };
 
 export type PostsView = "active" | "trash";
@@ -29,7 +31,7 @@ export type GetAllPostsOptions = {
   includeMdx?: boolean;
 };
 
-const ALLOWED_TYPES: PostType[] = ["post", "note", "reading", "paper"];
+const ALLOWED_TYPES: PostType[] = ["post", "note", "reading", "paper", "guide"];
 const normalizeType = (t: unknown): PostType =>
   ALLOWED_TYPES.includes(t as PostType) ? (t as PostType) : "post";
 
@@ -44,12 +46,21 @@ type PostRowQuery = (
  * working against a DB that predates the `type` / `tags` migrations.
  */
 async function selectPostRows(runQuery: PostRowQuery): Promise<UnifiedPost[]> {
-  let { data, error } = await runQuery(`${BASE_COLUMNS}, type, tags`);
+  let { data, error } = await runQuery(
+    `${BASE_COLUMNS}, type, tags, guide_section, guide_order`
+  );
   let hasType = true;
   let hasTags = true;
+  let hasGuide = true;
+  if (error && /guide_(section|order)/i.test(error.message)) {
+    hasGuide = false;
+    ({ data, error } = await runQuery(`${BASE_COLUMNS}, type, tags`));
+  }
   if (error && /tags/i.test(error.message)) {
     hasTags = false;
-    ({ data, error } = await runQuery(`${BASE_COLUMNS}, type`));
+    ({ data, error } = await runQuery(
+      hasGuide ? `${BASE_COLUMNS}, type, guide_section, guide_order` : `${BASE_COLUMNS}, type`
+    ));
   }
   if (error && /'?type'? column|column .*type.* does not exist/i.test(error.message)) {
     hasType = false;
@@ -73,6 +84,12 @@ async function selectPostRows(runQuery: PostRowQuery): Promise<UnifiedPost[]> {
     updatedAt: (r.updated_at as string) || (r.created_at as string) || new Date().toISOString(),
     deletedAt: (r.deleted_at as string | null) ?? null,
     tags: hasTags ? ((r.tags as string | null) ?? undefined) : undefined,
+    guideSection: hasGuide
+      ? ((r.guide_section as string | null) ?? undefined)
+      : undefined,
+    // numeric column: PostgREST tra ve string, luon boc Number()
+    guideOrder:
+      hasGuide && r.guide_order != null ? Number(r.guide_order) : undefined,
   }));
 }
 
@@ -114,6 +131,8 @@ export type SupabasePostFull = {
   createdAt: string;
   updatedAt: string;
   tags: string | null;
+  guideSection: string | null;
+  guideOrder: number | null;
 };
 
 export async function getSupabasePostBySlug(slug: string): Promise<SupabasePostFull | null> {
@@ -165,6 +184,8 @@ function mapPostRow(
     createdAt: (r.created_at as string) || (r.updated_at as string) || new Date().toISOString(),
     updatedAt: (r.updated_at as string) || (r.created_at as string) || new Date().toISOString(),
     tags: (r.tags as string | null) ?? null,
+    guideSection: (r.guide_section as string | null) ?? null,
+    guideOrder: r.guide_order != null ? Number(r.guide_order) : null,
   };
 }
 

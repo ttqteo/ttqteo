@@ -42,7 +42,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 
   const body = await request.json();
-  const { title, slug, description, content, is_published, deleted_at, type, tags } = body;
+  const { title, slug, description, content, is_published, deleted_at, type, tags, guide_section, guide_order } = body;
 
   const supabase = await createSupabaseServerClient();
 
@@ -61,14 +61,22 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
   const withType = type !== undefined ? { type } : {};
   const withTags = typeof tags === "string" ? { tags } : {};
+  const withGuide = {
+    ...(guide_section !== undefined ? { guide_section } : {}),
+    ...(guide_order !== undefined ? { guide_order } : {}),
+  };
 
   let { data, error } = await tryUpdate({
     ...basePayload,
     ...withType,
     ...withTags,
+    ...withGuide,
   });
 
   // Retry strategy when PostgREST schema cache is stale or columns are missing.
+  if (error && /guide_(section|order)/i.test(error.message)) {
+    ({ data, error } = await tryUpdate({ ...basePayload, ...withType, ...withTags }));
+  }
   if (error && /['"]?tags['"]? column|column .*tags.* does not exist/i.test(error.message)) {
     ({ data, error } = await tryUpdate({ ...basePayload, ...withType }));
   }

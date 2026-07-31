@@ -2,6 +2,7 @@
 
 import { FadedScroll } from "@/components/faded-scroll";
 import { SimpleEditor } from "@/components/simple-editor";
+import { GUIDE_SERIES, hasTag } from "@/lib/guides";
 import { clearWriterResume, setWriterResume } from "@/lib/resume-storage";
 import { cn } from "@/lib/utils";
 import { EditorToc } from "./editor-toc";
@@ -56,7 +57,7 @@ const Tldraw = dynamic(() => import("tldraw").then((m) => m.Tldraw), {
   ),
 });
 
-const ALLOWED_TYPES = ["post", "note", "reading", "paper"] as const;
+const ALLOWED_TYPES = ["post", "note", "reading", "paper", "guide"] as const;
 type PostType = (typeof ALLOWED_TYPES)[number];
 
 function resolveType(raw: string | undefined): PostType {
@@ -78,6 +79,8 @@ interface PostData {
   is_published: boolean;
   type?: PostType;
   tags?: string;
+  guide_section?: string | null;
+  guide_order?: number | null;
 }
 
 const DRAFT_STORAGE_KEY = "editor-draft";
@@ -116,6 +119,17 @@ export default function EditPostClient({
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [type, setType] = useState<PostType>(
     resolveType(initialData?.type ?? initialType),
+  );
+  const [guideSection, setGuideSection] = useState<string>(
+    initialData?.guide_section ?? "",
+  );
+  const [guideOrder, setGuideOrder] = useState<string>(
+    initialData?.guide_order != null ? String(initialData.guide_order) : "",
+  );
+  // Series suy ra từ tag sẵn có; chọn series mới sẽ tự thêm tag khi save.
+  const [seriesTag, setSeriesTag] = useState<string>(
+    GUIDE_SERIES.find((s) => hasTag({ tags: initialData?.tags }, s.tag))?.tag ??
+      "",
   );
   const [post, setPost] = useState<PostData>({
     title: initialData?.title || "",
@@ -240,10 +254,13 @@ export default function EditPostClient({
         .replace(/^-|-$/g, "");
       // Add random suffix to avoid duplicates
       const suffix = Math.random().toString(36).substring(2, 6);
-      const slug = `${year}/${month}/${day}/${name}-${suffix}`;
+      // Guide chapters live at /<series>/<slug>: keep the slug flat and clean,
+      // the editable input below handles collisions manually.
+      const slug =
+        type === "guide" ? name : `${year}/${month}/${day}/${name}-${suffix}`;
       setPost((prev) => ({ ...prev, slug }));
     }
-  }, [post.title, isNew]);
+  }, [post.title, isNew, type]);
 
   const handleDelete = async () => {
     setLoadingAction("delete");
@@ -283,6 +300,17 @@ export default function EditPostClient({
           ...post,
           is_published: publish,
           type,
+          tags:
+            type === "guide" &&
+            seriesTag &&
+            !hasTag({ tags: post.tags }, seriesTag)
+              ? [post.tags, seriesTag].filter(Boolean).join(", ")
+              : post.tags,
+          guide_section: type === "guide" && guideSection ? guideSection : null,
+          guide_order:
+            type === "guide" && guideOrder.trim() !== ""
+              ? Number(guideOrder)
+              : null,
         }),
       });
 
@@ -575,25 +603,38 @@ export default function EditPostClient({
           </div>
 
           {/* Slug Preview */}
-          {(() => {
-            const now = new Date();
-            const datePrefix = `${now.getFullYear()}/${String(
-              now.getMonth() + 1,
-            ).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
-            const slugName = post.title
-              ? removeVietnameseTones(post.title)
-                  .toLowerCase()
-                  .replace(/[^a-z0-9]+/g, "-")
-                  .replace(/^-|-$/g, "")
-              : "post-slug";
-            return (
-              <div className="text-sm text-muted-foreground">
-                <span className="font-mono bg-muted px-2 py-1 rounded">
-                  /blog/{datePrefix}/{slugName}
-                </span>
-              </div>
-            );
-          })()}
+          {type === "guide" ? (
+            <div className="text-sm text-muted-foreground flex items-center gap-1">
+              <span className="font-mono">/{seriesTag || "series"}/</span>
+              <input
+                type="text"
+                value={post.slug}
+                onChange={(e) => setPost({ ...post, slug: e.target.value })}
+                placeholder="chapter-slug"
+                className="font-mono bg-muted px-2 py-1 rounded outline-none min-w-[240px] focus-visible:ring-1 focus-visible:ring-ring"
+              />
+            </div>
+          ) : (
+            (() => {
+              const now = new Date();
+              const datePrefix = `${now.getFullYear()}/${String(
+                now.getMonth() + 1,
+              ).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
+              const slugName = post.title
+                ? removeVietnameseTones(post.title)
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, "-")
+                    .replace(/^-|-$/g, "")
+                : "post-slug";
+              return (
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-mono bg-muted px-2 py-1 rounded">
+                    /blog/{datePrefix}/{slugName}
+                  </span>
+                </div>
+              );
+            })()
+          )}
 
           {/* Type + Tags */}
           <div className="flex flex-wrap gap-6 items-start">
@@ -611,9 +652,68 @@ export default function EditPostClient({
                   <SelectItem value="note">Note</SelectItem>
                   <SelectItem value="reading">Reading</SelectItem>
                   <SelectItem value="paper">Paper</SelectItem>
+                  <SelectItem value="guide">Guide</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {type === "guide" && (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium">Series</label>
+                  <Select
+                    value={seriesTag}
+                    onValueChange={(v) => {
+                      setSeriesTag(v);
+                      setGuideSection("");
+                    }}
+                  >
+                    <SelectTrigger className="w-44">
+                      <SelectValue placeholder="Chọn series" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {GUIDE_SERIES.map((s) => (
+                        <SelectItem key={s.tag} value={s.tag}>
+                          {s.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium">Section</label>
+                  <Select
+                    value={guideSection}
+                    onValueChange={setGuideSection}
+                    disabled={!seriesTag}
+                  >
+                    <SelectTrigger className="w-44">
+                      <SelectValue placeholder="Chọn section" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(
+                        GUIDE_SERIES.find((s) => s.tag === seriesTag)
+                          ?.sections ?? []
+                      ).map((sec) => (
+                        <SelectItem key={sec.key} value={sec.key}>
+                          {sec.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium">Order</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={guideOrder}
+                    onChange={(e) => setGuideOrder(e.target.value)}
+                    placeholder="1"
+                    className="h-9 w-20 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </div>
+              </>
+            )}
             <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
               <label className="text-sm font-medium">
                 Tags
