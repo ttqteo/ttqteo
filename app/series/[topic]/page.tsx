@@ -58,7 +58,7 @@ export default async function GuideHubPage(props: PageProps) {
                 </span>
                 <div>
                   <Link
-                    href={`/${series.tag}/${c.slug}`}
+                    href={`/series/${series.tag}/${c.slug}`}
                     className="hover:text-accent transition-colors"
                   >
                     {c.title}

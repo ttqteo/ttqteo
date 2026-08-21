@@ -76,7 +76,7 @@ export default async function GuideChapterPage(props: PageProps) {
     <ReaderArticle
       slug={slug}
       title={post.title}
-      backHref={`/${series.tag}`}
+      backHref={`/series/${series.tag}`}
       backLabel={series.title.toLowerCase()}
       tags={tags}
       tocs={tocs}
@@ -89,7 +89,7 @@ export default async function GuideChapterPage(props: PageProps) {
         <nav className="flex justify-between gap-4 mt-14 pt-6 border-t text-sm">
           {prev ? (
             <Link
-              href={`/${series.tag}/${prev.slug}`}
+              href={`/series/${series.tag}/${prev.slug}`}
               className="hover:text-accent transition-colors"
             >
               ← {prev.title}
@@ -99,7 +99,7 @@ export default async function GuideChapterPage(props: PageProps) {
           )}
           {next && (
             <Link
-              href={`/${series.tag}/${next.slug}`}
+              href={`/series/${series.tag}/${next.slug}`}
               className="text-right hover:text-accent transition-colors"
             >
               {next.title} →

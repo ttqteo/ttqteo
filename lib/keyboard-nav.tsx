@@ -8,6 +8,8 @@ const ROUTES: Record<string, string> = {
   p: "/projects",
   b: "/blog",
   l: "/lab",
+  r: "/research",
+  s: "/series",
   a: "/about",
 };
 

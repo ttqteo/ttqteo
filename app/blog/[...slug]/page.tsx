@@ -117,7 +117,7 @@ export default async function BlogPage(props: PageProps) {
       const series = GUIDE_SERIES.find((s) =>
         hasTag({ tags: dbPost.tags ?? undefined }, s.tag),
       );
-      if (series) redirect(`/${series.tag}/${slug}`);
+      if (series) redirect(`/series/${series.tag}/${slug}`);
       notFound();
     }
     if (!dbPost || !dbPost.isPublished) {

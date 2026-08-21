@@ -16,7 +16,7 @@ import Link from "next/link";
 export type ReaderToc = { level: number; text: string; href: string };
 
 /**
- * Shell đọc bài dùng chung cho /blog/[...slug] và /[topic]/[...slug]:
+ * Shell đọc bài dùng chung cho /blog/[...slug] và /series/[topic]/[...slug]:
  * back link, title, tags, TOC sidebar, reader controls, progress tracking.
  * Nội dung bài và phần meta/footer khác nhau giữa hai trang nên là slots.
  */

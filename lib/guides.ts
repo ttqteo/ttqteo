@@ -3,7 +3,7 @@ import type { UnifiedPost } from "@/lib/posts";
 export type GuideSection = { key: string; title: string };
 
 export type GuideSeries = {
-  /** Vừa là tag của bài viết, vừa là URL segment: /system-design */
+  /** Vừa là tag của bài viết, vừa là URL segment: /series/system-design */
   tag: string;
   title: string;
   description: string;
@@ -21,6 +21,18 @@ export const GUIDE_SERIES: GuideSeries[] = [
       { key: "concepts", title: "Core Concepts" },
       { key: "technologies", title: "Key Technologies" },
       { key: "problems", title: "Common Problems" },
+    ],
+  },
+  {
+    tag: "java-core",
+    title: "Java Core",
+    description:
+      "Hiểu Java từ bản chất: JVM xử lý thế nào, bộ nhớ hoạt động ra sao, và vì sao Java được thiết kế như vậy. Không phải tutorial framework.",
+    sections: [
+      { key: "intro", title: "Bắt đầu" },
+      { key: "internals", title: "Java Bên Trong" },
+      { key: "oop-data", title: "OOP & Dữ Liệu" },
+      { key: "advanced", title: "Nâng Cao & Bẫy" },
     ],
   },
 ];

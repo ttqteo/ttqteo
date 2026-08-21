@@ -18,6 +18,22 @@ const nextConfig: NextConfig = {
       static: 300,
     },
   },
+  // /system-design was the live URL before series moved under /series/.
+  // Permanent so existing links and search results follow to the new hub.
+  async redirects() {
+    return [
+      {
+        source: "/system-design",
+        destination: "/series/system-design",
+        permanent: true,
+      },
+      {
+        source: "/system-design/:slug*",
+        destination: "/series/system-design/:slug*",
+        permanent: true,
+      },
+    ];
+  },
   // if used turbopack
   // transpilePackages: ["next-mdx-remote"],
 };
