@@ -1,7 +1,6 @@
 "use client";
 
 import { FadedScroll } from "@/components/faded-scroll";
-import { SimpleEditor } from "@/components/simple-editor";
 import { GUIDE_SERIES, hasTag } from "@/lib/guides";
 import { clearWriterResume, setWriterResume } from "@/lib/resume-storage";
 import { cn } from "@/lib/utils";
@@ -56,6 +55,22 @@ const Tldraw = dynamic(() => import("tldraw").then((m) => m.Tldraw), {
     </div>
   ),
 });
+
+// TipTap keo theo ca cay ProseMirror, la phan nang nhat cua route nay. Import
+// tinh bat trang phai cho ca graph do compile xong moi ve duoc gi (do duoc 7.5s
+// moi lan module editor doi trong dev). Tach chunk giong Tldraw o tren: khung
+// trang hien ngay, editor tram vao sau.
+const SimpleEditor = dynamic(
+  () => import("@/components/simple-editor").then((m) => m.SimpleEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full min-h-[500px] flex items-center justify-center text-muted-foreground text-sm font-mono">
+        loading editor...
+      </div>
+    ),
+  },
+);
 
 const ALLOWED_TYPES = ["post", "reading", "paper", "guide"] as const;
 type PostType = (typeof ALLOWED_TYPES)[number];
