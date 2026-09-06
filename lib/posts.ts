@@ -1,9 +1,7 @@
 import { getAllBlogs } from "@/lib/markdown";
-import { getGitFileMeta } from "@/lib/git-meta";
+import { normalizeType, toUnifiedMdxPost } from "@/lib/post-mapping";
 import { supabasePublic } from "@/lib/supabase-public";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
-import { stringToDate } from "@/lib/utils";
-import path from "path";
 
 export type PostSource = "mdx" | "supabase";
 export type PostType = "post" | "reading" | "paper" | "guide";
@@ -30,10 +28,6 @@ export type GetAllPostsOptions = {
   view?: PostsView;
   includeMdx?: boolean;
 };
-
-const ALLOWED_TYPES: PostType[] = ["post", "reading", "paper", "guide"];
-const normalizeType = (t: unknown): PostType =>
-  ALLOWED_TYPES.includes(t as PostType) ? (t as PostType) : "post";
 
 const BASE_COLUMNS = "id, slug, title, description, is_published, created_at, updated_at, deleted_at";
 
@@ -189,71 +183,9 @@ function mapPostRow(
   };
 }
 
-export function extractTocFromHtml(html: string) {
-  const regex = /<h([2-4])[^>]*?>([\s\S]*?)<\/h\1>/gi;
-  const out: { level: number; text: string; href: string }[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = regex.exec(html)) !== null) {
-    const level = parseInt(m[1], 10);
-    const text = m[2].replace(/<[^>]+>/g, "").trim();
-    if (!text) continue;
-    const slug = text
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .replace(/[^a-z0-9\s-]/g, "")
-      .trim()
-      .replace(/\s+/g, "-");
-    out.push({ level, text, href: `#${slug}` });
-  }
-  return out;
-}
-
-export function injectHeadingIds(html: string): string {
-  return html.replace(
-    /<h([2-4])([^>]*)>([\s\S]*?)<\/h\1>/gi,
-    (_, level, attrs, inner) => {
-      const text = String(inner).replace(/<[^>]+>/g, "").trim();
-      const slug = text
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "")
-        .replace(/[^a-z0-9\s-]/g, "")
-        .trim()
-        .replace(/\s+/g, "-");
-      const hasId = / id\s*=\s*["'][^"']*["']/.test(attrs);
-      const newAttrs = hasId ? attrs : `${attrs} id="${slug}"`;
-      return `<h${level}${newAttrs}>${inner}</h${level}>`;
-    }
-  );
-}
-
 export async function getMdxPosts(): Promise<UnifiedPost[]> {
   const blogs = await getAllBlogs();
-  return Promise.all(
-    blogs.map(async (b) => {
-      const createdIso = stringToDate(b.date).toISOString();
-      const absPath = path.join(
-        process.cwd(),
-        "/contents/blogs/",
-        `${b.slug}.mdx`,
-      );
-      const meta = await getGitFileMeta(absPath);
-      return {
-        id: `mdx-${b.slug}`,
-        slug: b.slug,
-        title: b.title,
-        description: undefined,
-        type: normalizeType(b.type),
-        isPublished: !!b.isPublished,
-        source: "mdx" as const,
-        createdAt: createdIso,
-        updatedAt: meta.lastCommitIso ?? createdIso,
-        deletedAt: null,
-        tags: (b as { tags?: string }).tags,
-      };
-    }),
-  );
+  return blogs.map(toUnifiedMdxPost);
 }
 
 export async function getAllPosts(opts: GetAllPostsOptions = {}): Promise<UnifiedPost[]> {

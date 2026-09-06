@@ -1,21 +1,18 @@
 import { ReaderArticle, type ReaderToc } from "@/components/reader-article";
-import { Typography } from "@/components/typography";
+import { PostBody } from "@/components/post-body";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Author, getAllBlogStaticPaths, getBlogForSlug, getBlogTocs } from "@/lib/markdown";
 import {
-  extractTocFromHtml,
   getPublishedSupabasePosts,
   getPublishedSupabasePostBySlug,
-  injectHeadingIds,
 } from "@/lib/posts";
-import { buildGitHubFileUrl, getGitFileMeta } from "@/lib/git-meta";
-import { formatDate, stringToDate } from "@/lib/utils";
+import { injectHeadingIds, tocFromHtml } from "@/lib/toc";
+import { formatDate } from "@/lib/utils";
 import { GUIDE_SERIES, hasTag } from "@/lib/guides";
-import { History } from "lucide-react";
+import { parseTags } from "@/lib/tags";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import path from "path";
 import { AdminEditButton } from "./admin-edit-button";
 
 // MDX + published supabase paths are pre-rendered via generateStaticParams;
@@ -74,7 +71,6 @@ export default async function BlogPage(props: PageProps) {
   let title: string;
   let dateLabel: string;
   let updatedLabel: string | null = null;
-  let historyHref: string | null = null;
   let authors: Author[] = [];
   let cover: string | null = null;
   let tags: string[] = [];
@@ -86,30 +82,13 @@ export default async function BlogPage(props: PageProps) {
     dateLabel = formatDate(mdxRes.frontmatter.date);
     authors = mdxRes.frontmatter.authors || [];
     cover = mdxRes.frontmatter.cover || null;
-    tags = (mdxRes.frontmatter.tags || "")
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
+    tags = parseTags(mdxRes.frontmatter.tags);
     tocs = await getBlogTocs(slug);
-    body = <Typography>{mdxRes.content}</Typography>;
+    body = <PostBody>{mdxRes.content}</PostBody>;
 
-    const blogAbsPath = path.join(process.cwd(), "/contents/blogs/", `${slug}.mdx`);
-    const meta = await getGitFileMeta(blogAbsPath);
-    if (meta.lastCommitIso) {
-      const published = stringToDate(mdxRes.frontmatter.date).getTime();
-      const updated = new Date(meta.lastCommitIso).getTime();
-      const DAY = 24 * 60 * 60 * 1000;
-      if (updated - published >= DAY) {
-        updatedLabel = formatDate(meta.lastCommitIso);
-      }
-    }
-    historyHref = buildGitHubFileUrl({
-      owner: "ttqteo",
-      repo: "ttqteo",
-      branch: "master",
-      relPath: `contents/blogs/${slug}.mdx`,
-      view: "history",
-    });
+    // Declared in frontmatter, not inferred from git: see `BlogMdxFrontmatter`.
+    const declaredUpdate = mdxRes.frontmatter.updated?.trim();
+    if (declaredUpdate) updatedLabel = formatDate(declaredUpdate);
   } else {
     const dbPost = await getPublishedSupabasePostBySlug(slug);
     // Guide chapters have one canonical URL under their series hub.
@@ -125,10 +104,7 @@ export default async function BlogPage(props: PageProps) {
     }
     title = dbPost.title;
     dateLabel = formatDate(dbPost.createdAt);
-    tags = (dbPost.tags || "")
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
+    tags = parseTags(dbPost.tags);
     const DAY = 24 * 60 * 60 * 1000;
     if (
       new Date(dbPost.updatedAt).getTime() -
@@ -138,13 +114,8 @@ export default async function BlogPage(props: PageProps) {
       updatedLabel = formatDate(dbPost.updatedAt);
     }
     const html = injectHeadingIds(dbPost.content);
-    tocs = extractTocFromHtml(html);
-    body = (
-      <div
-        className="prose prose-zinc dark:prose-invert max-w-none prose-headings:scroll-m-20"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-    );
+    tocs = tocFromHtml(html);
+    body = <PostBody html={html} />;
   }
 
   return (
@@ -160,19 +131,8 @@ export default async function BlogPage(props: PageProps) {
         <>
           <Authors authors={authors} date={dateLabel} />
           {updatedLabel && (
-            <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
-              <span>Cập nhật ngày {updatedLabel}</span>
-              {historyHref && (
-                <a
-                  href={historyHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:text-accent transition-colors"
-                >
-                  <History className="w-3 h-3" />
-                  lịch sử thay đổi
-                </a>
-              )}
+            <div className="text-xs font-mono text-muted-foreground">
+              Cập nhật ngày {updatedLabel}
             </div>
           )}
         </>

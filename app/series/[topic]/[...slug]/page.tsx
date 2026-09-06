@@ -1,3 +1,4 @@
+import { PostBody } from "@/components/post-body";
 import { ReaderArticle } from "@/components/reader-article";
 import {
   GUIDE_SERIES,
@@ -7,12 +8,12 @@ import {
   hasTag,
   prevNext,
 } from "@/lib/guides";
+import { parseTags } from "@/lib/tags";
 import {
-  extractTocFromHtml,
   getPublishedSupabasePosts,
   getPublishedSupabasePostBySlug,
-  injectHeadingIds,
 } from "@/lib/posts";
+import { injectHeadingIds, tocFromHtml } from "@/lib/toc";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -66,11 +67,8 @@ export default async function GuideChapterPage(props: PageProps) {
   const { prev, next } = prevNext(flat, slug);
 
   const html = injectHeadingIds(post.content);
-  const tocs = extractTocFromHtml(html);
-  const tags = (post.tags || "")
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean);
+  const tocs = tocFromHtml(html);
+  const tags = parseTags(post.tags);
 
   return (
     <ReaderArticle
@@ -108,10 +106,7 @@ export default async function GuideChapterPage(props: PageProps) {
         </nav>
       }
     >
-      <div
-        className="prose prose-zinc dark:prose-invert max-w-none prose-headings:scroll-m-20"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+      <PostBody html={html} />
     </ReaderArticle>
   );
 }
