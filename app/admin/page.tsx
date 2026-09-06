@@ -1,10 +1,4 @@
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { parseQuery } from "@/lib/admin-posts";
 import { getUser, isAdmin } from "@/lib/supabase-server";
 import { PlusIcon } from "lucide-react";
@@ -16,7 +10,6 @@ import { LoginButton } from "./login-button";
 import { PostsSection } from "./posts-section";
 import { PostsSectionSkeleton } from "./posts-skeleton";
 import { SearchInput } from "./search-input";
-import { SyncMdxButton } from "./sync-mdx-button";
 
 export const dynamic = "force-dynamic";
 
@@ -65,28 +58,14 @@ export default async function AdminPage({ searchParams }: PageProps) {
     <div className="max-w-6xl mx-auto pt-12 pb-8 px-4 space-y-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">posts</h1>
-        <div className="flex items-center gap-2">
-          <SyncMdxButton />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button>
-                <PlusIcon className="w-4 h-4 mr-2" />
-                New
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href="/admin/edit/new?type=post">Post</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/admin/edit/new?type=reading">Reading</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/admin/edit/new?type=paper">Paper</Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        {/* No type picker here: the editor's own Type select covers all four
+            types, so choosing one up front only added a click. */}
+        <Button asChild>
+          <Link href="/admin/edit/new">
+            <PlusIcon className="w-4 h-4 mr-2" />
+            New
+          </Link>
+        </Button>
       </div>
 
       <AdminNavProvider>
