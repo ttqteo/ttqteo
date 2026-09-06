@@ -66,9 +66,14 @@ export function ReaderArticle({
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 -mt-1 mb-1">
               {tags.map((t) => (
-                <Badge key={t} variant="secondary" className="font-mono text-xs">
-                  {t}
-                </Badge>
+                <Link key={t} href={`/tags/${encodeURIComponent(t.toLowerCase())}`}>
+                  <Badge
+                    variant="secondary"
+                    className="font-mono text-xs hover:bg-accent/15 hover:text-accent transition-colors"
+                  >
+                    {t}
+                  </Badge>
+                </Link>
               ))}
             </div>
           )}
