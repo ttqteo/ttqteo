@@ -25,8 +25,10 @@ export function SheetLeftbar() {
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="md:hidden flex">
-          <span className="text-2xl mr-8">menu</span>
+        {/* Sized to the word, not to an icon: `size="icon"` is a fixed 36x36
+            box, and the label overflowed it onto the theme toggle. */}
+        <Button variant="ghost" size="sm" className="md:hidden flex">
+          <span className="text-2xl">menu</span>
         </Button>
       </SheetTrigger>
       <SheetContent className="flex flex-col gap-4 px-0 w-full " side="left">
