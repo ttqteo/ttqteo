@@ -1,5 +1,4 @@
 import { promises as fs } from "fs";
-import GithubSlugger from "github-slugger";
 import matter from "gray-matter";
 import { compileMDX } from "next-mdx-remote/rsc";
 import path from "path";
@@ -8,6 +7,7 @@ import rehypeCodeTitles from "rehype-code-titles";
 import rehypePrism from "rehype-prism-plus";
 import rehypeSlug from "rehype-slug";
 import remarkGfm from "remark-gfm";
+import { tocFromMarkdown } from "./toc";
 import { visit } from "unist-util-visit";
 import { page_routes, ROUTES } from "./routes-config";
 
@@ -192,6 +192,11 @@ export type Author = {
 
 export type BlogMdxFrontmatter = BaseMdxFrontmatter & {
   date: string;
+  /**
+   * Optional, and deliberately manual: the git commit date can't tell a real
+   * revision from a reformat, so a post counts as updated only when it says so.
+   */
+  updated?: string;
   authors: Author[];
   cover: string;
   isPublished: boolean;
@@ -262,17 +267,7 @@ export async function getAllBlogs() {
 export async function getBlogTocs(slug: string) {
   const blogFile = path.join(process.cwd(), "/contents/blogs/", `${slug}.mdx`);
   try {
-    const rawMdx = await fs.readFile(blogFile, "utf-8");
-    const headingsRegex = /^(#{1,4})\s(.+)$/gm;
-    const slugger = new GithubSlugger();
-    let match;
-    const extracted: { level: number; text: string; href: string }[] = [];
-    while ((match = headingsRegex.exec(rawMdx)) !== null) {
-      const level = match[1].length;
-      const text = match[2].trim();
-      extracted.push({ level, text, href: `#${slugger.slug(text)}` });
-    }
-    return extracted;
+    return tocFromMarkdown(await fs.readFile(blogFile, "utf-8"));
   } catch {
     return [];
   }
