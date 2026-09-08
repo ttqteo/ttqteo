@@ -2,6 +2,23 @@
 
 import { FadedScroll } from "@/components/faded-scroll";
 import { GUIDE_SERIES, hasTag } from "@/lib/guides";
+import {
+  clearEditorDraft,
+  draftDiffersFrom,
+  readEditorDraft,
+  saveEditorDraft,
+  type EditorDraft,
+  type EditorDraftBody,
+} from "@/lib/editor-draft";
+import {
+  DEFAULT_EDITOR_PREFS,
+  readEditorPrefs,
+  writeEditorPrefs,
+  type EditorAlign,
+  type EditorPrefs,
+  type EditorWidth,
+} from "@/lib/editor-prefs";
+import { navigationTarget } from "@/lib/nav-guard";
 import { clearWriterResume, setWriterResume } from "@/lib/resume-storage";
 import { cn } from "@/lib/utils";
 import { EditorToc } from "./editor-toc";
@@ -30,13 +47,24 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  AlignCenterIcon,
+  AlignLeftIcon,
   ArrowLeftIcon,
   ArrowUpIcon,
   Loader2Icon,
   LogOutIcon,
   PenLineIcon,
+  RotateCcwIcon,
   SaveIcon,
   SendIcon,
+  Settings2Icon,
   TrashIcon,
 } from "lucide-react";
 import "tldraw/tldraw.css";
@@ -98,7 +126,20 @@ interface PostData {
   guide_order?: number | null;
 }
 
-const DRAFT_STORAGE_KEY = "editor-draft";
+/** How long the editor sits still before a draft is written. */
+const AUTOSAVE_MS = 5000;
+
+const WIDTH_CLASS: Record<EditorWidth, string> = {
+  narrow: "max-w-[720px]",
+  wide: "max-w-[1080px]",
+};
+
+const ALIGN_CLASS: Record<EditorAlign, string> = {
+  center: "mx-auto",
+  left: "mr-auto",
+};
+
+type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
 
 function removeVietnameseTones(str: string): string {
   return str
@@ -155,6 +196,45 @@ export default function EditPostClient({
     tags: initialData?.tags || "",
   });
 
+  const postId = initialData?.id ?? null;
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+
+  // What the server is known to hold. Autosave compares against this so simply
+  // opening a post — or a slug the editor regenerated on its own — never counts
+  // as an edit worth writing.
+  const baselineRef = useRef<EditorDraftBody>({
+    title: initialData?.title || "",
+    description: initialData?.description || "",
+    content: initialData?.content || "",
+    tags: initialData?.tags || "",
+    slug: initialData?.slug || "",
+  });
+
+  // A manual save in flight must not be raced by the autosave timer.
+  const loadingActionRef = useRef<string | null>(null);
+
+  // Whether the *server* is behind. Distinct from `saveState`: a published post
+  // autosaves to localStorage only, so it can read "đã lưu" and still be unsaved
+  // as far as anything outside this browser is concerned. This is what the exit
+  // guards below key off.
+  const [dirtyVsServer, setDirtyVsServer] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+
+  // Layout prefs live in localStorage, which the server cannot see. Reading
+  // them during render would desync hydration, so they land after mount and the
+  // first paint uses the defaults.
+  const [prefs, setPrefs] = useState<EditorPrefs>(DEFAULT_EDITOR_PREFS);
+  useEffect(() => {
+    setPrefs(readEditorPrefs());
+  }, []);
+  const updatePrefs = useCallback((patch: Partial<EditorPrefs>) => {
+    setPrefs((prev) => {
+      const next = { ...prev, ...patch };
+      writeEditorPrefs(next);
+      return next;
+    });
+  }, []);
+
   const PANEL_MS = 300;
 
   useEffect(() => {
@@ -202,39 +282,186 @@ export default function EditPostClient({
     document.title = `edit • ${post.title}` || "New Post";
   }, [post.title]);
 
-  // Restore draft from sessionStorage on mount (only for new posts)
+  // Hand the title over to the header once it scrolls away, so there is always
+  // something naming the post on screen.
+  const titleRef = useRef<HTMLTextAreaElement | null>(null);
+  const [titleInHeader, setTitleInHeader] = useState(false);
+
   useEffect(() => {
-    if (isNew) {
-      const savedDraft = sessionStorage.getItem(DRAFT_STORAGE_KEY);
-      if (savedDraft) {
-        try {
-          const parsed = JSON.parse(savedDraft);
-          setPost((prev) => ({ ...prev, ...parsed }));
-        } catch {
-          // Invalid JSON, ignore
-        }
+    const el = titleRef.current;
+    if (!el) return;
+    const col = editorColumnRef.current;
+    // Split mode scrolls inside the editor column; normal mode scrolls the
+    // window. The observer has to watch whichever one is actually moving.
+    const usesColumn = !!col && col.scrollHeight > col.clientHeight;
+    const observer = new IntersectionObserver(
+      ([entry]) => setTitleInHeader(!entry.isIntersecting),
+      {
+        root: usesColumn ? col : null,
+        // The header floats over the top of the scrollport, so the handover
+        // happens when the title slides under it, not when it leaves the
+        // viewport entirely.
+        rootMargin: "-96px 0px 0px 0px",
+        threshold: 0,
+      },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [showTldraw, panelMounted]);
+
+  useEffect(() => {
+    loadingActionRef.current = loadingAction;
+  }, [loadingAction]);
+
+  const buildPayload = useCallback(
+    (publish: boolean) => ({
+      ...post,
+      is_published: publish,
+      type,
+      tags:
+        type === "guide" && seriesTag && !hasTag({ tags: post.tags }, seriesTag)
+          ? [post.tags, seriesTag].filter(Boolean).join(", ")
+          : post.tags,
+      guide_section: type === "guide" && guideSection ? guideSection : null,
+      guide_order:
+        type === "guide" && guideOrder.trim() !== "" ? Number(guideOrder) : null,
+    }),
+    [post, type, seriesTag, guideSection, guideOrder],
+  );
+
+  // An unsaved draft found on mount, offered back through the banner below.
+  // Held in state rather than left in storage so autosave can keep overwriting
+  // the stored copy while the offer stands — whatever is typed next still has
+  // to survive a reload.
+  const [recoverable, setRecoverable] = useState<EditorDraft | null>(null);
+  useEffect(() => {
+    const stored = readEditorDraft(postId);
+    if (stored && draftDiffersFrom(stored, baselineRef.current)) {
+      setRecoverable(stored);
+    }
+  }, [postId]);
+
+  const restoreDraft = () => {
+    if (!recoverable) return;
+    setPost((prev) => ({
+      ...prev,
+      title: recoverable.title,
+      description: recoverable.description,
+      content: recoverable.content,
+      tags: recoverable.tags,
+      slug: recoverable.slug || prev.slug,
+    }));
+    setRecoverable(null);
+  };
+
+  const discardDraft = () => {
+    clearEditorDraft(postId);
+    setRecoverable(null);
+  };
+
+  // Autosave. The local snapshot is the part that survives a reload and is
+  // written for every post; the server write is deliberately narrower. A post
+  // that is already published is never saved without pressing the button — a
+  // stray keystroke must not edit what readers are looking at — and a post with
+  // no id yet is left alone so half-typed thoughts do not create rows.
+  useEffect(() => {
+    const body: EditorDraftBody = {
+      title: post.title,
+      description: post.description,
+      content: post.content,
+      tags: post.tags ?? "",
+      slug: post.slug,
+    };
+    const differs = draftDiffersFrom({ ...body, savedAt: 0 }, baselineRef.current);
+    setDirtyVsServer(differs);
+    if (!differs) return;
+
+    setSaveState("dirty");
+    const payload = buildPayload(false);
+
+    const timer = window.setTimeout(async () => {
+      if (loadingActionRef.current) return;
+      saveEditorDraft(postId, body);
+
+      if (isNew || !postId || post.is_published) {
+        setLastSaved(new Date());
+        setSaveState("saved");
+        return;
       }
-    }
-  }, [isNew]);
 
-  // Save draft to sessionStorage on change (only for new posts)
-  const saveDraft = useCallback(() => {
-    if (isNew && (post.title || post.description || post.content)) {
-      sessionStorage.setItem(
-        DRAFT_STORAGE_KEY,
-        JSON.stringify({
-          title: post.title,
-          description: post.description,
-          content: post.content,
-        }),
-      );
-      setLastSaved(new Date());
-    }
-  }, [isNew, post.title, post.description, post.content]);
+      setSaveState("saving");
+      try {
+        const res = await fetch(`/api/posts/${postId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        baselineRef.current = body;
+        setDirtyVsServer(false);
+        // The server now holds it, so the local copy has nothing left to rescue.
+        clearEditorDraft(postId);
+        setLastSaved(new Date());
+        setSaveState("saved");
+      } catch {
+        // Keep the local snapshot: a failed autosave is exactly when it matters.
+        setSaveState("error");
+      }
+    }, AUTOSAVE_MS);
 
+    return () => window.clearTimeout(timer);
+  }, [
+    post.title,
+    post.description,
+    post.content,
+    post.tags,
+    post.slug,
+    post.is_published,
+    postId,
+    isNew,
+    buildPayload,
+  ]);
+
+  // Leaving with the server behind. Two mechanisms, because a page can be left
+  // two different ways and only one of them is ours to handle.
+  //
+  // A reload, a closed tab or a typed URL tears the document down, and the only
+  // thing a page may do about that is `beforeunload`. The browser then shows its
+  // own generic prompt — the wording is fixed and cannot be replaced with a
+  // dialog of ours, by design, so that pages cannot fake a system message.
   useEffect(() => {
-    saveDraft();
-  }, [saveDraft]);
+    if (!dirtyVsServer) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      // Older browsers need returnValue set before they show the prompt.
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirtyVsServer]);
+
+  // In-app navigation never unloads the document, so `beforeunload` is silent
+  // for it and the App Router exposes no navigation event to hook. Catching the
+  // click before the router sees it is what is left — and it means the back
+  // arrow, the admin nav and any other in-app link all go through one guard.
+  useEffect(() => {
+    if (!dirtyVsServer) return;
+    const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented) return;
+      const anchor = (event.target as Element | null)?.closest?.("a[href]");
+      if (!anchor) return;
+      const href = navigationTarget(
+        anchor as HTMLAnchorElement,
+        window.location.href,
+        event,
+      );
+      if (!href) return;
+      event.preventDefault();
+      setPendingHref(href);
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [dirtyVsServer]);
 
   // Track writer resume for existing posts (debounced).
   useEffect(() => {
@@ -250,11 +477,6 @@ export default function EditPostClient({
     }, 2000);
     return () => window.clearTimeout(t);
   }, [isNew, initialData?.id, post.title, post.description, post.content]);
-
-  // Clear draft after successful save
-  const clearDraft = () => {
-    sessionStorage.removeItem(DRAFT_STORAGE_KEY);
-  };
 
   // Auto-generate slug from title with date prefix (year/month/day/name)
   useEffect(() => {
@@ -302,7 +524,13 @@ export default function EditPostClient({
     }
   };
 
-  const handleSave = async (publish: boolean, action: string) => {
+  const handleSave = async (
+    publish: boolean,
+    action: string,
+    // Where to go once the save lands, for the "save and leave" path. Replaces
+    // the usual stay-in-the-editor routing rather than running after it.
+    leaveTo?: string,
+  ) => {
     setLoadingAction(action);
     try {
       const url = isNew ? "/api/posts" : `/api/posts/${initialData?.id}`;
@@ -311,28 +539,29 @@ export default function EditPostClient({
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...post,
-          is_published: publish,
-          type,
-          tags:
-            type === "guide" &&
-            seriesTag &&
-            !hasTag({ tags: post.tags }, seriesTag)
-              ? [post.tags, seriesTag].filter(Boolean).join(", ")
-              : post.tags,
-          guide_section: type === "guide" && guideSection ? guideSection : null,
-          guide_order:
-            type === "guide" && guideOrder.trim() !== ""
-              ? Number(guideOrder)
-              : null,
-        }),
+        body: JSON.stringify(buildPayload(publish)),
       });
 
       if (res.ok) {
-        clearDraft();
+        baselineRef.current = {
+          title: post.title,
+          description: post.description,
+          content: post.content,
+          tags: post.tags ?? "",
+          slug: post.slug,
+        };
+        clearEditorDraft(postId);
+        setRecoverable(null);
+        setSaveState("saved");
+        setDirtyVsServer(false);
         if (publish) clearWriterResume();
         toast.success(publish ? "Post published" : "Draft saved");
+        if (leaveTo) {
+          setPendingHref(null);
+          setLastSaved(new Date());
+          router.push(leaveTo);
+          return;
+        }
         if (isNew) {
           // After creating a new post we want the URL to match the new id so
           // subsequent saves use PUT, but keep the user in the editor.
@@ -377,21 +606,60 @@ export default function EditPostClient({
       >
         <div
           className={cn(
-            "px-4 py-3 flex items-center justify-between",
+            "relative px-4 py-3 flex items-center justify-between",
             isSplit ? "w-full" : "max-w-[1280px] mx-auto w-full",
           )}
         >
+          {/* Centred absolutely rather than placed in the left group: the title
+              then fades in and out without shifting the save status or the
+              buttons on either side. */}
+          <div className="pointer-events-none absolute inset-0 hidden items-center justify-center px-72 md:flex">
+            <span
+              className={cn(
+                "truncate font-serif text-sm font-semibold transition-opacity duration-200 motion-reduce:transition-none",
+                titleInHeader && post.title ? "opacity-100" : "opacity-0",
+              )}
+            >
+              {post.title}
+            </span>
+          </div>
+
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" asChild>
               <Link href="/admin">
                 <ArrowLeftIcon className="w-5 h-5" />
               </Link>
             </Button>
-            {/* Auto-save Status */}
-            {isNew && lastSaved && (
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <span className="w-2 h-2 rounded-full bg-green-500" />
-                <span>Saved</span>
+            {/* Autosave status. Published posts autosave locally only, so the
+                label says where the copy actually went. */}
+            {saveState !== "idle" && (
+              <div className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
+                {saveState === "saving" ? (
+                  <>
+                    <Loader2Icon className="w-3 h-3 animate-spin" />
+                    <span>đang lưu…</span>
+                  </>
+                ) : saveState === "dirty" ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    <span>chưa lưu</span>
+                  </>
+                ) : saveState === "error" ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-destructive" />
+                    <span>lưu server lỗi, đã giữ bản nháp trong máy</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-green-500" />
+                    <span>
+                      {isNew || post.is_published ? "nháp trong máy" : "đã lưu"}
+                      {lastSaved
+                        ? ` ${lastSaved.toLocaleTimeString("vi-VN")}`
+                        : ""}
+                    </span>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -493,6 +761,65 @@ export default function EditPostClient({
         </div>
       </div>
 
+      {/* Leaving with the server behind, for in-app navigation. A reload or a
+          closed tab cannot reach this dialog and gets the browser's own prompt. */}
+      <AlertDialog
+        open={pendingHref !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingHref(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Rời khỏi trang?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {post.is_published
+                ? "Bài đã đăng, nên thay đổi mới chỉ nằm trong máy chứ chưa lên server."
+                : "Có thay đổi chưa lưu lên server."}{" "}
+              Bản nháp trong máy vẫn được giữ và sẽ được mời khôi phục khi bạn mở
+              lại bài này.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!loadingAction}>Ở lại</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!!loadingAction}
+              onClick={() => {
+                const href = pendingHref;
+                setPendingHref(null);
+                if (href) router.push(href);
+              }}
+            >
+              Thoát không lưu
+            </Button>
+            <AlertDialogAction
+              disabled={!!loadingAction}
+              onClick={(event) => {
+                // Hold the dialog open while the request runs: a failed save
+                // must leave the author here, not silently on another page.
+                event.preventDefault();
+                const href = pendingHref;
+                if (!href) return;
+                // A published post saves as published — routing this through
+                // the draft path would quietly unpublish it.
+                void handleSave(
+                  post.is_published,
+                  post.is_published ? "save" : "save-draft",
+                  href,
+                );
+              }}
+            >
+              {loadingAction ? (
+                <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
+              {post.is_published ? "Lưu rồi thoát" : "Lưu nháp rồi thoát"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Bottom-right controls — always visible. In split mode they step left of
           the board, because tldraw parks its own watermark in that corner and
           the two were sitting on top of each other. */}
@@ -518,6 +845,86 @@ export default function EditPostClient({
             <TooltipContent side="left">Scroll to top</TooltipContent>
           </Tooltip>
         )}
+        {/* Layout options. Hidden in split mode, where the board owns the
+            right-hand side and width/alignment have nothing to act on. */}
+        {!isSplit && (
+          <Popover>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-label="Tuỳ chọn bố cục"
+                  >
+                    <Settings2Icon className="w-4 h-4" />
+                  </Button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="left">Bố cục</TooltipContent>
+            </Tooltip>
+            <PopoverContent side="left" align="end" className="w-60 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="editor-toc-toggle" className="text-sm">
+                  Mục lục
+                </label>
+                <Switch
+                  id="editor-toc-toggle"
+                  checked={prefs.showToc}
+                  onCheckedChange={(checked) =>
+                    updatePrefs({ showToc: checked })
+                  }
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <span className="text-sm">Bề rộng</span>
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  size="sm"
+                  value={prefs.width}
+                  onValueChange={(value) =>
+                    value && updatePrefs({ width: value as EditorWidth })
+                  }
+                  className="w-full"
+                >
+                  <ToggleGroupItem value="narrow" className="flex-1 text-xs">
+                    Hẹp
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="wide" className="flex-1 text-xs">
+                    Rộng
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+
+              <div className="space-y-1.5">
+                <span className="text-sm">Canh lề</span>
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  size="sm"
+                  value={prefs.align}
+                  onValueChange={(value) =>
+                    value && updatePrefs({ align: value as EditorAlign })
+                  }
+                  className="w-full"
+                >
+                  <ToggleGroupItem value="center" className="flex-1 text-xs">
+                    <AlignCenterIcon className="w-3.5 h-3.5 mr-1" />
+                    Giữa
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="left" className="flex-1 text-xs">
+                    <AlignLeftIcon className="w-3.5 h-3.5 mr-1" />
+                    Trái
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -568,9 +975,33 @@ export default function EditPostClient({
               ? panelOpen
                 ? "w-[55%] overflow-auto pt-0 pb-8 px-8 space-y-6"
                 : "w-full overflow-auto pt-0 pb-8 px-8 space-y-6"
-              : "flex-1 min-w-0 max-w-[920px] mx-auto lg:mx-0 space-y-6",
+              : cn(
+                  "flex-1 min-w-0 space-y-6",
+                  WIDTH_CLASS[prefs.width],
+                  ALIGN_CLASS[prefs.align],
+                ),
           )}
         >
+          {/* Unsaved-draft recovery */}
+          {recoverable && (
+            <div className="flex flex-wrap items-center gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+              <span className="flex-1 min-w-[200px]">
+                Có bản nháp chưa lưu từ{" "}
+                <span className="font-mono">
+                  {new Date(recoverable.savedAt).toLocaleString("vi-VN")}
+                </span>
+                .
+              </span>
+              <Button type="button" size="sm" variant="outline" onClick={restoreDraft}>
+                <RotateCcwIcon className="w-3.5 h-3.5 mr-1.5" />
+                Khôi phục
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={discardDraft}>
+                Bỏ qua
+              </Button>
+            </div>
+          )}
+
           {/* Title */}
           <div className={cn("space-y-1", isSplit && "pt-8")}>
             <div className="flex justify-end font-mono text-[10px] text-muted-foreground/60 tabular-nums">
@@ -583,6 +1014,7 @@ export default function EditPostClient({
               </span>
             </div>
             <textarea
+              ref={titleRef}
               value={post.title}
               onChange={(e) => setPost({ ...post, title: e.target.value })}
               placeholder="Title"
@@ -789,8 +1221,8 @@ export default function EditPostClient({
           </div>
         )}
 
-        {/* TOC sidebar (only in normal mode) */}
-        {!isSplit && (
+        {/* TOC sidebar (only in normal mode, and only when kept on) */}
+        {!isSplit && prefs.showToc && (
           <aside className="hidden lg:flex flex-col shrink-0 self-start sticky top-20 w-[220px] max-h-[calc(100vh-6rem)]">
             <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-3 shrink-0">
               Mục lục
