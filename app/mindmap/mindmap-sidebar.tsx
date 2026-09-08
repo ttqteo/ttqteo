@@ -467,8 +467,8 @@ export function MindmapSidebar({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Mindmap?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete "
-              {mindmaps.find((m) => m.id === deleteId)?.name}" and all its
+              This will permanently delete &quot;
+              {mindmaps.find((m) => m.id === deleteId)?.name}&quot; and all its
               content. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
