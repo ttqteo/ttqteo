@@ -326,3 +326,127 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
 .reader-content .prose h4 {
   font-size: calc(var(--reader-fs, 1rem) * 1.1);
 }
+
+/* Editor body rhythm. Tailwind Typography gives paragraphs, lists, quotes and
+   rules each a different margin, so the old `prose-p:my-1` override left
+   paragraphs tight while everything around them kept the default ~1.25em and
+   the gaps read as uneven. One value for every block instead, with headings
+   keeping a deliberate lead so hierarchy still shows. */
+.editor-prose > * {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+.editor-prose > h1 {
+  margin-top: 1.6em;
+  margin-bottom: 0.5em;
+}
+.editor-prose > h2 {
+  margin-top: 1.4em;
+  margin-bottom: 0.45em;
+}
+.editor-prose > h3 {
+  margin-top: 1.2em;
+  margin-bottom: 0.4em;
+}
+.editor-prose > :first-child {
+  margin-top: 0;
+}
+.editor-prose > :last-child {
+  margin-bottom: 0;
+}
+.editor-prose li {
+  margin-top: 0.15em;
+  margin-bottom: 0.15em;
+}
+/* A list item's paragraph wrapper must not add a second gap on top of the
+   item's own. */
+.editor-prose li > p {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* Legacy YouTube embeds. Kept because published posts saved by the first cut of
+   this feature still carry this markup on the public page; the editor upgrades
+   them to `.link-card-embed` the next time such a post is opened and saved. */
+.yt-embed {
+  @apply relative my-5 w-full overflow-hidden rounded-lg border bg-black;
+  aspect-ratio: 16 / 9;
+}
+.yt-embed iframe {
+  @apply absolute inset-0 h-full w-full;
+  border: 0;
+}
+
+/* Link cards. Written into stored post HTML by the `linkCard` tiptap node and
+   re-rendered on the public page through `dangerouslySetInnerHTML`, so the
+   markup carries semantic class names only: Tailwind never scans the database
+   and would generate no CSS for utilities living solely in that string.
+   `@apply` here is fine, this file is scanned. */
+.link-card {
+  @apply my-5 flex items-stretch gap-4 rounded-lg border bg-card p-3 transition-colors;
+}
+.link-card:hover {
+  @apply bg-muted/50;
+}
+/* `.prose a` sets a colour and an underline for body links. A card is a block,
+   not a run of text, so it opts out of both in either theme. */
+.prose a.link-card,
+.dark .prose a.link-card {
+  color: inherit;
+  text-decoration: none;
+}
+.link-card-body {
+  @apply flex min-w-0 flex-1 flex-col justify-center gap-1;
+}
+.link-card-title {
+  @apply block truncate text-sm font-medium;
+}
+.link-card-desc {
+  @apply block text-xs text-muted-foreground;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.link-card-meta {
+  @apply flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground;
+}
+.link-card-url {
+  @apply truncate;
+}
+/* Scoped one level deeper than the prose image utilities, which otherwise win
+   the tie and put a border and vertical margin on both of these. */
+.link-card .link-card-favicon {
+  @apply my-0 h-4 w-4 shrink-0 rounded-sm;
+  border: 0;
+}
+.link-card .link-card-thumb {
+  @apply my-0 shrink-0 rounded-md border-0 object-cover;
+  /* Last in the markup so a screen reader hits the title first; first visually. */
+  order: -1;
+  width: 160px;
+  aspect-ratio: 16 / 10;
+}
+/* Below this the thumbnail leaves too little room for the text to be readable. */
+@media (max-width: 480px) {
+  .link-card .link-card-thumb {
+    display: none;
+  }
+}
+
+.link-card-embed {
+  @apply relative my-5 w-full overflow-hidden rounded-lg border bg-black;
+  aspect-ratio: 16 / 9;
+}
+.link-card-embed iframe {
+  @apply absolute inset-0 h-full w-full;
+  border: 0;
+}
+
+/* tiptap marks the selected atom; without this a card gives no feedback when
+   it is clicked in the editor. */
+.yt-embed.ProseMirror-selectednode,
+.link-card.ProseMirror-selectednode,
+.link-card-embed.ProseMirror-selectednode {
+  @apply ring-2 ring-ring;
+}

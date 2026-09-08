@@ -6,6 +6,9 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
 import Image from "@tiptap/extension-image";
+import { LinkCard } from "./extensions/link-card";
+import { bareUrl, type UnfurlResult } from "@/lib/unfurl";
+import { parseYoutubeUrl, youtubeEmbedSrc } from "@/lib/youtube";
 import {
   Bold,
   Italic,
@@ -27,6 +30,8 @@ import {
   Loader2,
   ExternalLink,
   Trash2,
+  Bookmark,
+  MonitorPlay,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,9 +48,55 @@ interface SimpleEditorProps {
   stickyTop?: string | null;
 }
 
+/**
+ * A pasted URL that has been turned into a plain link and is now offering to
+ * become something richer. `from`/`to` are live document positions, remapped on
+ * every transaction below so the offer stays anchored while the author types.
+ */
+type PastePrompt = {
+  url: string;
+  from: number;
+  to: number;
+  loading: boolean;
+  data: UnfurlResult | null;
+};
+
+/**
+ * What the menu can offer with no network at all. The unfurl route supplies the
+ * title, description and thumbnail, but a YouTube embed is derivable from the
+ * URL by itself, so Embed stays available even when the unfurl fails.
+ */
+function localUnfurl(url: string): UnfurlResult {
+  const video = parseYoutubeUrl(url);
+  return {
+    url,
+    title: null,
+    description: null,
+    image: null,
+    favicon: null,
+    siteName: null,
+    embedSrc: video ? youtubeEmbedSrc(video.videoId, video.start) : null,
+    embeddable: Boolean(video),
+  };
+}
+
+function withLocalFallback(url: string, data: UnfurlResult | null): UnfurlResult {
+  const local = localUnfurl(url);
+  if (!data) return local;
+  return {
+    ...data,
+    embedSrc: data.embedSrc ?? local.embedSrc,
+    embeddable: data.embeddable || local.embeddable,
+  };
+}
+
 export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEditorProps) {
   const { uploadImage, isUploading } = useImageUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pastePrompt, setPastePrompt] = useState<PastePrompt | null>(null);
+  const [promptCoords, setPromptCoords] = useState<{ top: number; left: number } | null>(
+    null,
+  );
 
   const editor = useEditor({
     extensions: [
@@ -72,6 +123,7 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
           class: "rounded-lg border my-4",
         },
       }),
+      LinkCard,
     ],
     content: content || "",
     immediatelyRender: false,
@@ -80,8 +132,42 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
     },
     editorProps: {
       attributes: {
+        // Block spacing lives in `.editor-prose` (globals.css) rather than in
+        // `prose-*` variants: overriding only paragraphs here left every other
+        // block on Tailwind Typography's own margin, which is what made the
+        // gaps look uneven. Sizes and weights stay as utilities.
         class:
-          "prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[500px] p-4 text-base prose-p:my-1 leading-normal prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-h1:font-bold prose-h2:font-semibold prose-h3:font-semibold prose-h1:mt-6 prose-h1:mb-3 prose-h2:mt-5 prose-h2:mb-2 prose-h3:mt-4 prose-h3:mb-2",
+          "editor-prose prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[500px] p-4 text-base leading-normal prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-h1:font-bold prose-h2:font-semibold prose-h3:font-semibold",
+      },
+      handlePaste: (view, event) => {
+        const url = bareUrl(event.clipboardData?.getData("text/plain"));
+        if (!url) return false;
+
+        // Only a URL pasted alone on an empty line becomes a candidate for a
+        // card. Dropping one into the middle of a sentence should stay a link
+        // in that sentence, and inside a code block the author wants the text.
+        const { $from, empty } = view.state.selection;
+        if (!empty) return false;
+        if (!$from.parent.isTextblock || $from.parent.type.spec.code) return false;
+        if ($from.parent.textContent.trim() !== "") return false;
+
+        // Insert the plain link first, so nothing is lost if the unfurl fails
+        // or the author walks away mid-decision.
+        const from = $from.pos;
+        const linkMark = view.state.schema.marks.link;
+        view.dispatch(
+          view.state.tr
+            .replaceSelectionWith(
+              view.state.schema.text(
+                url,
+                linkMark ? [linkMark.create({ href: url })] : undefined,
+              ),
+              false,
+            )
+            .scrollIntoView(),
+        );
+        setPastePrompt({ url, from, to: from + url.length, loading: true, data: null });
+        return true;
       },
     },
   });
@@ -93,9 +179,115 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
     }
   }, [content, editor]);
 
+  // Keep the offer anchored to its link while the author keeps writing. Without
+  // remapping, typing above the link would leave the menu pointing at whatever
+  // text has drifted into those positions.
+  useEffect(() => {
+    if (!editor) return;
+    const onTransaction = ({ transaction }: { transaction: { docChanged: boolean; mapping: { map: (pos: number, bias?: number) => number } } }) => {
+      if (!transaction.docChanged) return;
+      setPastePrompt((prev) => {
+        if (!prev) return prev;
+        const from = transaction.mapping.map(prev.from, 1);
+        const to = transaction.mapping.map(prev.to, -1);
+        // Typed over or deleted: the offer no longer has a subject.
+        return to <= from ? null : { ...prev, from, to };
+      });
+    };
+    editor.on("transaction", onTransaction);
+    return () => {
+      editor.off("transaction", onTransaction);
+    };
+  }, [editor]);
+
+  // Fetch the metadata. A failure is not an error state: the menu falls back to
+  // what can be derived locally and a bookmark with only a URL is still a valid
+  // card, so the author is never blocked on the network.
+  useEffect(() => {
+    if (!pastePrompt?.loading) return;
+    const url = pastePrompt.url;
+    let cancelled = false;
+
+    void (async () => {
+      let data: UnfurlResult | null = null;
+      try {
+        const res = await fetch("/api/admin/unfurl", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        if (res.ok) data = (await res.json()) as UnfurlResult;
+      } catch {
+        /* fall through to the local fallback */
+      }
+      if (cancelled) return;
+      setPastePrompt((prev) =>
+        prev && prev.url === url
+          ? { ...prev, loading: false, data: withLocalFallback(url, data) }
+          : prev,
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pastePrompt?.loading, pastePrompt?.url]);
+
+  // Park the menu under the link it belongs to. Viewport coordinates, so the
+  // menu is positioned fixed and escapes the editor's own scroll container.
+  useEffect(() => {
+    if (!editor || !pastePrompt) {
+      setPromptCoords(null);
+      return;
+    }
+    try {
+      const start = editor.view.coordsAtPos(pastePrompt.from);
+      const end = editor.view.coordsAtPos(pastePrompt.to);
+      setPromptCoords({ top: end.bottom + 6, left: start.left });
+    } catch {
+      setPromptCoords(null);
+    }
+  }, [editor, pastePrompt]);
+
+  useEffect(() => {
+    if (!pastePrompt) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPastePrompt(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [pastePrompt]);
+
   if (!editor) {
     return <div className="min-h-[500px] animate-pulse bg-muted rounded" />;
   }
+
+  /**
+   * Swap the plain link for a card. One chain, so a single undo puts the link
+   * back exactly as it was.
+   */
+  const applyLinkCard = (mode: "bookmark" | "embed") => {
+    if (!pastePrompt) return;
+    const data = pastePrompt.data;
+    editor
+      .chain()
+      .focus()
+      .deleteRange({ from: pastePrompt.from, to: pastePrompt.to })
+      .insertContentAt(pastePrompt.from, {
+        type: "linkCard",
+        attrs: {
+          url: pastePrompt.url,
+          mode,
+          title: data?.title ?? null,
+          description: data?.description ?? null,
+          image: data?.image ?? null,
+          favicon: data?.favicon ?? null,
+          embedSrc: data?.embedSrc ?? null,
+        },
+      })
+      .run();
+    setPastePrompt(null);
+  };
 
   const addLink = () => {
     const previous = editor.getAttributes("link").href as string | undefined;
@@ -332,6 +524,62 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
 
       {/* Editor */}
       <EditorContent editor={editor} />
+
+      {/* Paste offer. The link is already in the document; this only asks
+          whether it should become something more. */}
+      {pastePrompt && promptCoords && (
+        <div
+          style={{ top: promptCoords.top, left: promptCoords.left }}
+          className="fixed z-[60] flex items-center gap-1 rounded-md border bg-popover p-1 shadow-md"
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          {pastePrompt.loading ? (
+            <span className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              đang đọc link…
+            </span>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setPastePrompt(null)}
+              >
+                <Link2 className="w-3.5 h-3.5 mr-1.5" />
+                Link thường
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => applyLinkCard("bookmark")}
+              >
+                <Bookmark className="w-3.5 h-3.5 mr-1.5" />
+                Bookmark
+              </Button>
+              {/* Embed is offered only where an iframe is known to render.
+                  Most of the web sends X-Frame-Options: DENY, which fails as a
+                  silent blank box — a button that quietly produces nothing is
+                  worse than no button. */}
+              {pastePrompt.data?.embeddable && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => applyLinkCard("embed")}
+                >
+                  <MonitorPlay className="w-3.5 h-3.5 mr-1.5" />
+                  Embed
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       <LinkBubble editor={editor} />
     </div>
