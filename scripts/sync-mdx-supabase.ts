@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import { createClient } from "@supabase/supabase-js";
 import "dotenv/config";
 import { syncMdxToSupabase } from "../lib/sync-mdx-supabase";

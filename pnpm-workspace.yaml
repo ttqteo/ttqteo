@@ -1,0 +1,40 @@
+# pnpm 10 moved settings out of the "pnpm" field in package.json and into this
+# file. The postcss override below had silently stopped applying because of that
+# move, which is why it is still here despite predating the rest.
+#
+# Each key is scoped to the vulnerable range rather than pinning one version, so
+# a package already on a patched release is left alone and the majors in use do
+# not shift underneath us.
+overrides:
+  # https://github.com/ttqteo/ttqteo/security/dependabot
+  'postcss@<8.5.18': '>=8.5.18'
+  # Keyed by major rather than by the vulnerable range: the left side is matched
+  # against a dependant's *specifier*, and a spec like ^5.0.0 is not a subset of
+  # <5.0.9, so the range form silently failed to apply to these two. The right
+  # side stays inside the same major so no consumer gets a breaking bump.
+  'brace-expansion@1': '^1.1.18'
+  'brace-expansion@5': '^5.0.9'
+  'js-yaml@3': '^3.15.1'
+  'js-yaml@4': '^4.3.1'
+  'dompurify@<3.4.13': '>=3.4.13'
+  'nanoid@<3.3.18': '>=3.3.18'
+  'ws@<8.21.0': '>=8.21.0'
+  'sharp@<0.35.0': '>=0.35.0'
+  'esbuild@<0.28.1': '>=0.28.1'
+  'vite@<8.0.16': '>=8.0.16'
+  'postcss-selector-parser@<6.1.3': '>=6.1.3'
+
+  # Not security fixes: deduping. tiptap and prosemirror-commands each pull
+  # their own prosemirror-model and prosemirror-view, and pnpm's strict layout
+  # then installs two copies where the previous flat node_modules had hoisted
+  # one. Two copies break `instanceof` across the boundary and make the two sets
+  # of types mutually unassignable. Both pins stay inside the same minor.
+  'prosemirror-model': '^1.25.11'
+  'prosemirror-view': '^1.42.3'
+
+# Install scripts are blocked by default from pnpm 10 on. Both of these fetch or
+# compile a native binary and do not work without running.
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+
