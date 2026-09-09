@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import CodeBlock from "@tiptap/extension-code-block";
 import {
   NodeViewContent,
@@ -54,6 +54,24 @@ function CodeBlockView({ node, updateAttributes, editor }: NodeViewProps) {
   const language = (node.attrs.language as string | null) ?? "";
   const isMermaid = language === MERMAID_LANGUAGE;
   const [preview, setPreview] = useState(false);
+  const [previewSource, setPreviewSource] = useState(node.textContent);
+
+  useEffect(() => {
+    if (!preview) return;
+    // Node view được update lại ở mỗi lần gõ, nên nếu đưa thẳng
+    // `node.textContent` xuống thì mermaid parse lại từng ký tự, và phần lớn
+    // trạng thái giữa chừng không parse được nên sơ đồ nhấp nháy qua lại với
+    // dòng báo lỗi. 300ms là con số mermaid-renderer.tsx đã dùng cho cùng lý do.
+    const id = window.setTimeout(() => setPreviewSource(node.textContent), 300);
+    return () => window.clearTimeout(id);
+  }, [node.textContent, preview]);
+
+  const togglePreview = () => {
+    // Lúc bật lên thì lấy nội dung hiện tại ngay: chờ hết 300ms, hoặc tệ hơn
+    // là hiện lại bản source từ lần mở trước, đều đọc như bị treo.
+    if (!preview) setPreviewSource(node.textContent);
+    setPreview((on) => !on);
+  };
 
   return (
     <NodeViewWrapper className="code-block-shell">
@@ -64,7 +82,7 @@ function CodeBlockView({ node, updateAttributes, editor }: NodeViewProps) {
           <button
             type="button"
             className="code-block-preview-toggle"
-            onClick={() => setPreview((on) => !on)}
+            onClick={togglePreview}
           >
             {preview ? "ẩn sơ đồ" : "xem sơ đồ"}
           </button>
@@ -91,10 +109,10 @@ function CodeBlockView({ node, updateAttributes, editor }: NodeViewProps) {
       </pre>
       {/* Sơ đồ nằm dưới code chứ không thay chỗ nó: ProseMirror cần contentDOM
           ở nguyên trong document, giấu đi là mời lỗi toạ độ con trỏ. Vẽ theo
-          `node.textContent` nên tắt rồi bật lại là thấy bản mới nhất. */}
+          bản source đã hoãn ở trên, nên nó tự bắt kịp khi ngừng gõ. */}
       {isMermaid && preview && (
         <div className="code-block-preview" contentEditable={false} suppressContentEditableWarning>
-          <MermaidDiagram source={node.textContent} />
+          <MermaidDiagram source={previewSource} />
         </div>
       )}
     </NodeViewWrapper>

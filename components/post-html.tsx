@@ -3,12 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MermaidDiagram } from "@/components/mermaid-diagram";
-import { isMermaidPre } from "@/lib/mermaid";
+import { isMermaidPre, languageOf } from "@/lib/mermaid";
 
 const COPY = "copy";
 const COPIED = "đã copy";
 const FAILED = "lỗi";
-const LANGUAGE_PREFIX = "language-";
 
 type Slot = { key: string; container: HTMLElement; source: string };
 
@@ -53,10 +52,7 @@ export function PostHtml({ html }: { html: string }) {
       }
 
       const code = pre.querySelector("code");
-      const language =
-        Array.from(code?.classList ?? [])
-          .find((name) => name.startsWith(LANGUAGE_PREFIX))
-          ?.slice(LANGUAGE_PREFIX.length) ?? "";
+      const language = languageOf(pre) ?? "";
 
       const shell = document.createElement("div");
       shell.className = "code-shell";
@@ -72,31 +68,37 @@ export function PostHtml({ html }: { html: string }) {
       button.type = "button";
       button.className = "code-shell-copy";
       button.textContent = COPY;
+
+      let timer: number | null = null;
+      const reset = () => {
+        // Bấm lần thứ hai trong 1.5s mà chỉ đặt thêm một hẹn giờ thì cái cũ
+        // vẫn chạy và trả nhãn về "copy" sớm hơn hạn của lần bấm mới.
+        if (timer !== null) window.clearTimeout(timer);
+        timer = window.setTimeout(() => {
+          button.textContent = COPY;
+        }, 1500);
+        timers.push(timer);
+      };
+
       button.addEventListener("click", () => {
         const text = code?.textContent ?? pre.textContent ?? "";
         // Older Safari and any non-secure origin have no clipboard API; saying
         // so beats a button that looks like it worked.
         const done = navigator.clipboard?.writeText(text);
         if (!done) {
+          // Nhánh này cũng phải hẹn giờ, nếu không nút kẹt chữ "lỗi" vĩnh viễn.
           button.textContent = FAILED;
+          reset();
           return;
         }
         done.then(
           () => {
             button.textContent = COPIED;
-            timers.push(
-              window.setTimeout(() => {
-                button.textContent = COPY;
-              }, 1500),
-            );
+            reset();
           },
           () => {
             button.textContent = FAILED;
-            timers.push(
-              window.setTimeout(() => {
-                button.textContent = COPY;
-              }, 1500),
-            );
+            reset();
           },
         );
       });

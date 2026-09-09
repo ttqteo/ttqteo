@@ -50,19 +50,28 @@ export function MermaidDiagram({ source }: { source: string }) {
     };
   }, []);
 
+  const reset = () => {
+    // Bấm lần thứ hai trong 1.5s mà chỉ ghi đè `timer.current` thì hẹn giờ cũ
+    // vẫn chạy và trả nhãn về "copy" sớm hơn hạn của lần bấm mới.
+    if (timer.current) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setCopyLabel(COPY), 1500);
+  };
+
   const copy = () => {
     // Safari cũ và mọi origin không bảo mật đều không có clipboard API; nói
     // thẳng ra hơn là một cái nút trông như đã chạy.
     const done = navigator.clipboard?.writeText(source);
     if (!done) {
+      // Nhánh này cũng phải hẹn giờ, nếu không nút đứng nguyên chữ "lỗi" mãi.
       setCopyLabel(FAILED);
+      reset();
       return;
     }
     done.then(
       () => setCopyLabel(COPIED),
       () => setCopyLabel(FAILED),
     );
-    timer.current = window.setTimeout(() => setCopyLabel(COPY), 1500);
+    reset();
   };
 
   const asSource = showSource || error !== null;

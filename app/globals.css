@@ -556,6 +556,14 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
 .callout > :last-child {
   @apply mb-0;
 }
+/* Trong khung soạn thảo, nội dung nằm thêm một lớp `.callout-body`, nên quy
+   tắc bỏ margin ở trên không với tới đoạn văn. Bài đã lưu không có lớp này. */
+.callout-body > :first-child {
+  @apply mt-0;
+}
+.callout-body > :last-child {
+  @apply mb-0;
+}
 
 .callout-note {
   @apply border-border bg-muted/40;
