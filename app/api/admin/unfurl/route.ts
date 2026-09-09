@@ -64,18 +64,33 @@ async function fetchGuarded(rawUrl: string, accept: string): Promise<Response> {
   throw new Error("too many redirects");
 }
 
-/** Reads at most MAX_BYTES, then drops the connection. */
-async function readCapped(res: Response): Promise<string> {
+/**
+ * Reads at most MAX_BYTES, then drops the connection.
+ *
+ * `stopAfter` ends the read as soon as that marker has been seen. Everything
+ * this route wants from a page lives in `<head>`, and sites like YouTube ship
+ * hundreds of kilobytes of body after it — reading to the cap made the paste
+ * menu wait seconds for bytes that were then thrown away.
+ */
+async function readCapped(res: Response, stopAfter?: string): Promise<string> {
   const reader = res.body?.getReader();
   if (!reader) return "";
   const chunks: Uint8Array[] = [];
   let size = 0;
+  // Only the tail of the previous chunk can carry a marker split across a
+  // boundary, so this scans a small trailing window rather than the whole body.
+  const probe = stopAfter ? new TextDecoder("utf-8") : null;
+  let tail = "";
   try {
     while (size < MAX_BYTES) {
       const { done, value } = await reader.read();
       if (done) break;
       chunks.push(value);
       size += value.length;
+      if (probe && stopAfter) {
+        tail = (tail + probe.decode(value, { stream: true })).slice(-8192);
+        if (tail.toLowerCase().includes(stopAfter)) break;
+      }
     }
   } finally {
     await reader.cancel().catch(() => {});
@@ -102,7 +117,7 @@ async function fetchPage(
       await res.body?.cancel().catch(() => {});
       return null;
     }
-    return { html: await readCapped(res), finalUrl: res.url || url };
+    return { html: await readCapped(res, "</head>"), finalUrl: res.url || url };
   } catch {
     return null;
   }
