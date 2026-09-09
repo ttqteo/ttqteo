@@ -544,6 +544,11 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   @apply absolute left-4 top-3 text-base leading-6;
   content: "";
 }
+/* Tiêu đề của callout trong bài MDX. Bài soạn bằng editor không có dòng
+   này, nên quy tắc nằm riêng thay vì gắn vào `.callout > :first-child`. */
+.callout-title {
+  @apply mb-1 font-semibold;
+}
 /* Đoạn đầu và cuối bỏ margin, nếu không prose đẩy chữ lệch khỏi khung. */
 .callout > :first-child {
   @apply mt-0;
