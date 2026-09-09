@@ -1,15 +1,10 @@
-import { Button } from "@/components/ui/button";
-import { parseQuery } from "@/lib/admin-posts";
+import { parseQuery, type AdminPostsQuery } from "@/lib/admin-posts";
 import { getUser, isAdmin } from "@/lib/supabase-server";
-import { PlusIcon } from "lucide-react";
-import Link from "next/link";
 import { Suspense } from "react";
-import { AdminNavProvider } from "./admin-nav";
-import { AdminSidebar, AdminSidebarSkeleton } from "./admin-sidebar";
 import { LoginButton } from "./login-button";
-import { PostsSection } from "./posts-section";
-import { PostsSectionSkeleton } from "./posts-skeleton";
-import { SearchInput } from "./search-input";
+import { PostsBrowser } from "./posts-browser";
+import { loadAdminPosts } from "./posts-data";
+import { PostsBrowserSkeleton } from "./posts-skeleton";
 
 export const dynamic = "force-dynamic";
 
@@ -55,34 +50,20 @@ export default async function AdminPage({ searchParams }: PageProps) {
   return (
     // Extra top padding because this page hides the site navbar: without it the
     // heading starts 36px under the toolbar, tighter than every other page.
-    <div className="max-w-6xl mx-auto pt-12 pb-8 px-4 space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">posts</h1>
-        {/* No type picker here: the editor's own Type select covers all four
-            types, so choosing one up front only added a click. */}
-        <Button asChild>
-          <Link href="/admin/edit/new">
-            <PlusIcon className="w-4 h-4 mr-2" />
-            New
-          </Link>
-        </Button>
-      </div>
-
-      <AdminNavProvider>
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* The sidebar keeps its counters on screen while a filter loads;
-              only the table swaps for a skeleton. */}
-          <Suspense fallback={<AdminSidebarSkeleton />}>
-            <AdminSidebar query={query} />
-          </Suspense>
-          <div className="min-w-0 flex-1 space-y-4">
-            <SearchInput query={query} />
-            <Suspense fallback={<PostsSectionSkeleton />}>
-              <PostsSection query={query} />
-            </Suspense>
-          </div>
-        </div>
-      </AdminNavProvider>
+    <div className="max-w-6xl mx-auto pt-12 pb-8 px-2 sm:px-4 space-y-6">
+      <Suspense fallback={<PostsBrowserSkeleton />}>
+        <PostsBrowserLoader query={query} />
+      </Suspense>
     </div>
   );
+}
+
+/**
+ * Reads every post once and hands the whole set to the client, which then does
+ * its own filtering. The counters needed the full list anyway, so this is the
+ * same query the page always ran — it just stops running again per filter.
+ */
+async function PostsBrowserLoader({ query }: { query: AdminPostsQuery }) {
+  const { active, trash } = await loadAdminPosts();
+  return <PostsBrowser active={active} trash={trash} initialQuery={query} />;
 }

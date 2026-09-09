@@ -1,26 +1,23 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
-import { buildQueryString, type AdminPostsQuery } from "@/lib/admin-posts";
 import { SearchIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useAdminNav } from "./admin-nav";
-
-interface SearchInputProps {
-  query: AdminPostsQuery;
-}
+import { usePostsQuery } from "./posts-query";
 
 /**
- * Search lives in the URL like every other filter. `replace` rather than `push`
- * keeps one back-step from unwinding the search a character at a time.
+ * Search still lands in the URL like every other filter, but it filters the
+ * list already in memory, so the debounce is only there to keep the address bar
+ * from gaining an entry per keystroke. `replace` keeps one back-step from
+ * unwinding the term a character at a time.
  */
-export function SearchInput({ query }: SearchInputProps) {
-  const { navigate } = useAdminNav();
+export function SearchInput() {
+  const { query, setQuery } = usePostsQuery();
   const [value, setValue] = useState(query.q);
   const latest = useRef(query.q);
 
-  // Adopt the URL's term when it changes elsewhere (a sidebar link, back button),
-  // but never while the user is mid-edit with a different value pending.
+  // Adopt the query's term when it changes elsewhere (a filter, the back
+  // button), but never while the user is mid-edit with a different value.
   useEffect(() => {
     if (query.q !== latest.current) {
       latest.current = query.q;
@@ -32,12 +29,10 @@ export function SearchInput({ query }: SearchInputProps) {
     if (value === latest.current) return;
     const timer = setTimeout(() => {
       latest.current = value;
-      navigate(`/admin${buildQueryString({ ...query, q: value })}`, {
-        replace: true,
-      });
-    }, 250);
+      setQuery({ q: value }, { replace: true });
+    }, 200);
     return () => clearTimeout(timer);
-  }, [value, query, navigate]);
+  }, [value, setQuery]);
 
   return (
     <div className="relative w-full sm:max-w-xs">
