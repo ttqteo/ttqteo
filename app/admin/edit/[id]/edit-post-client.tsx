@@ -96,7 +96,7 @@ const SimpleEditor = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full min-h-[500px] flex items-center justify-center text-muted-foreground text-sm font-mono">
+      <div className="w-full min-h-[max(500px,60vh)] flex items-center justify-center text-muted-foreground text-sm font-mono">
         loading editor...
       </div>
     ),
@@ -632,26 +632,12 @@ export default function EditPostClient({
       >
         <div
           className={cn(
-            "relative px-4 py-3 flex items-center justify-between",
+            "px-4 py-3 flex items-center justify-between",
             isSplit ? "w-full" : "max-w-[1280px] mx-auto w-full",
           )}
         >
-          {/* Centred absolutely rather than placed in the left group: the title
-              then fades in and out without shifting the save status or the
-              buttons on either side. */}
-          <div className="pointer-events-none absolute inset-0 hidden items-center justify-center px-72 md:flex">
-            <span
-              className={cn(
-                "truncate font-serif text-sm font-semibold transition-opacity duration-200 motion-reduce:transition-none",
-                titleInHeader && post.title ? "opacity-100" : "opacity-0",
-              )}
-            >
-              {post.title}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" asChild>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <Button variant="ghost" size="icon" asChild className="shrink-0">
               <Link href="/admin">
                 <ArrowLeftIcon className="w-5 h-5" />
               </Link>
@@ -683,9 +669,23 @@ export default function EditPostClient({
                 <span className="hidden md:inline">{saveStatusLabel}</span>
               </div>
             )}
+
+            {/* Flows at the end of the left group rather than being centred in
+                the header. Centring meant reserving a fixed gutter each side,
+                and the write/preview toggle pushed the right-hand buttons past
+                it, so the title ran underneath them. Last in the group also
+                keeps the save status still while the title fades in. */}
+            <span
+              className={cn(
+                "hidden min-w-0 truncate font-serif text-sm font-semibold transition-opacity duration-200 motion-reduce:transition-none md:block",
+                titleInHeader && post.title ? "opacity-100" : "opacity-0",
+              )}
+            >
+              {post.title}
+            </span>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {/* Write / preview. The labels collapse to icons on narrow screens,
                 where this has to share the header with delete, save and
                 publish. */}

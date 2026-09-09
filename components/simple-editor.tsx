@@ -148,7 +148,7 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
         // block on Tailwind Typography's own margin, which is what made the
         // gaps look uneven. Sizes and weights stay as utilities.
         class:
-          "editor-prose prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[500px] p-4 text-base leading-normal prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-h1:font-bold prose-h2:font-semibold prose-h3:font-semibold",
+          "editor-prose prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[max(500px,60vh)] p-4 text-base leading-normal prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-h1:font-bold prose-h2:font-semibold prose-h3:font-semibold",
       },
       handlePaste: (view, event) => {
         const url = bareUrl(event.clipboardData?.getData("text/plain"));
@@ -279,7 +279,7 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
   }, [pastePrompt]);
 
   if (!editor) {
-    return <div className="min-h-[500px] animate-pulse bg-muted rounded" />;
+    return <div className="min-h-[max(500px,60vh)] animate-pulse bg-muted rounded" />;
   }
 
   /**
