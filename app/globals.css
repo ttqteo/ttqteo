@@ -624,3 +624,14 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
 .editor-html :is(ul, ol) + :is(ul, ol) {
   margin-top: 0.2em;
 }
+
+/* Tailwind Typography wraps inline code in literal backtick characters through
+   ::before / ::after. `<Typography>` carries `prose-code:before:content-none`
+   to cancel that, but the pair of variants does not compose and the rule never
+   reaches the stylesheet — the plugin's own `content: "`"` is in the build and
+   nothing overrides it, so every inline `code` has been rendering with visible
+   backticks. The plugin already does exactly this for code inside <pre>. */
+.prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *))::before,
+.prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *))::after {
+  content: none;
+}

@@ -12,7 +12,15 @@ export type EditorPrefs = {
   align: EditorAlign;
 };
 
-export const EDITOR_PREFS_KEY = "ttqteo:editor-prefs";
+/**
+ * Versioned so a changed default actually reaches an editor that already has
+ * prefs stored. Reading the old key would keep handing back the previous
+ * layout forever, and the defaults below would only ever apply to a browser
+ * that had never opened the editor. Bump this when a default changes; the old
+ * key is abandoned rather than migrated, since these are three cheap choices
+ * to make again.
+ */
+export const EDITOR_PREFS_KEY = "ttqteo:editor-prefs:v2";
 
 export const DEFAULT_EDITOR_PREFS: EditorPrefs = {
   // Off by default: while writing, the outline is a thing you consult

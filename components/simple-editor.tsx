@@ -108,6 +108,22 @@ function withLocalFallback(url: string, data: UnfurlResult | null): UnfurlResult
   };
 }
 
+/**
+ * The list the caret is actually in, meaning the innermost one.
+ *
+ * `editor.isActive("bulletList")` answers "is there a bullet list anywhere
+ * above me", so a bullet nested under a numbered item lit both list buttons at
+ * once and the toolbar looked like two mutually exclusive toggles were on.
+ */
+function innermostList(editor: Editor): "bulletList" | "orderedList" | null {
+  const { $from } = editor.state.selection;
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const name = $from.node(depth).type.name;
+    if (name === "bulletList" || name === "orderedList") return name;
+  }
+  return null;
+}
+
 /** What the style menu shows for whatever the caret is currently in. */
 function blockStyleLabel(editor: Editor): string {
   for (const level of [1, 2, 3] as const) {
@@ -480,14 +496,14 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
         {/* Lists */}
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleBulletList().run()}
-          isActive={editor.isActive("bulletList")}
+          isActive={innermostList(editor) === "bulletList"}
           tooltip="Bullet List"
         >
           <List className="w-4 h-4" />
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          isActive={editor.isActive("orderedList")}
+          isActive={innermostList(editor) === "orderedList"}
           tooltip="Numbered List"
         >
           <ListOrdered className="w-4 h-4" />
