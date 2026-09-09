@@ -646,7 +646,7 @@ export default function EditPostClient({
         <div
           className={cn(
             "px-4 py-3 flex items-center justify-between",
-            isSplit ? "w-full" : "max-w-[1280px] mx-auto w-full",
+            isSplit ? "w-full" : "w-full",
           )}
         >
           <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -1033,7 +1033,7 @@ export default function EditPostClient({
         className={
           isSplit
             ? "relative flex flex-1 overflow-hidden"
-            : "py-4 sm:py-8 mx-auto max-w-[1280px] w-full px-4 flex gap-6 lg:gap-10"
+            : "py-4 sm:py-8 mx-auto w-full px-4 flex gap-6 lg:gap-10"
         }
       >
         {/* Editor column */}

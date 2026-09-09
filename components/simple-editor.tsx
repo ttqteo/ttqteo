@@ -30,6 +30,8 @@ import {
   IndentIncrease,
   IndentDecrease,
   Plus,
+  ChevronDown,
+  Pilcrow,
   Undo,
   Redo,
   Link2,
@@ -104,6 +106,14 @@ function withLocalFallback(url: string, data: UnfurlResult | null): UnfurlResult
     embedSrc: data.embedSrc ?? local.embedSrc,
     embeddable: data.embeddable || local.embeddable,
   };
+}
+
+/** What the style menu shows for whatever the caret is currently in. */
+function blockStyleLabel(editor: Editor): string {
+  for (const level of [1, 2, 3] as const) {
+    if (editor.isActive("heading", { level })) return `Tiêu đề ${level}`;
+  }
+  return "Đoạn văn";
 }
 
 export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEditorProps) {
@@ -416,34 +426,54 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
 
         <div className="w-px h-6 bg-border mx-1" />
 
-        {/* Headings */}
-        <ToolbarButton
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 1 }).run()
-          }
-          isActive={editor.isActive("heading", { level: 1 })}
-          tooltip="Heading 1"
-        >
-          <Heading1 className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 2 }).run()
-          }
-          isActive={editor.isActive("heading", { level: 2 })}
-          tooltip="Heading 2"
-        >
-          <Heading2 className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 3 }).run()
-          }
-          isActive={editor.isActive("heading", { level: 3 })}
-          tooltip="Heading 3"
-        >
-          <Heading3 className="w-4 h-4" />
-        </ToolbarButton>
+        {/* Block style in one control, the way Substack keeps its Style menu.
+            Four buttons that are mutually exclusive read better as a menu
+            naming the current one than as four toggles you have to inspect. */}
+        <DropdownMenu>
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 gap-1 text-xs font-normal"
+                >
+                  {blockStyleLabel(editor)}
+                  <ChevronDown className="w-3 h-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={5}>
+              Kiểu khối
+            </TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="start" className="w-44">
+            <DropdownMenuItem
+              onSelect={() => editor.chain().focus().setParagraph().run()}
+            >
+              <Pilcrow className="w-4 h-4 mr-2" />
+              Đoạn văn
+            </DropdownMenuItem>
+            {([1, 2, 3] as const).map((level) => (
+              <DropdownMenuItem
+                key={level}
+                onSelect={() =>
+                  editor.chain().focus().toggleHeading({ level }).run()
+                }
+              >
+                {level === 1 ? (
+                  <Heading1 className="w-4 h-4 mr-2" />
+                ) : level === 2 ? (
+                  <Heading2 className="w-4 h-4 mr-2" />
+                ) : (
+                  <Heading3 className="w-4 h-4 mr-2" />
+                )}
+                Tiêu đề {level}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <div className="w-px h-6 bg-border mx-1" />
 

@@ -15,7 +15,10 @@ export type EditorPrefs = {
 export const EDITOR_PREFS_KEY = "ttqteo:editor-prefs";
 
 export const DEFAULT_EDITOR_PREFS: EditorPrefs = {
-  showToc: true,
+  // Off by default: while writing, the outline is a thing you consult
+  // occasionally, not something worth a permanent column. The layout popover
+  // brings it back.
+  showToc: false,
   width: "narrow",
   align: "center",
 };
