@@ -53,13 +53,16 @@ import {
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { PostBody } from "@/components/post-body";
 import {
   AlignCenterIcon,
   AlignLeftIcon,
   ArrowLeftIcon,
   ArrowUpIcon,
+  EyeIcon,
   Loader2Icon,
   LogOutIcon,
+  PencilIcon,
   PenLineIcon,
   RotateCcwIcon,
   SaveIcon,
@@ -199,6 +202,12 @@ export default function EditPostClient({
   const postId = initialData?.id ?? null;
   const [saveState, setSaveState] = useState<SaveState>("idle");
 
+  // Preview renders through the same PostBody the public page uses, so what is
+  // on screen here is what a reader gets rather than an approximation of it.
+  // Deliberately not persisted: preview is somewhere you visit and come back
+  // from, and reopening a post into it would hide the editor for no reason.
+  const [mode, setMode] = useState<"write" | "preview">("write");
+
   // What the server is known to hold. Autosave compares against this so simply
   // opening a post — or a slug the editor regenerated on its own — never counts
   // as an edit worth writing.
@@ -284,11 +293,15 @@ export default function EditPostClient({
 
   // Hand the title over to the header once it scrolls away, so there is always
   // something naming the post on screen.
-  const titleRef = useRef<HTMLTextAreaElement | null>(null);
+  // Both titles are in the DOM at once, so the handover watches whichever one
+  // the current mode is actually showing.
+  const writeTitleRef = useRef<HTMLTextAreaElement | null>(null);
+  const previewTitleRef = useRef<HTMLHeadingElement | null>(null);
   const [titleInHeader, setTitleInHeader] = useState(false);
 
   useEffect(() => {
-    const el = titleRef.current;
+    const el =
+      mode === "preview" ? previewTitleRef.current : writeTitleRef.current;
     if (!el) return;
     const col = editorColumnRef.current;
     // Split mode scrolls inside the editor column; normal mode scrolls the
@@ -307,7 +320,7 @@ export default function EditPostClient({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [showTldraw, panelMounted]);
+  }, [showTldraw, panelMounted, mode]);
 
   useEffect(() => {
     loadingActionRef.current = loadingAction;
@@ -592,6 +605,19 @@ export default function EditPostClient({
   // editor would snap back to full width while the board is still on screen.
   const isSplit = showTldraw || panelMounted;
 
+  // One string for both the visible label and the title attribute, so the dot
+  // still explains itself on a phone where the label is hidden.
+  const saveStatusLabel =
+    saveState === "saving"
+      ? "đang lưu…"
+      : saveState === "dirty"
+        ? "chưa lưu"
+        : saveState === "error"
+          ? "lưu server lỗi, đã giữ bản nháp trong máy"
+          : `${isNew || post.is_published ? "nháp trong máy" : "đã lưu"}${
+              lastSaved ? ` ${lastSaved.toLocaleTimeString("vi-VN")}` : ""
+            }`;
+
   return (
     <div
       className={
@@ -632,45 +658,69 @@ export default function EditPostClient({
             </Button>
             {/* Autosave status. Published posts autosave locally only, so the
                 label says where the copy actually went. */}
+            {/* The dot stays at every width; only its label folds away. On a
+                phone the header also has to hold delete, save and publish, and
+                the error text in particular is long enough to push them off. */}
             {saveState !== "idle" && (
-              <div className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
+              <div
+                className="flex shrink-0 items-center gap-1.5 font-mono text-xs text-muted-foreground"
+                title={saveStatusLabel}
+              >
                 {saveState === "saving" ? (
-                  <>
-                    <Loader2Icon className="w-3 h-3 animate-spin" />
-                    <span>đang lưu…</span>
-                  </>
-                ) : saveState === "dirty" ? (
-                  <>
-                    <span className="w-2 h-2 rounded-full bg-amber-500" />
-                    <span>chưa lưu</span>
-                  </>
-                ) : saveState === "error" ? (
-                  <>
-                    <span className="w-2 h-2 rounded-full bg-destructive" />
-                    <span>lưu server lỗi, đã giữ bản nháp trong máy</span>
-                  </>
+                  <Loader2Icon className="w-3 h-3 animate-spin" />
                 ) : (
-                  <>
-                    <span className="w-2 h-2 rounded-full bg-green-500" />
-                    <span>
-                      {isNew || post.is_published ? "nháp trong máy" : "đã lưu"}
-                      {lastSaved
-                        ? ` ${lastSaved.toLocaleTimeString("vi-VN")}`
-                        : ""}
-                    </span>
-                  </>
+                  <span
+                    className={cn(
+                      "w-2 h-2 rounded-full",
+                      saveState === "dirty"
+                        ? "bg-amber-500"
+                        : saveState === "error"
+                          ? "bg-destructive"
+                          : "bg-green-500",
+                    )}
+                  />
                 )}
+                <span className="hidden md:inline">{saveStatusLabel}</span>
               </div>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Write / preview. The labels collapse to icons on narrow screens,
+                where this has to share the header with delete, save and
+                publish. */}
+            <div className="flex items-center rounded-md border p-0.5">
+              <Button
+                type="button"
+                variant={mode === "write" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 px-2 text-xs"
+                aria-pressed={mode === "write"}
+                onClick={() => setMode("write")}
+              >
+                <PencilIcon className="w-3.5 h-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">Viết</span>
+              </Button>
+              <Button
+                type="button"
+                variant={mode === "preview" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 px-2 text-xs"
+                aria-pressed={mode === "preview"}
+                onClick={() => setMode("preview")}
+              >
+                <EyeIcon className="w-3.5 h-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">Xem trước</span>
+              </Button>
+            </div>
+
             {!isNew && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
                     variant="outline"
                     size="icon"
+                    className="h-9 w-9 shrink-0"
                     disabled={!!loadingAction}
                   >
                     {loadingAction === "delete" ? (
@@ -705,55 +755,58 @@ export default function EditPostClient({
               <>
                 <Button
                   variant="outline"
+                  className="px-2.5 sm:px-4"
                   onClick={() => handleSave(false, "unpublish")}
                   disabled={!!loadingAction}
                 >
                   {loadingAction === "unpublish" ? (
-                    <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
+                    <Loader2Icon className="w-4 h-4 animate-spin sm:mr-2" />
                   ) : (
-                    <LogOutIcon className="w-4 h-4 mr-2" />
+                    <LogOutIcon className="w-4 h-4 sm:mr-2" />
                   )}
-                  Unpublish
+                  <span className="hidden sm:inline">Unpublish</span>
                 </Button>
 
                 <Button
+                  className="px-2.5 sm:px-4"
                   onClick={() => handleSave(true, "save")}
                   disabled={!!loadingAction}
                 >
                   {loadingAction === "save" ? (
-                    <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
+                    <Loader2Icon className="w-4 h-4 animate-spin sm:mr-2" />
                   ) : (
-                    <SaveIcon className="w-4 h-4 mr-2" />
+                    <SaveIcon className="w-4 h-4 sm:mr-2" />
                   )}
-                  Save
+                  <span className="hidden sm:inline">Save</span>
                 </Button>
               </>
             ) : (
               <>
                 <Button
                   variant="outline"
+                  className="px-2.5 sm:px-4"
                   onClick={() => handleSave(false, "save-draft")}
                   disabled={!!loadingAction}
                 >
                   {loadingAction === "save-draft" ? (
-                    <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
+                    <Loader2Icon className="w-4 h-4 animate-spin sm:mr-2" />
                   ) : (
-                    <SaveIcon className="w-4 h-4 mr-2" />
+                    <SaveIcon className="w-4 h-4 sm:mr-2" />
                   )}
-                  Save Draft
+                  <span className="hidden sm:inline">Save Draft</span>
                 </Button>
 
                 <Button
-                  className="bg-pink-500 hover:bg-pink-600 text-white"
+                  className="bg-pink-500 hover:bg-pink-600 text-white px-2.5 sm:px-4"
                   onClick={() => handleSave(true, "publish")}
                   disabled={!!loadingAction}
                 >
                   {loadingAction === "publish" ? (
-                    <Loader2Icon className="w-4 h-4 animate-spin mr-2" />
+                    <Loader2Icon className="w-4 h-4 animate-spin sm:mr-2" />
                   ) : (
-                    <SendIcon className="w-4 h-4 mr-2" />
+                    <SendIcon className="w-4 h-4 sm:mr-2" />
                   )}
-                  Publish
+                  <span className="hidden sm:inline">Publish</span>
                 </Button>
               </>
             )}
@@ -959,7 +1012,7 @@ export default function EditPostClient({
         className={
           isSplit
             ? "relative flex flex-1 overflow-hidden"
-            : "py-8 mx-auto max-w-[1280px] w-full px-4 flex gap-10"
+            : "py-4 sm:py-8 mx-auto max-w-[1280px] w-full px-4 flex gap-6 lg:gap-10"
         }
       >
         {/* Editor column */}
@@ -973,8 +1026,8 @@ export default function EditPostClient({
             // block instead, where it scrolls away like normal content.
             isSplit
               ? panelOpen
-                ? "w-[55%] overflow-auto pt-0 pb-8 px-8 space-y-6"
-                : "w-full overflow-auto pt-0 pb-8 px-8 space-y-6"
+                ? "w-[55%] overflow-auto pt-0 pb-8 px-4 sm:px-8 space-y-6"
+                : "w-full overflow-auto pt-0 pb-8 px-4 sm:px-8 space-y-6"
               : cn(
                   "flex-1 min-w-0 space-y-6",
                   WIDTH_CLASS[prefs.width],
@@ -1002,6 +1055,55 @@ export default function EditPostClient({
             </div>
           )}
 
+          {mode === "preview" && (
+            /* Rendered through the same PostBody the public route uses, so this
+               is the real article rather than a second opinion about it. */
+            <article className={cn("space-y-4", isSplit && "pt-8")}>
+              <h1
+                ref={previewTitleRef}
+                className="font-serif text-3xl sm:text-4xl font-bold leading-tight"
+              >
+                {post.title || (
+                  <span className="text-muted-foreground/50">
+                    Chưa có tiêu đề
+                  </span>
+                )}
+              </h1>
+              {post.description && (
+                <p className="text-base sm:text-lg text-muted-foreground leading-snug">
+                  {post.description}
+                </p>
+              )}
+              {post.tags && (
+                <div className="flex flex-wrap gap-1.5">
+                  {post.tags
+                    .split(",")
+                    .map((t) => t.trim())
+                    .filter(Boolean)
+                    .map((t) => (
+                      <span
+                        key={t}
+                        className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/70 bg-muted/60 rounded px-1.5 py-0.5"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                </div>
+              )}
+              {post.content.trim() ? (
+                <PostBody html={post.content} />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Bài chưa có nội dung.
+                </p>
+              )}
+            </article>
+          )}
+
+          {/* Kept mounted while previewing rather than swapped out: unmounting
+              tiptap would throw away the undo stack, and preview is exactly
+              where an author steps right after a large edit. */}
+          <div hidden={mode === "preview"} className="space-y-6">
           {/* Title */}
           <div className={cn("space-y-1", isSplit && "pt-8")}>
             <div className="flex justify-end font-mono text-[10px] text-muted-foreground/60 tabular-nums">
@@ -1014,13 +1116,13 @@ export default function EditPostClient({
               </span>
             </div>
             <textarea
-              ref={titleRef}
+              ref={writeTitleRef}
               value={post.title}
               onChange={(e) => setPost({ ...post, title: e.target.value })}
               placeholder="Title"
               maxLength={TITLE_MAX}
               rows={1}
-              className="block w-full text-4xl font-serif font-bold py-2 bg-transparent border-none shadow-none outline-none resize-none leading-tight placeholder:text-muted-foreground/50 [field-sizing:content]"
+              className="block w-full text-3xl sm:text-4xl font-serif font-bold py-2 bg-transparent border-none shadow-none outline-none resize-none leading-tight placeholder:text-muted-foreground/50 [field-sizing:content]"
             />
           </div>
 
@@ -1052,13 +1154,13 @@ export default function EditPostClient({
           {/* Slug Preview */}
           {type === "guide" ? (
             <div className="text-sm text-muted-foreground flex items-center gap-1">
-              <span className="font-mono">/{seriesTag || "series"}/</span>
+              <span className="font-mono shrink-0">/{seriesTag || "series"}/</span>
               <input
                 type="text"
                 value={post.slug}
                 onChange={(e) => setPost({ ...post, slug: e.target.value })}
                 placeholder="chapter-slug"
-                className="font-mono bg-muted px-2 py-1 rounded outline-none min-w-[240px] focus-visible:ring-1 focus-visible:ring-ring"
+                className="font-mono bg-muted px-2 py-1 rounded outline-none min-w-0 flex-1 sm:flex-none sm:min-w-[240px] focus-visible:ring-1 focus-visible:ring-ring"
               />
             </div>
           ) : (
@@ -1075,7 +1177,7 @@ export default function EditPostClient({
                 : "post-slug";
               return (
                 <div className="text-sm text-muted-foreground">
-                  <span className="font-mono bg-muted px-2 py-1 rounded">
+                  <span className="font-mono bg-muted px-2 py-1 rounded inline-block max-w-full break-all">
                     /blog/{datePrefix}/{slugName}
                   </span>
                 </div>
@@ -1084,7 +1186,7 @@ export default function EditPostClient({
           )}
 
           {/* Type + Tags */}
-          <div className="flex flex-wrap gap-6 items-start">
+          <div className="flex flex-wrap gap-4 sm:gap-6 items-start">
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium">Type</label>
               <Select
@@ -1199,6 +1301,7 @@ export default function EditPostClient({
             onChange={(content) => setPost({ ...post, content })}
             stickyTop={isSplit ? "0px" : "100px"}
           />
+          </div>
         </div>
 
         {/* tldraw panel — absolutely positioned and slid in with `transform`
