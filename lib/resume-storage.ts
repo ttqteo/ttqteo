@@ -3,8 +3,13 @@ export const WRITER_RESUME_KEY = "ttqteo:writer-resume";
 export const RESUME_SHOWN_KEY = "ttqteo:resume-shown";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+/**
+ * Both offers expire after a week. Past that the thread is gone — you no longer
+ * remember what you were reading or part-way through writing — so the prompt
+ * stops being a help and becomes something to dismiss.
+ */
 export const READER_TTL_MS = 7 * DAY_MS;
-export const WRITER_TTL_MS = 30 * DAY_MS;
+export const WRITER_TTL_MS = 7 * DAY_MS;
 
 export type ReaderResume = {
   slug: string;

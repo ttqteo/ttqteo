@@ -30,10 +30,14 @@ export function ResumeOrchestrator() {
     const w = isAdmin ? getWriterResume() : null;
     const r = getReaderResume();
 
-    const writerSamePage = w && pathname === w.route;
+    // Anywhere in the editor counts as already writing, not just the post the
+    // offer points at. Starting a new post and being told to go back to a
+    // different one is the prompt interrupting exactly what it exists to
+    // encourage.
+    const inEditor = pathname.startsWith("/admin/edit");
     const readerSamePage = r && pathname === `/blog/${r.slug}`;
 
-    const writerCandidate = w && !writerSamePage ? w : null;
+    const writerCandidate = w && !inEditor ? w : null;
     const readerCandidate = r && !readerSamePage ? r : null;
 
     if (!writerCandidate && !readerCandidate) return;
