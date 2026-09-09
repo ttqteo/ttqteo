@@ -475,7 +475,13 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   padding: 0.75rem 0 !important;
 }
 .code-block-shell > pre > code {
-  display: block;
+  /* inline-block, not block: the <pre> scrolls horizontally, and a block child
+     drops its right padding as soon as the content overflows, so a long line
+     ends up flush against the edge. inline-block sizes to the content and keeps
+     both sides; min-width holds the background across the full width when the
+     line is short. */
+  display: inline-block;
+  min-width: 100%;
   padding: 0 1rem !important;
 }
 
@@ -505,7 +511,9 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   padding: 0.75rem 0 !important;
 }
 .code-shell > pre > code {
-  display: block;
+  /* See the note on `.code-block-shell > pre > code`. */
+  display: inline-block;
+  min-width: 100%;
   padding: 0 1rem !important;
 }
 
