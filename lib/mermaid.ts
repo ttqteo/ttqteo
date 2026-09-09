@@ -46,8 +46,7 @@ function load(): Promise<typeof import("mermaid").default> {
 
 export async function renderMermaid(
   source: string,
-  { dark, ...overrides }: { dark: boolean } &
-    Omit<MermaidConfig, "theme" | "startOnLoad">,
+  { dark }: { dark: boolean },
 ): Promise<string> {
   const mermaid = await load();
   counter += 1;
@@ -60,13 +59,14 @@ export async function renderMermaid(
     startOnLoad: false,
     theme: dark ? "dark" : "default",
     // Bài viết do chủ site tự soạn, nhưng không sơ đồ nào cần HTML thô trong
-    // nhãn node, nên đóng luôn cửa đó. Trang mindmap giữ "loose" vì nó cần bắt
-    // click, đó là chuyện riêng của nó.
+    // nhãn node, nên đóng luôn cửa đó.
+    //
+    // Cố tình không cho người gọi đè: `initialize` không phải merge mà là ghi
+    // đè cấu hình toàn cục, nên hai lần vẽ chồng nhau với hai mức bảo mật khác
+    // nhau thì lần initialize sau quyết định cả hai. Khoá cứng ở đây là cách
+    // duy nhất để lời hứa "strict" nói trên là thật.
     securityLevel: "strict",
     fontFamily: "inherit",
-    // Đặt cuối để người gọi đè được: trang mindmap cần "loose" và một khối
-    // config riêng, còn theme thì không ai đè vì nó đã theo dark mode.
-    ...overrides,
   } satisfies MermaidConfig);
 
   try {

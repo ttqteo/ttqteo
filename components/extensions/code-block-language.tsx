@@ -61,7 +61,7 @@ function CodeBlockView({ node, updateAttributes, editor }: NodeViewProps) {
     // Node view được update lại ở mỗi lần gõ, nên nếu đưa thẳng
     // `node.textContent` xuống thì mermaid parse lại từng ký tự, và phần lớn
     // trạng thái giữa chừng không parse được nên sơ đồ nhấp nháy qua lại với
-    // dòng báo lỗi. 300ms là con số mermaid-renderer.tsx đã dùng cho cùng lý do.
+    // dòng báo lỗi. 300ms đủ để gõ xong một dòng mà chưa thấy chờ.
     const id = window.setTimeout(() => setPreviewSource(node.textContent), 300);
     return () => window.clearTimeout(id);
   }, [node.textContent, preview]);
