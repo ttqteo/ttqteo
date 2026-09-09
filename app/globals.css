@@ -450,3 +450,95 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
 .link-card-embed.ProseMirror-selectednode {
   @apply ring-2 ring-ring;
 }
+
+/* Code blocks in the editor. The picker sits inside the node view and never
+   reaches stored HTML: what gets saved is still `<pre><code class="language-x">`,
+   so a block written before the picker existed keeps working with no language. */
+.code-block-shell {
+  @apply relative;
+}
+.code-block-lang {
+  @apply rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground outline-none;
+}
+.code-block-shell > pre {
+  @apply rounded-lg;
+  padding: 0.75rem 0 !important;
+}
+.code-block-shell > pre > code {
+  display: block;
+  padding: 0 1rem !important;
+}
+
+/* Code blocks in a rendered post. The bar and button are built by PostHtml at
+   runtime, because editor-authored content is an HTML string with no React on
+   the read path to hang them off. The `!important` on padding is not
+   decoration: the global `pre` and `pre > code` rules above are themselves
+   !important, for the prism markup MDX produces, and only a longer selector
+   gets out from under them. */
+.code-shell {
+  @apply relative my-5 overflow-hidden rounded-lg border bg-muted/30;
+}
+.code-shell-bar {
+  @apply flex items-center justify-between gap-2 border-b bg-muted/50 px-3 py-1;
+}
+.code-shell-lang {
+  @apply font-mono text-[10px] uppercase tracking-widest text-muted-foreground;
+}
+.code-shell-copy {
+  @apply rounded px-2 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors;
+}
+.code-shell-copy:hover {
+  @apply bg-background text-foreground;
+}
+.code-shell > pre {
+  @apply m-0 overflow-x-auto bg-transparent;
+  padding: 0.75rem 0 !important;
+}
+.code-shell > pre > code {
+  display: block;
+  padding: 0 1rem !important;
+}
+
+/* Sơ đồ mermaid trong bài viết. Dùng lại `.code-shell` và thanh của nó, chỉ
+   thêm phần khung vẽ, nên một sơ đồ và một khối code đọc như cùng một loại
+   vật thể. */
+.mermaid-canvas {
+  @apply overflow-x-auto p-4;
+}
+.mermaid-canvas svg {
+  @apply mx-auto h-auto max-w-full;
+}
+.mermaid-skeleton {
+  @apply p-8 text-center font-mono text-xs text-muted-foreground;
+}
+.mermaid-error {
+  @apply m-0 border-t px-3 py-1 font-mono text-[11px] text-destructive;
+}
+
+/* Chỗ PostHtml thay một `<pre class="language-mermaid">` bằng container để
+   portal React vào. Không style gì ngoài việc xoá margin thừa của prose. */
+.mermaid-slot {
+  @apply m-0;
+}
+
+/* Sơ đồ xem trước ngay dưới khối code trong khung soạn thảo. Nó nằm dưới chứ
+   không thay chỗ `<pre>`: ProseMirror cần contentDOM ở nguyên trong document,
+   giấu nó đi là mời lỗi toạ độ con trỏ. */
+.code-block-preview {
+  @apply mt-2 rounded-lg border bg-background;
+}
+.code-block-controls {
+  @apply absolute right-2 top-2 z-10 flex items-center gap-1;
+}
+.code-block-preview-toggle {
+  @apply rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground;
+}
+
+/* Two lists in a row are one thought continued, not two sections. Tailwind
+   Typography gives each list a full block margin, so a bullet list under a
+   numbered one opened a gap wide enough to read as a break. Applies to the
+   rendered post as well as the editor, so preview keeps matching. */
+.prose :is(ul, ol) + :is(ul, ol),
+.editor-prose :is(ul, ol) + :is(ul, ol) {
+  margin-top: 0.2em;
+}
