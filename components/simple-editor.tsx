@@ -6,7 +6,11 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
 import Image from "@tiptap/extension-image";
+import { CodeBlockWithLanguage } from "./extensions/code-block-language";
 import { LinkCard } from "./extensions/link-card";
+import { Callout } from "./extensions/callout";
+import { ListNesting } from "./extensions/list-nesting";
+import { SmartArrows } from "./extensions/smart-arrows";
 import { bareUrl, type UnfurlResult } from "@/lib/unfurl";
 import { parseYoutubeUrl, youtubeEmbedSrc } from "@/lib/youtube";
 import {
@@ -32,6 +36,7 @@ import {
   Trash2,
   Bookmark,
   MonitorPlay,
+  Lightbulb,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -106,7 +111,10 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
         },
         link: false,
         underline: false,
+        // Replaced below by the same node plus a language picker.
+        codeBlock: false,
       }),
+      CodeBlockWithLanguage,
       Link.configure({
         openOnClick: false,
         autolink: true,
@@ -124,6 +132,9 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
         },
       }),
       LinkCard,
+      Callout,
+      ListNesting,
+      SmartArrows,
     ],
     content: content || "",
     immediatelyRender: false,
@@ -166,7 +177,16 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
             )
             .scrollIntoView(),
         );
-        setPastePrompt({ url, from, to: from + url.length, loading: true, data: null });
+        // Seeded with what is knowable without the network, so the menu can be
+        // useful on the same frame. For YouTube that already includes the embed
+        // src, which is the option most pastes are reaching for.
+        setPastePrompt({
+          url,
+          from,
+          to: from + url.length,
+          loading: true,
+          data: localUnfurl(url),
+        });
         return true;
       },
     },
@@ -510,6 +530,13 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
         >
           <Code2 className="w-4 h-4" />
         </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleCallout("note").run()}
+          isActive={editor.isActive("callout")}
+          tooltip="Callout"
+        >
+          <Lightbulb className="w-4 h-4" />
+        </ToolbarButton>
 
         <div className="w-px h-6 bg-border mx-1" />
 
@@ -533,55 +560,59 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
           className="fixed z-[60] flex items-center gap-1 rounded-md border bg-popover p-1 shadow-md"
           onMouseDown={(e) => e.preventDefault()}
         >
-          {pastePrompt.loading ? (
-            <span className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              đang đọc link…
-            </span>
-          ) : (
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => setPastePrompt(null)}
-              >
-                <Link2 className="w-3.5 h-3.5 mr-1.5" />
-                Link thường
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => applyLinkCard("bookmark")}
-              >
-                <Bookmark className="w-3.5 h-3.5 mr-1.5" />
-                Bookmark
-              </Button>
-              {/* Embed is offered only where an iframe is known to render.
-                  Most of the web sends X-Frame-Options: DENY, which fails as a
-                  silent blank box — a button that quietly produces nothing is
-                  worse than no button. */}
-              {pastePrompt.data?.embeddable && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => applyLinkCard("embed")}
-                >
-                  <MonitorPlay className="w-3.5 h-3.5 mr-1.5" />
-                  Embed
-                </Button>
-              )}
-            </>
+          {/* The menu appears immediately rather than after the unfurl. Only
+              Bookmark actually needs the fetched metadata, so only Bookmark
+              waits; dismissing, or embedding a video whose id came from the URL
+              itself, should not sit behind a network round trip. */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setPastePrompt(null)}
+          >
+            <Link2 className="w-3.5 h-3.5 mr-1.5" />
+            Link thường
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            disabled={pastePrompt.loading}
+            onClick={() => applyLinkCard("bookmark")}
+          >
+            {pastePrompt.loading ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <Bookmark className="w-3.5 h-3.5 mr-1.5" />
+            )}
+            Bookmark
+          </Button>
+          {/* Embed is offered only where an iframe is known to render. Most of
+              the web sends X-Frame-Options: DENY, which fails as a silent blank
+              box, and a button that quietly produces nothing is worse than no
+              button. */}
+          {pastePrompt.data?.embeddable && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => applyLinkCard("embed")}
+            >
+              <MonitorPlay className="w-3.5 h-3.5 mr-1.5" />
+              Embed
+            </Button>
           )}
         </div>
       )}
 
-      <LinkBubble editor={editor} />
+      {/* Unmounted rather than hidden while the paste offer is up. The cursor
+          lands inside the link that was just inserted, so this bubble's own
+          `isActive("link")` fires and the two menus stack on top of each
+          other. */}
+      {!pastePrompt && <LinkBubble editor={editor} />}
     </div>
   );
 }
