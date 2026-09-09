@@ -10,6 +10,7 @@ import { CodeBlockWithLanguage } from "./extensions/code-block-language";
 import { LinkCard } from "./extensions/link-card";
 import { Callout } from "./extensions/callout";
 import { CodeAutoPairs } from "./extensions/code-auto-pairs";
+import { CodeHighlighting } from "./extensions/code-highlighting";
 import { ListNesting } from "./extensions/list-nesting";
 import { SmartArrows } from "./extensions/smart-arrows";
 import { bareUrl, type UnfurlResult } from "@/lib/unfurl";
@@ -135,6 +136,7 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
       LinkCard,
       Callout,
       CodeAutoPairs,
+      CodeHighlighting,
       ListNesting,
       SmartArrows,
     ],

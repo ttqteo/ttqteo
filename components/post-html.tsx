@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MermaidDiagram } from "@/components/mermaid-diagram";
+import { highlightCodeIn } from "@/lib/code-highlight-dom";
 import { isMermaidPre, languageOf } from "@/lib/mermaid";
 
 const COPY = "copy";
@@ -123,6 +124,10 @@ export function PostHtml({ html }: { html: string }) {
     // Gần như mọi bài đều không có sơ đồ nào, nên chỉ đặt state khi thật sự
     // tìm được, tránh bắt chúng trả giá một lần render thừa.
     if (found.length > 0) setSlots(found);
+
+    // Sau khi dựng xong shell, để các khối đã nằm đúng chỗ cuối cùng. Không
+    // await: import là lazy, và hỏng thì code vẫn đọc được, chỉ là không màu.
+    void highlightCodeIn(root);
 
     return () => {
       timers.forEach((id) => window.clearTimeout(id));
