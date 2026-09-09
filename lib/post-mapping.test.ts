@@ -46,11 +46,17 @@ describe("toUnifiedMdxPost", () => {
     expect(post.updatedAt).toBe(post.createdAt);
   });
 
-  it("keeps the declared post type and defaults unknown ones to `post`", () => {
-    expect(toUnifiedMdxPost(blog({ type: "reading" })).type).toBe("reading");
+  it("keeps a guide, and reads everything else back as an article", () => {
+    expect(toUnifiedMdxPost(blog({ type: "guide" })).type).toBe("guide");
+    expect(toUnifiedMdxPost(blog({ type: "article" })).type).toBe("article");
+    // The values written before the types were collapsed. Existing frontmatter
+    // is never rewritten, so they have to keep resolving.
+    for (const legacy of ["post", "reading", "paper", "note"] as const) {
+      expect(toUnifiedMdxPost(blog({ type: legacy })).type, legacy).toBe("article");
+    }
     expect(
       toUnifiedMdxPost(blog({ type: "nonsense" as never })).type,
-    ).toBe("post");
+    ).toBe("article");
   });
 
   it("marks the row as coming from MDX", () => {

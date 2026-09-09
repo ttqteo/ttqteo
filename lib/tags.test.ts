@@ -12,7 +12,7 @@ function post(overrides: Partial<UnifiedPost> & { id: string }): UnifiedPost {
   return {
     slug: `slug-${overrides.id}`,
     title: `Post ${overrides.id}`,
-    type: "post",
+    type: "article",
     isPublished: true,
     source: "mdx",
     createdAt: "2026-01-01T00:00:00.000Z",

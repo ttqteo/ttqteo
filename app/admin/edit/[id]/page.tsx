@@ -50,7 +50,7 @@ export default async function EditPostPage({ params, searchParams }: PageProps) 
         description: post.description || "",
         content: post.content || "",
         is_published: post.is_published,
-        type: post.type || "post",
+        type: post.type || "article",
         tags: post.tags || "",
         guide_section: post.guide_section ?? null,
         guide_order: post.guide_order != null ? Number(post.guide_order) : null,

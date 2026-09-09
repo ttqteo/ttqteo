@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
   const result = await safeFetch(async () => {
     let payload: Record<string, unknown> = {
       ...basePayload,
-      type: type || "post",
+      type: type || "article",
       ...(tagsValue !== undefined ? { tags: tagsValue } : {}),
       ...withGuide,
     };
@@ -100,13 +100,13 @@ export async function POST(request: NextRequest) {
     if (error && /guide_(section|order)/i.test(error.message)) {
       payload = {
         ...basePayload,
-        type: type || "post",
+        type: type || "article",
         ...(tagsValue !== undefined ? { tags: tagsValue } : {}),
       };
       ({ data, error } = await tryInsert(payload));
     }
     if (error && /['"]?tags['"]? column|column .*tags.* does not exist/i.test(error.message)) {
-      payload = { ...basePayload, type: type || "post" };
+      payload = { ...basePayload, type: type || "article" };
       ({ data, error } = await tryInsert(payload));
     }
     if (error && /['"]?type['"]? column|column .*type.* does not exist/i.test(error.message)) {

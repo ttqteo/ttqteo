@@ -11,26 +11,12 @@ import { getPublishedPosts } from "@/lib/posts";
 export const revalidate = 300;
 export const metadata = { title: "lab" };
 
-const LAB_TYPES = ["reading", "paper"];
-
 export default async function LabPage() {
-  // Covers both sources: MDX posts with `type: reading|note|paper` in their
-  // frontmatter and supabase rows with the same type. `post` belongs on /blog,
-  // `guide` belongs to its series hub, so lab keeps an explicit whitelist.
-  const posts = await getPublishedPosts();
-  const labPosts = posts.filter((p) => LAB_TYPES.includes(p.type));
-
-  const postEntries: IndexEntry[] = labPosts.map((p) => ({
-    year: new Date(p.createdAt).getFullYear(),
-    title: p.title,
-    description: p.description,
-    // MDX lab content is still rendered by the /blog route; only supabase-backed
-    // entries have their own /lab page.
-    href: p.source === "mdx" ? `/blog/${p.slug}` : `/lab/${p.slug}`,
-    type: p.type as IndexEntryType,
-  }));
-
-  const merged = [...postEntries, ...labStaticIndex].sort((a, b) =>
+  // `reading` and `paper` used to feed this page. Collapsing the post types
+  // left nothing to filter on: the three posts that qualified are articles now
+  // and list on /blog, where they already rendered. What remains is the curated
+  // index, which was always the larger half of this page.
+  const merged = [...labStaticIndex].sort((a, b) =>
     String(b.year).localeCompare(String(a.year)),
   );
 

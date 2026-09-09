@@ -25,7 +25,7 @@ function SectionHeader({ title, href }: { title: string; href: string }) {
 export default async function Home() {
   const posts = await getPublishedPosts();
   const recentBlogs = posts
-    .filter((p) => p.type === "post")
+    .filter((p) => p.type === "article")
     .slice(0, 3)
     .map((p) => ({
       year: new Date(p.createdAt).getFullYear(),

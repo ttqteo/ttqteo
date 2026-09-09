@@ -13,9 +13,7 @@ export type ViewKey =
   | "published"
   | "draft"
   | "trash"
-  | "post"
-  | "reading"
-  | "paper"
+  | "article"
   | "guide"
   | "supabase"
   | "mdx";
@@ -35,9 +33,7 @@ export const VIEWS: ViewKey[] = [
   "published",
   "draft",
   "trash",
-  "post",
-  "reading",
-  "paper",
+  "article",
   "guide",
   "supabase",
   "mdx",

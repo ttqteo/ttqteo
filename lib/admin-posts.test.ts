@@ -15,7 +15,7 @@ function post(overrides: Partial<UnifiedPost> & { id: string }): UnifiedPost {
   return {
     slug: `slug-${overrides.id}`,
     title: `Post ${overrides.id}`,
-    type: "post",
+    type: "article",
     isPublished: true,
     source: "supabase",
     createdAt: "2026-01-01T00:00:00.000Z",
@@ -51,7 +51,7 @@ describe("parseQuery", () => {
 
   it("maps the retired status/type/source params onto a view", () => {
     expect(parseQuery({ status: "draft" }).view).toBe("draft");
-    expect(parseQuery({ type: "reading" }).view).toBe("reading");
+    expect(parseQuery({ type: "guide" }).view).toBe("guide");
     expect(parseQuery({ source: "mdx" }).view).toBe("mdx");
   });
 
@@ -78,9 +78,9 @@ describe("buildQueryString", () => {
 
 describe("countPosts", () => {
   const active = [
-    post({ id: "1", isPublished: true, type: "post", source: "supabase" }),
-    post({ id: "2", isPublished: false, type: "paper", source: "supabase" }),
-    post({ id: "3", isPublished: true, type: "reading", source: "mdx" }),
+    post({ id: "1", isPublished: true, type: "article", source: "supabase" }),
+    post({ id: "2", isPublished: false, type: "article", source: "supabase" }),
+    post({ id: "3", isPublished: true, type: "guide", source: "mdx" }),
   ];
   const trash = [post({ id: "4", deletedAt: "2026-02-01T00:00:00.000Z" })];
 
@@ -90,10 +90,8 @@ describe("countPosts", () => {
       published: 2,
       draft: 1,
       trash: 1,
-      post: 1,
-      reading: 1,
-      paper: 1,
-      guide: 0,
+      article: 2,
+      guide: 1,
       supabase: 2,
       mdx: 1,
     });
@@ -118,9 +116,9 @@ describe("datasetFor", () => {
 
 describe("filterAndSortPosts", () => {
   const posts = [
-    post({ id: "a", title: "Banana", isPublished: true, type: "post", source: "supabase", updatedAt: "2026-03-01T00:00:00.000Z", createdAt: "2026-01-03T00:00:00.000Z" }),
-    post({ id: "b", title: "apple", isPublished: false, type: "paper", source: "supabase", updatedAt: "2026-05-01T00:00:00.000Z", createdAt: "2026-01-01T00:00:00.000Z" }),
-    post({ id: "c", title: "Cherry", isPublished: true, type: "reading", source: "mdx", updatedAt: "2026-04-01T00:00:00.000Z", createdAt: "2026-01-02T00:00:00.000Z" }),
+    post({ id: "a", title: "Banana", isPublished: true, type: "article", source: "supabase", updatedAt: "2026-03-01T00:00:00.000Z", createdAt: "2026-01-03T00:00:00.000Z" }),
+    post({ id: "b", title: "apple", isPublished: false, type: "article", source: "supabase", updatedAt: "2026-05-01T00:00:00.000Z", createdAt: "2026-01-01T00:00:00.000Z" }),
+    post({ id: "c", title: "Cherry", isPublished: true, type: "guide", source: "mdx", updatedAt: "2026-04-01T00:00:00.000Z", createdAt: "2026-01-02T00:00:00.000Z" }),
   ];
   const ids = (result: UnifiedPost[]) => result.map((p) => p.id);
 
@@ -130,7 +128,7 @@ describe("filterAndSortPosts", () => {
   });
 
   it("selects by type and source view", () => {
-    expect(ids(filterAndSortPosts(posts, query({ view: "paper" })))).toEqual(["b"]);
+    expect(ids(filterAndSortPosts(posts, query({ view: "guide" })))).toEqual(["c"]);
     expect(ids(filterAndSortPosts(posts, query({ view: "mdx" })))).toEqual(["c"]);
   });
 

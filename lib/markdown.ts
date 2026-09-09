@@ -201,7 +201,8 @@ export type BlogMdxFrontmatter = BaseMdxFrontmatter & {
   cover: string;
   isPublished: boolean;
   tags: string;
-  type?: "post" | "reading" | "paper";
+  /** Legacy values still in existing frontmatter; all read back as `article`. */
+  type?: "article" | "guide" | "post" | "reading" | "paper" | "note";
 };
 
 export async function getAllBlogStaticPaths() {

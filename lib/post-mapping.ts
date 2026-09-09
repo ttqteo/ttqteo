@@ -2,10 +2,24 @@ import type { BlogMdxFrontmatter } from "@/lib/markdown";
 import type { PostType, UnifiedPost } from "@/lib/posts";
 import { stringToDate } from "@/lib/utils";
 
-const ALLOWED_TYPES: PostType[] = ["post", "reading", "paper", "guide"];
+/**
+ * The single place a stored type becomes a `PostType`, for both MDX
+ * frontmatter and Supabase rows.
+ *
+ * `post`, `reading`, `paper` and `note` are the values written before the two
+ * kinds were collapsed. Mapping them here means neither the database nor the
+ * existing frontmatter has to be rewritten, and anything unrecognised is an
+ * article rather than an error.
+ */
+const LEGACY_ARTICLE_TYPES = ["post", "reading", "paper", "note"];
 
-export const normalizeType = (t: unknown): PostType =>
-  ALLOWED_TYPES.includes(t as PostType) ? (t as PostType) : "post";
+export const normalizeType = (t: unknown): PostType => {
+  if (t === "guide") return "guide";
+  if (t === "article" || LEGACY_ARTICLE_TYPES.includes(t as string)) {
+    return "article";
+  }
+  return "article";
+};
 
 /**
  * Frontmatter → listing row. Kept free of the Supabase clients in `lib/posts`

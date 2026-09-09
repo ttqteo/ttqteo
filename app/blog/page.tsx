@@ -12,7 +12,7 @@ export const revalidate = 300;
 
 export default async function BlogIndexPage() {
   const posts = await getPublishedPosts();
-  const filtered = posts.filter((p) => p.type === "post");
+  const filtered = posts.filter((p) => p.type === "article");
 
   const now = Date.now();
   const entries: IndexEntry[] = filtered.map((p) => toIndexEntry(p, now));

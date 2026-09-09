@@ -8,6 +8,6 @@ import type { ViewKey } from "@/lib/admin-posts";
  */
 export const FILTER_GROUPS: { label: string; views: ViewKey[] }[] = [
   { label: "status", views: ["all", "published", "draft", "trash"] },
-  { label: "type", views: ["post", "reading", "paper", "guide"] },
+  { label: "type", views: ["article", "guide"] },
   { label: "source", views: ["supabase", "mdx"] },
 ];

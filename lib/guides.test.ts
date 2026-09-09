@@ -53,7 +53,7 @@ describe("groupChapters", () => {
   it("keeps only published guides carrying the series tag", () => {
     const posts = [
       post({ id: "1", guideSection: "concepts", guideOrder: 1 }),
-      post({ id: "2", type: "post" }),
+      post({ id: "2", type: "article" }),
       post({ id: "3", isPublished: false }),
       post({ id: "4", tags: "other" }),
     ];

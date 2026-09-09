@@ -104,14 +104,14 @@ const SimpleEditor = dynamic(
   },
 );
 
-const ALLOWED_TYPES = ["post", "reading", "paper", "guide"] as const;
+const ALLOWED_TYPES = ["article", "guide"] as const;
 type PostType = (typeof ALLOWED_TYPES)[number];
 
 function resolveType(raw: string | undefined): PostType {
   if (raw && (ALLOWED_TYPES as readonly string[]).includes(raw)) {
     return raw as PostType;
   }
-  return "post";
+  return "article";
 }
 
 const TITLE_MAX = 160;
@@ -1312,9 +1312,7 @@ export default function EditPostClient({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="post">Post</SelectItem>
-                  <SelectItem value="reading">Reading</SelectItem>
-                  <SelectItem value="paper">Paper</SelectItem>
+                  <SelectItem value="article">Article</SelectItem>
                   <SelectItem value="guide">Guide</SelectItem>
                 </SelectContent>
               </Select>

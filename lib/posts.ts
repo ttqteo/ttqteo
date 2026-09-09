@@ -4,7 +4,15 @@ import { supabasePublic } from "@/lib/supabase-public";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 export type PostSource = "mdx" | "supabase";
-export type PostType = "post" | "reading" | "paper" | "guide";
+/**
+ * Two kinds, because only two behave differently: an article stands alone,
+ * a guide belongs to a series and carries its section and order.
+ *
+ * `post`, `reading` and `paper` used to be separate values, but nothing ever
+ * branched on the difference between reading and paper, and all three are
+ * still read back as `article` — see `normalizeType`.
+ */
+export type PostType = "article" | "guide";
 
 export type UnifiedPost = {
   id: string;
@@ -71,7 +79,7 @@ async function selectPostRows(runQuery: PostRowQuery): Promise<UnifiedPost[]> {
     slug: String(r.slug),
     title: (r.title as string) || "Untitled",
     description: (r.description as string | null) ?? undefined,
-    type: hasType ? normalizeType(r.type) : "post",
+    type: hasType ? normalizeType(r.type) : "article",
     isPublished: !!r.is_published,
     source: "supabase" as const,
     createdAt: (r.created_at as string) || (r.updated_at as string) || new Date().toISOString(),

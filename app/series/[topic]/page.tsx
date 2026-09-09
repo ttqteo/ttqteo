@@ -30,7 +30,7 @@ export default async function GuideHubPage(props: PageProps) {
   const posts = await getPublishedSupabasePosts();
   const groups = groupChapters(posts, series);
   const fieldNotes = posts
-    .filter((p) => p.type === "post" && hasTag(p, series.tag))
+    .filter((p) => p.type === "article" && hasTag(p, series.tag))
     .sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),

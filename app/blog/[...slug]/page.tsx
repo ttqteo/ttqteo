@@ -56,7 +56,7 @@ export async function generateStaticParams() {
 
   const slugs = new Set(mdxPaths ?? []);
   for (const post of dbPosts) {
-    if (post.type === "post") slugs.add(post.slug);
+    if (post.type === "article") slugs.add(post.slug);
   }
 
   return [...slugs].map((it) => ({ slug: it.split("/") }));
