@@ -1,17 +1,24 @@
-import { render, screen } from "@testing-library/react";
+import { StrictMode } from "react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next-themes", () => ({ useTheme: () => ({ resolvedTheme: "light" }) }));
 vi.mock("mermaid", () => ({
   default: {
     initialize: vi.fn(),
-    render: vi.fn(async () => ({ svg: '<svg role="img" aria-label="sơ đồ"></svg>' })),
+    // Nhả source ra trong SVG để test phân biệt được sơ đồ nào đang hiện sau
+    // khi `html` đổi; nhãn giữ nguyên nên các test cũ không phải sửa.
+    render: vi.fn(async (_id: string, source: string) => ({
+      svg: `<svg role="img" aria-label="sơ đồ"><text>${source}</text></svg>`,
+    })),
   },
 }));
 
 import { PostHtml } from "@/components/post-html";
 
 const MERMAID = '<pre><code class="language-mermaid">graph TD; A--&gt;B</code></pre>';
+const OTHER_MERMAID =
+  '<pre><code class="language-mermaid">sequenceDiagram; A--&gt;&gt;B: chao</code></pre>';
 
 describe("PostHtml", () => {
   it("biến khối mermaid thành sơ đồ", async () => {
@@ -42,5 +49,30 @@ describe("PostHtml", () => {
     const { container } = render(<PostHtml html={MERMAID} />);
     await screen.findByRole("img", { name: "sơ đồ" });
     expect(container.querySelector(".mermaid-slot > pre")).toBeNull();
+  });
+
+  it("vẽ được sơ đồ dưới StrictMode", async () => {
+    // Next 16 bọc cây App Router trong StrictMode, nên effect chạy hai lần
+    // trên cùng một DOM. Lần hai không còn `<pre>` mermaid nào để tìm vì lần
+    // một đã thay chúng bằng container.
+    render(
+      <StrictMode>
+        <PostHtml html={MERMAID} />
+      </StrictMode>,
+    );
+    expect(await screen.findByRole("img", { name: "sơ đồ" })).toBeInTheDocument();
+  });
+
+  it("đổi sang sơ đồ mới khi `html` đổi, không để lại slot cũ", async () => {
+    const { container, rerender } = render(<PostHtml html={MERMAID} />);
+    await screen.findByRole("img", { name: "sơ đồ" });
+
+    rerender(<PostHtml html={OTHER_MERMAID} />);
+    await waitFor(() => {
+      expect(container.querySelector(".mermaid-slot svg text")?.textContent).toContain(
+        "sequenceDiagram",
+      );
+    });
+    expect(container.querySelectorAll(".mermaid-slot")).toHaveLength(1);
   });
 });

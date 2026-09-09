@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { MERMAID_LANGUAGE, renderMermaid } from "@/lib/mermaid";
 
@@ -66,6 +66,10 @@ export function MermaidDiagram({ source }: { source: string }) {
   };
 
   const asSource = showSource || error !== null;
+  // Cùng lý do với `inner` của post-html.tsx: React 19 so sánh prop bằng
+  // identity, nên một object `{ __html }` mới ở mỗi lần render bắt nó ghi lại
+  // innerHTML, và bấm copy sẽ dựng lại toàn bộ sơ đồ.
+  const inner = useMemo(() => ({ __html: svg ?? "" }), [svg]);
 
   return (
     <div className="code-shell" aria-busy={svg === null && error === null}>
@@ -94,7 +98,7 @@ export function MermaidDiagram({ source }: { source: string }) {
       ) : svg ? (
         // SVG đến từ mermaid ở securityLevel "strict", nhãn node đã được nó
         // sanitize; đây là cách duy nhất gắn một cây SVG dựng sẵn vào React.
-        <div className="mermaid-canvas" dangerouslySetInnerHTML={{ __html: svg }} />
+        <div className="mermaid-canvas" dangerouslySetInnerHTML={inner} />
       ) : (
         <div className="mermaid-skeleton">đang vẽ sơ đồ…</div>
       )}

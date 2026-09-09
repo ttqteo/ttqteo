@@ -34,9 +34,8 @@ export function PostHtml({ html }: { html: string }) {
     const root = ref.current;
     if (!root) return;
     const timers: number[] = [];
-    const found: Slot[] = [];
 
-    root.querySelectorAll("pre").forEach((pre, index) => {
+    root.querySelectorAll("pre").forEach((pre) => {
       // React replaces this whole subtree when `html` changes, so a shell can
       // only be left over within a single pass; this guards a re-run.
       if (pre.parentElement?.classList.contains("code-shell")) return;
@@ -48,8 +47,8 @@ export function PostHtml({ html }: { html: string }) {
         const source = pre.querySelector("code")?.textContent ?? pre.textContent ?? "";
         const container = document.createElement("div");
         container.className = "mermaid-slot";
+        container.dataset.mermaidSource = source;
         pre.replaceWith(container);
-        found.push({ key: `mermaid-${index}`, container, source });
         return;
       }
 
@@ -107,14 +106,28 @@ export function PostHtml({ html }: { html: string }) {
       shell.append(bar, pre);
     });
 
-    setSlots(found);
+    // Đọc lại từ DOM chứ không thu trong vòng lặp trên: dưới StrictMode effect
+    // chạy hai lần trên cùng một DOM, và lần hai không còn `<pre>` mermaid nào
+    // để tìm vì lần một đã thay chúng bằng container. Nguồn sự thật là
+    // container.
+    const found: Slot[] = Array.from(
+      root.querySelectorAll<HTMLElement>(".mermaid-slot"),
+    ).map((container, index) => ({
+      key: `mermaid-${index}`,
+      container,
+      source: container.dataset.mermaidSource ?? "",
+    }));
+
+    // Gần như mọi bài đều không có sơ đồ nào, nên chỉ đặt state khi thật sự
+    // tìm được, tránh bắt chúng trả giá một lần render thừa.
+    if (found.length > 0) setSlots(found);
 
     return () => {
       timers.forEach((id) => window.clearTimeout(id));
       // Khi `html` đổi, React dựng lại toàn bộ subtree và mọi container ở trên
       // bị tháo khỏi document. Bỏ slot cũ đi trước khi effect mới chạy, nếu
       // không portal sẽ trỏ vào node đã mồ côi.
-      setSlots([]);
+      setSlots((prev) => (prev.length > 0 ? [] : prev));
     };
   }, [html]);
 

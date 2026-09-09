@@ -31,7 +31,16 @@ let counter = 0;
  * một module nằm trên đường render bài viết.
  */
 function load(): Promise<typeof import("mermaid").default> {
-  loading ??= import("mermaid").then((mod) => mod.default);
+  loading ??= import("mermaid").then(
+    (mod) => mod.default,
+    (err) => {
+      // Một lần tải hỏng, hay gặp nhất là deploy mới làm chunk cũ 404, không
+      // được đóng băng mọi sơ đồ còn lại của phiên. Xoá cache để lần sau thử
+      // lại thay vì trả về đúng lời từ chối đó mãi.
+      loading = null;
+      throw err;
+    },
+  );
   return loading;
 }
 
