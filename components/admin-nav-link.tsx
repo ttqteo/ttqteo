@@ -17,7 +17,7 @@ export function AdminNavLink({ href, exact = false, children }: AdminNavLinkProp
   return (
     <Link
       href={href}
-      className={`flex items-center gap-1.5 transition-colors ${
+      className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap transition-colors ${
         active
           ? "text-white bg-zinc-800/70 px-2 py-1 rounded-md"
           : "hover:text-zinc-300"

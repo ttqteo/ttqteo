@@ -1,13 +1,38 @@
 "use client";
 
-import { FileTextIcon, PencilIcon } from "lucide-react";
+import { FileTextIcon, MoonIcon, PencilIcon, SunIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useTheme } from "next-themes";
 import { AdminNavLink } from "@/components/admin-nav-link";
 import { LogoutForm } from "@/components/admin/logout-form";
 
 interface AdminToolbarProps {
   editPostId?: string;
+}
+
+/**
+ * The toolbar is always dark, so this cannot borrow the site's ghost button:
+ * its hover and foreground follow the theme and would go invisible in light
+ * mode. Which icon shows is decided by CSS off the `dark` class next-themes
+ * writes before hydration, not by reading the theme during render, so there is
+ * no mismatch and no need to wait for mount.
+ */
+function ToolbarThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme();
+
+  return (
+    <button
+      type="button"
+      aria-label="Đổi giao diện sáng/tối"
+      title="Đổi giao diện sáng/tối"
+      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+      className="relative grid h-5 w-5 place-items-center text-zinc-300 transition-colors hover:text-white"
+    >
+      <SunIcon className="h-3.5 w-3.5 rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" />
+      <MoonIcon className="absolute h-3.5 w-3.5 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
+    </button>
+  );
 }
 
 export function AdminToolbar({ editPostId }: AdminToolbarProps) {
@@ -24,10 +49,10 @@ export function AdminToolbar({ editPostId }: AdminToolbarProps) {
           `items-center` centres against the full 36px bar. With padding instead,
           the row was only as tall as its content and sat a couple of px high. */}
       <div className="sm:container px-2 mx-auto w-[95vw] h-full flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
           <Link
             href="/admin"
-            className="flex items-center gap-2 hover:text-zinc-300 transition-colors bg-zinc-800/50 py-0.5 px-2 rounded-full border border-zinc-700/50 leading-none"
+            className="flex shrink-0 items-center gap-2 hover:text-zinc-300 transition-colors bg-zinc-800/50 py-0.5 px-2 rounded-full border border-zinc-700/50 leading-none"
           >
             {/* Same crop problem as the navbar; the toolbar is always dark, so
                 it only ever needs the light circle. */}
@@ -40,7 +65,7 @@ export function AdminToolbar({ editPostId }: AdminToolbarProps) {
             />
             <span className="font-semibold">ttqteo</span>
           </Link>
-          <div className="w-px h-4 bg-zinc-700 mx-1" />
+          <div className="w-px h-4 bg-zinc-700 shrink-0 sm:mx-1" />
           {/* /admin is the post list now, so dashboard and posts are one item. */}
           <AdminNavLink href="/admin" exact>
             <FileTextIcon className="w-3.5 h-3.5" />
@@ -48,19 +73,24 @@ export function AdminToolbar({ editPostId }: AdminToolbarProps) {
           </AdminNavLink>
           {editPostId && (
             <AdminNavLink href={`/admin/edit/${editPostId}`}>
-              <PencilIcon className="w-3.5 h-3.5" />
-              <span>Edit Post</span>
+              <PencilIcon className="w-3.5 h-3.5 shrink-0" />
+              {/* The icon carries it on a phone; the bar has to fit the logo,
+                  posts, new and logout on 390px too. */}
+              <span className="hidden sm:inline">Edit Post</span>
             </AdminNavLink>
           )}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex shrink-0 items-center gap-3 sm:gap-4">
           <Link
             href="/admin/edit/new"
-            className="flex items-center gap-1.5 hover:text-zinc-300 transition-colors text-xs"
+            className="flex items-center gap-1.5 whitespace-nowrap hover:text-zinc-300 transition-colors text-xs"
           >
-            <span>+ new blog</span>
+            <span className="sm:hidden">+ new</span>
+            <span className="hidden sm:inline">+ new blog</span>
           </Link>
-          •
+          <span className="hidden sm:inline">•</span>
+          <ToolbarThemeToggle />
+          <span className="hidden sm:inline">•</span>
           <LogoutForm />
         </div>
       </div>
