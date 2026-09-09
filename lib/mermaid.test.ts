@@ -5,6 +5,9 @@ vi.mock("mermaid", () => ({
     initialize: vi.fn(),
     render: vi.fn(async (id: string, source: string) => {
       if (source.includes("boom")) throw new Error("Parse error on line 1");
+      // mermaid không phải lúc nào cũng ném lỗi: có lúc nó resolve với chuỗi
+      // rỗng, và đó là ca người gọi không tự phân biệt được.
+      if (source.includes("empty")) return { svg: "" };
       return { svg: `<svg data-id="${id}">${source}</svg>` };
     }),
   },
@@ -63,6 +66,12 @@ describe("renderMermaid", () => {
     const a = await renderMermaid("graph TD; A-->B", { dark: false });
     const b = await renderMermaid("graph TD; A-->B", { dark: false });
     expect(a).not.toBe(b);
+  });
+
+  it("coi SVG rỗng là thất bại chứ không phải kết quả hợp lệ", async () => {
+    // Với người gọi, "rỗng" không phân biệt được với "chưa vẽ xong", nên nếu
+    // để nó resolve thì khối sơ đồ đứng mãi ở skeleton, không lỗi, không lối ra.
+    await expect(renderMermaid("empty", { dark: false })).rejects.toThrow(/rỗng/);
   });
 
   it("để lỗi cú pháp ném ra ngoài cho người gọi xử lý", async () => {

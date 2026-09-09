@@ -104,7 +104,11 @@ export function MermaidDiagram({ source }: { source: string }) {
         <pre>
           <code className={`language-${MERMAID_LANGUAGE}`}>{source}</code>
         </pre>
-      ) : svg ? (
+      ) : svg !== null ? (
+        // So với `null` chứ không dùng truthiness: một chuỗi rỗng là kết quả
+        // đã vẽ xong, dù rỗng, và đọc nó thành "đang tải" thì khối treo mãi ở
+        // skeleton. `renderMermaid` đã chặn ca đó, đây là lớp thứ hai.
+        //
         // SVG đến từ mermaid ở securityLevel "strict", nhãn node đã được nó
         // sanitize; đây là cách duy nhất gắn một cây SVG dựng sẵn vào React.
         <div className="mermaid-canvas" dangerouslySetInnerHTML={inner} />

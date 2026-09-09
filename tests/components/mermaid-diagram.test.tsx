@@ -8,6 +8,7 @@ vi.mock("mermaid", () => ({
     initialize: vi.fn(),
     render: vi.fn(async (id: string, source: string) => {
       if (source.includes("boom")) throw new Error("Parse error on line 1");
+      if (source.includes("empty")) return { svg: "" };
       return { svg: '<svg role="img" aria-label="sơ đồ"></svg>' };
     }),
   },
@@ -33,6 +34,15 @@ describe("MermaidDiagram", () => {
 
     await user.click(screen.getByRole("button", { name: "sơ đồ" }));
     expect(screen.getByRole("img", { name: "sơ đồ" })).toBeInTheDocument();
+  });
+
+  it("không đứng mãi ở skeleton khi mermaid trả về SVG rỗng", async () => {
+    // Chuỗi rỗng là falsy, nên nhánh `svg ? sơ đồ : skeleton` đọc nó là "chưa
+    // vẽ xong" và khối treo ở "đang vẽ sơ đồ…" vĩnh viễn, không lỗi, không
+    // đường ra. Đây đúng là triệu chứng người dùng gặp trong editor.
+    render(<MermaidDiagram source="empty" />);
+    expect(await screen.findByText("empty")).toBeInTheDocument();
+    expect(screen.queryByText("đang vẽ sơ đồ…")).not.toBeInTheDocument();
   });
 
   it("giữ lại source khi cú pháp sai, không nuốt mất khối", async () => {

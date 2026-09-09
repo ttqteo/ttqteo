@@ -71,6 +71,11 @@ export async function renderMermaid(
 
   try {
     const { svg } = await mermaid.render(id, source);
+    // mermaid không phải lúc nào cũng ném lỗi khi hỏng: có đường nó resolve
+    // với chuỗi rỗng. Người gọi không phân biệt được "rỗng" với "chưa vẽ
+    // xong", nên nếu để nó đi tiếp thì khối sơ đồ treo mãi ở skeleton, không
+    // báo lỗi và không có lối ra. Đổi thành thất bại để nó rơi về hiện source.
+    if (!svg.trim()) throw new Error("mermaid trả về SVG rỗng");
     return svg;
   } finally {
     // Khi parse hỏng, mermaid bỏ lại cái div tạm nó dựng để đo chữ. Không dọn
