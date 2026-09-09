@@ -516,6 +516,8 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   @apply bg-background text-foreground;
 }
 .code-shell > pre {
+  /* Transparent so the shell's surface shows through; the shell owns the
+     colour so the bar and the code cannot end up on different greys. */
   @apply m-0 overflow-x-auto bg-transparent;
   padding: 0.75rem 0 !important;
 }
@@ -524,6 +526,17 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   display: inline-block;
   min-width: 100%;
   padding: 0 1.25rem !important;
+}
+
+/* Đoạn chữ mà prism không gắn class token nào phải lấy màu chữ thường.
+   Tailwind Typography đặt `--tw-prose-pre-code` thành zinc-200 vì nó cho rằng
+   `pre` nằm trên nền tối, còn hai vỏ trên đều đã chuyển sang nền sáng. Không
+   có dòng này thì `java -version` hiện mỗi chữ `java` (prism gọi nó là
+   `.function`, có màu riêng trong syntax.css) còn `-version` thành xám trắng
+   trên nền trắng. Token vẫn thắng vì màu của chúng nằm trên span bên trong. */
+.code-shell > pre,
+.code-block-shell > pre {
+  color: inherit;
 }
 
 /* Sơ đồ mermaid trong bài viết. Dùng lại `.code-shell` và thanh của nó, chỉ
@@ -643,4 +656,25 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
 .prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *))::before,
 .prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *))::after {
   content: none;
+}
+
+/* Inline code, everywhere it appears. The editor carries `prose` alongside
+   `editor-prose`, so one rule covers both and they cannot drift.
+   A tint over whatever sits behind it, not a fixed colour: these turn up inside
+   callouts and quotes as well as plain paragraphs, and an opaque chip in the
+   muted token disappears the moment the block behind it is muted too.
+   `pre code` is excluded — a code block is a surface, and a chip inside it
+   would be a box within a box. */
+.prose :where(code):not(:where(pre code, [class~="not-prose"], [class~="not-prose"] *)) {
+  background-color: rgb(0 0 0 / 0.07);
+  border: 1px solid rgb(0 0 0 / 0.11);
+  border-radius: 0.3rem;
+  padding: 0.08em 0.36em;
+  font-size: 0.875em;
+  font-weight: 400;
+  color: inherit;
+}
+.dark .prose :where(code):not(:where(pre code, [class~="not-prose"], [class~="not-prose"] *)) {
+  background-color: rgb(255 255 255 / 0.13);
+  border-color: rgb(255 255 255 / 0.17);
 }

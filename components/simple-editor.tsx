@@ -421,7 +421,7 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
         onChange={handleImageUpload}
       />
       <div
-        className={`z-30 flex flex-wrap gap-1 p-2 border-y bg-background/95 backdrop-blur ${stickyTop !== null ? "sticky" : ""}`}
+        className={`z-30 flex flex-wrap gap-1 p-2 bg-background/95 backdrop-blur ${stickyTop !== null ? "sticky" : ""}`}
         style={stickyTop !== null ? { top: stickyTop } : undefined}
       >
         {/* Undo/Redo */}

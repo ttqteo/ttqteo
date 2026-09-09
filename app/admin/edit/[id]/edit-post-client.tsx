@@ -1194,17 +1194,22 @@ export default function EditPostClient({
                was never going to have. */
             <div className="text-sm text-muted-foreground flex items-center gap-1">
               <span className="font-mono shrink-0">/blog/</span>
-              <input
-                type="text"
-                value={post.slug}
-                onChange={(e) => {
-                  slugTouched.current = true;
-                  setPost({ ...post, slug: e.target.value });
-                }}
-                placeholder="2026/09/09/ten-bai"
-                aria-label="Đường dẫn bài viết"
-                className="font-mono bg-muted px-2 py-1 rounded outline-none min-w-0 flex-1 focus-visible:ring-1 focus-visible:ring-ring"
-              />
+              {/* The pencil is the affordance: styled as a chip, the field read
+                  as a label rather than something you could type into. */}
+              <label className="flex min-w-0 flex-1 items-center gap-1.5 rounded bg-muted px-2 py-1 focus-within:ring-1 focus-within:ring-ring">
+                <input
+                  type="text"
+                  value={post.slug}
+                  onChange={(e) => {
+                    slugTouched.current = true;
+                    setPost({ ...post, slug: e.target.value });
+                  }}
+                  placeholder="2026/09/09/ten-bai"
+                  aria-label="Đường dẫn bài viết"
+                  className="font-mono bg-transparent outline-none min-w-0 flex-1"
+                />
+                <PencilIcon className="w-3 h-3 shrink-0 text-muted-foreground/60" />
+              </label>
             </div>
           )}
 
