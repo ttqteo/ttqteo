@@ -9,7 +9,9 @@ import type { ReactNode } from "react";
  * looked different depending on where a post happened to be stored.
  *
  * The HTML branch goes through PostHtml, which adds the code-block chrome that
- * MDX gets for free from its own `pre` component.
+ * MDX gets for free from its own `pre` component. It also carries
+ * `editor-html`, which gives that content the same block rhythm the editor
+ * shows while it is being written; MDX keeps Typography's looser defaults.
  */
 export function PostBody({ children, html }: { children?: ReactNode; html?: string }) {
   return (

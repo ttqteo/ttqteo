@@ -135,7 +135,7 @@ export function PostHtml({ html }: { html: string }) {
 
   return (
     <>
-      <div ref={ref} dangerouslySetInnerHTML={inner} />
+      <div ref={ref} className="editor-html" dangerouslySetInnerHTML={inner} />
       {slots.map((slot) =>
         createPortal(<MermaidDiagram source={slot.source} />, slot.container, slot.key),
       )}

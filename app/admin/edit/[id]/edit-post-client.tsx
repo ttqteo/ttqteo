@@ -607,6 +607,14 @@ export default function EditPostClient({
 
   // One string for both the visible label and the title attribute, so the dot
   // still explains itself on a phone where the label is hidden.
+  const saveStatusClock =
+    saveState === "saved" && lastSaved
+      ? lastSaved.toLocaleTimeString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "";
+
   const saveStatusLabel =
     saveState === "saving"
       ? "đang lưu…"
@@ -666,7 +674,15 @@ export default function EditPostClient({
                     )}
                   />
                 )}
-                <span className="hidden md:inline">{saveStatusLabel}</span>
+                {/* Only the time, and only once there is one. The words are
+                    in the title: the dot's colour already says which of the
+                    four states this is, so spelling it out again cost header
+                    width the post title needed. */}
+                {saveStatusClock && (
+                  <span className="hidden md:inline tabular-nums">
+                    {saveStatusClock}
+                  </span>
+                )}
               </div>
             )}
 

@@ -327,40 +327,50 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   font-size: calc(var(--reader-fs, 1rem) * 1.1);
 }
 
-/* Editor body rhythm. Tailwind Typography gives paragraphs, lists, quotes and
+/* Editor body rhythm, shared with `.editor-html` so preview and the published
+   page match what was typed rather than falling back to Tailwind Typography's
+   looser defaults. Tailwind Typography gives paragraphs, lists, quotes and
    rules each a different margin, so the old `prose-p:my-1` override left
    paragraphs tight while everything around them kept the default ~1.25em and
    the gaps read as uneven. One value for every block instead, with headings
    keeping a deliberate lead so hierarchy still shows. */
-.editor-prose > * {
+.editor-prose > *,
+.editor-html > * {
   margin-top: 0.75em;
   margin-bottom: 0.75em;
 }
-.editor-prose > h1 {
+.editor-prose > h1,
+.editor-html > h1 {
   margin-top: 1.6em;
   margin-bottom: 0.5em;
 }
-.editor-prose > h2 {
+.editor-prose > h2,
+.editor-html > h2 {
   margin-top: 1.4em;
   margin-bottom: 0.45em;
 }
-.editor-prose > h3 {
+.editor-prose > h3,
+.editor-html > h3 {
   margin-top: 1.2em;
   margin-bottom: 0.4em;
 }
-.editor-prose > :first-child {
+.editor-prose > :first-child,
+.editor-html > :first-child {
   margin-top: 0;
 }
-.editor-prose > :last-child {
+.editor-prose > :last-child,
+.editor-html > :last-child {
   margin-bottom: 0;
 }
-.editor-prose li {
+.editor-prose li,
+.editor-html li {
   margin-top: 0.15em;
   margin-bottom: 0.15em;
 }
 /* A list item's paragraph wrapper must not add a second gap on top of the
    item's own. */
-.editor-prose li > p {
+.editor-prose li > p,
+.editor-html li > p {
   margin-top: 0;
   margin-bottom: 0;
 }
@@ -602,6 +612,7 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
    numbered one opened a gap wide enough to read as a break. Applies to the
    rendered post as well as the editor, so preview keeps matching. */
 .prose :is(ul, ol) + :is(ul, ol),
-.editor-prose :is(ul, ol) + :is(ul, ol) {
+.editor-prose :is(ul, ol) + :is(ul, ol),
+.editor-html :is(ul, ol) + :is(ul, ol) {
   margin-top: 0.2em;
 }
