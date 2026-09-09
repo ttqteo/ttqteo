@@ -59,6 +59,13 @@ describe("renderMermaid", () => {
     expect(vi.mocked(mermaid.initialize).mock.calls[0][0]).toMatchObject({ theme: "dark" });
   });
 
+  it("cho người gọi đè config, ví dụ trang mindmap cần nhãn HTML để bắt click", async () => {
+    await renderMermaid("graph TD; A-->B", { dark: false, securityLevel: "loose" });
+    expect(vi.mocked(mermaid.initialize).mock.calls[0][0]).toMatchObject({
+      securityLevel: "loose",
+    });
+  });
+
   it("cấp id khác nhau cho mỗi lần vẽ", async () => {
     const a = await renderMermaid("graph TD; A-->B", { dark: false });
     const b = await renderMermaid("graph TD; A-->B", { dark: false });

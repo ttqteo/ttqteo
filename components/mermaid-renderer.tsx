@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import mermaid from "mermaid";
 import { useTheme } from "next-themes";
+
+import { renderMermaid } from "@/lib/mermaid";
 
 interface NodeClickInfo {
   nodeText: string;
@@ -70,23 +71,18 @@ export function MermaidRenderer({
 
       const currentTheme = resolvedTheme || theme;
 
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: currentTheme === "dark" ? "dark" : "default",
-        mindmap: {
-          padding: 20,
-          useMaxWidth: true,
-        },
-        securityLevel: "loose",
-      });
-
       try {
         setError(null);
-        // Generate unique ID for each render to avoid mermaid caching issues
-        const uniqueId = `mermaid-${Date.now()}-${Math.random()
-          .toString(36)
-          .substring(7)}`;
-        const { svg } = await mermaid.render(uniqueId, chart);
+        const svg = await renderMermaid(chart, {
+          dark: currentTheme === "dark",
+          // Mindmap dựng nhãn node bằng HTML rồi bắt click lên đó, nên nó phải
+          // nới "loose"; bài viết thì không cần và cứ để mặc định "strict".
+          securityLevel: "loose",
+          mindmap: {
+            padding: 20,
+            useMaxWidth: true,
+          },
+        });
 
         if (currentRenderId === renderIdRef.current && containerRef.current) {
           containerRef.current.innerHTML = svg;

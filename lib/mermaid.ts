@@ -37,7 +37,8 @@ function load(): Promise<typeof import("mermaid").default> {
 
 export async function renderMermaid(
   source: string,
-  { dark }: { dark: boolean },
+  { dark, ...overrides }: { dark: boolean } &
+    Omit<MermaidConfig, "theme" | "startOnLoad">,
 ): Promise<string> {
   const mermaid = await load();
   counter += 1;
@@ -54,6 +55,9 @@ export async function renderMermaid(
     // click, đó là chuyện riêng của nó.
     securityLevel: "strict",
     fontFamily: "inherit",
+    // Đặt cuối để người gọi đè được: trang mindmap cần "loose" và một khối
+    // config riêng, còn theme thì không ai đè vì nó đã theo dark mode.
+    ...overrides,
   } satisfies MermaidConfig);
 
   try {
