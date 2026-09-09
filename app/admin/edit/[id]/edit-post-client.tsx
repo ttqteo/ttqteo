@@ -59,6 +59,7 @@ import {
   AlignLeftIcon,
   ArrowLeftIcon,
   ArrowUpIcon,
+  CheckIcon,
   EyeIcon,
   Loader2Icon,
   LogOutIcon,
@@ -150,6 +151,88 @@ function removeVietnameseTones(str: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/đ/g, "d")
     .replace(/Đ/g, "D");
+}
+
+/**
+ * The slug: a plain value until you ask to change it.
+ *
+ * It was an always-live input, which made the pencil beside it meaningless and
+ * put a text field in the way of something you read far more often than you
+ * edit. Escape restores what it held when editing started, so a half-typed
+ * path can be abandoned rather than only undone.
+ */
+function SlugField({
+  prefix,
+  value,
+  placeholder,
+  onChange,
+}: {
+  prefix: string;
+  value: string;
+  placeholder: string;
+  onChange: (next: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const before = useRef(value);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  return (
+    <div className="text-sm text-muted-foreground flex items-center gap-1">
+      <span className="font-mono shrink-0">{prefix}</span>
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded bg-muted px-2 py-1 focus-within:ring-1 focus-within:ring-ring">
+        {editing ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            onBlur={() => setEditing(false)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                setEditing(false);
+              } else if (event.key === "Escape") {
+                onChange(before.current);
+                setEditing(false);
+              }
+            }}
+            placeholder={placeholder}
+            aria-label="Đường dẫn bài viết"
+            className="font-mono bg-transparent outline-none min-w-0 flex-1"
+          />
+        ) : (
+          <span className="font-mono truncate min-w-0 flex-1">
+            {value || (
+              <span className="text-muted-foreground/50">{placeholder}</span>
+            )}
+          </span>
+        )}
+        <button
+          type="button"
+          // Without this the input's blur fires first and unmounts the button
+          // mid-click, so the tick never registers.
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            if (!editing) before.current = value;
+            setEditing((on) => !on);
+          }}
+          aria-label={editing ? "Xong" : "Sửa đường dẫn"}
+          title={editing ? "Xong" : "Sửa đường dẫn"}
+          className="shrink-0 text-muted-foreground/60 transition-colors hover:text-foreground"
+        >
+          {editing ? (
+            <CheckIcon className="w-3.5 h-3.5" />
+          ) : (
+            <PencilIcon className="w-3.5 h-3.5" />
+          )}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function EditPostClient({
@@ -572,6 +655,10 @@ export default function EditPostClient({
         setRecoverable(null);
         setSaveState("saved");
         setDirtyVsServer(false);
+        // Saving a draft is usually the moment you want to see how it reads,
+        // so it lands in preview. Only for the explicit button: autosave fires
+        // every few seconds and would yank the editor away mid-sentence.
+        if (action === "save-draft") setMode("preview");
         if (publish) clearWriterResume();
         toast.success(publish ? "Post published" : "Draft saved");
         if (leaveTo) {
@@ -1174,43 +1261,29 @@ export default function EditPostClient({
 
           {/* Slug Preview */}
           {type === "guide" ? (
-            <div className="text-sm text-muted-foreground flex items-center gap-1">
-              <span className="font-mono shrink-0">/{seriesTag || "series"}/</span>
-              <input
-                type="text"
-                value={post.slug}
-                onChange={(e) => {
-                  slugTouched.current = true;
-                  setPost({ ...post, slug: e.target.value });
-                }}
-                placeholder="chapter-slug"
-                className="font-mono bg-muted px-2 py-1 rounded outline-none min-w-0 flex-1 sm:flex-none sm:min-w-[240px] focus-visible:ring-1 focus-visible:ring-ring"
-              />
-            </div>
+            <SlugField
+              prefix={`/${seriesTag || "series"}/`}
+              value={post.slug}
+              placeholder="chapter-slug"
+              onChange={(next) => {
+                slugTouched.current = true;
+                setPost({ ...post, slug: next });
+              }}
+            />
           ) : (
             /* Editable, and bound to the slug that actually gets saved. This
                used to recompute a preview from the title, which left out the
                random suffix the real slug carries — so it showed a URL the post
                was never going to have. */
-            <div className="text-sm text-muted-foreground flex items-center gap-1">
-              <span className="font-mono shrink-0">/blog/</span>
-              {/* The pencil is the affordance: styled as a chip, the field read
-                  as a label rather than something you could type into. */}
-              <label className="flex min-w-0 flex-1 items-center gap-1.5 rounded bg-muted px-2 py-1 focus-within:ring-1 focus-within:ring-ring">
-                <input
-                  type="text"
-                  value={post.slug}
-                  onChange={(e) => {
-                    slugTouched.current = true;
-                    setPost({ ...post, slug: e.target.value });
-                  }}
-                  placeholder="2026/09/09/ten-bai"
-                  aria-label="Đường dẫn bài viết"
-                  className="font-mono bg-transparent outline-none min-w-0 flex-1"
-                />
-                <PencilIcon className="w-3 h-3 shrink-0 text-muted-foreground/60" />
-              </label>
-            </div>
+            <SlugField
+              prefix="/blog/"
+              value={post.slug}
+              placeholder="2026/09/09/ten-bai"
+              onChange={(next) => {
+                slugTouched.current = true;
+                setPost({ ...post, slug: next });
+              }}
+            />
           )}
 
           {/* Type + Tags */}
