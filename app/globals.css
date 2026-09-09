@@ -534,6 +534,56 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   @apply rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground;
 }
 
+/* Callout trong bài viết. Đây là toàn bộ diện mạo của khối: `renderHTML` của
+   node chỉ phát ra class, không có component nào chạy trên đường đọc. Các biến
+   thể chỉ đổi màu viền, nền và ký hiệu, phần còn lại dùng chung. */
+.callout {
+  @apply relative my-5 rounded-lg border-l-4 border-y border-r py-3 pl-11 pr-4;
+}
+.callout::before {
+  @apply absolute left-4 top-3 text-base leading-6;
+  content: "";
+}
+/* Đoạn đầu và cuối bỏ margin, nếu không prose đẩy chữ lệch khỏi khung. */
+.callout > :first-child {
+  @apply mt-0;
+}
+.callout > :last-child {
+  @apply mb-0;
+}
+
+.callout-note {
+  @apply border-border bg-muted/40;
+}
+.callout-note::before {
+  content: "📌";
+}
+.callout-tip {
+  @apply border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/40;
+}
+.callout-tip::before {
+  content: "💡";
+}
+.callout-warning {
+  @apply border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/40;
+}
+.callout-warning::before {
+  content: "⚠️";
+}
+.callout-danger {
+  @apply border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40;
+}
+.callout-danger::before {
+  content: "🛑";
+}
+
+/* Picker chỉ có trong khung soạn thảo. Nó không lọt xuống HTML đã lưu, nên
+   quy tắc này không bao giờ khớp gì trên trang public. */
+.callout-picker {
+  @apply absolute right-2 top-2 z-10 rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground outline-none;
+}
+
+
 /* Two lists in a row are one thought continued, not two sections. Tailwind
    Typography gives each list a full block margin, so a bullet list under a
    numbered one opened a gap wide enough to read as a break. Applies to the
