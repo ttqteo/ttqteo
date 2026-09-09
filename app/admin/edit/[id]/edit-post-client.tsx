@@ -561,10 +561,24 @@ export default function EditPostClient({
     return () => document.removeEventListener("click", onClick, true);
   }, [dirtyVsServer]);
 
-  // Track writer resume for existing posts (debounced).
+  // The "đang viết" offer should point at the most recent thing being written,
+  // which is what the debounce below keeps true for a saved post.
+  //
+  // A new post is the case that used to go wrong. It has no id, so nothing here
+  // ran, and the offer went on naming whatever post came before it — starting
+  // something new left a prompt telling you to go back to the last one. There
+  // is nothing to point at until the post is saved, so the pointer is dropped
+  // instead; the unsaved draft is held locally and offered back by the recovery
+  // banner when you return to the editor.
   useEffect(() => {
     const id = initialData?.id;
-    if (isNew || !id) return;
+    const started = !!(post.title.trim() || post.content.trim());
+
+    if (isNew || !id) {
+      if (started) clearWriterResume();
+      return;
+    }
+
     const t = window.setTimeout(() => {
       setWriterResume({
         postId: id,
