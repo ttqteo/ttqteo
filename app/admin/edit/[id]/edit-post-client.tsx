@@ -201,6 +201,8 @@ export default function EditPostClient({
 
   const postId = initialData?.id ?? null;
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  // A slug the author typed is theirs; auto-generation backs off after that.
+  const slugTouched = useRef(false);
 
   // Preview renders through the same PostBody the public page uses, so what is
   // on screen here is what a reader gets rather than an approximation of it.
@@ -491,8 +493,11 @@ export default function EditPostClient({
     return () => window.clearTimeout(t);
   }, [isNew, initialData?.id, post.title, post.description, post.content]);
 
-  // Auto-generate slug from title with date prefix (year/month/day/name)
+  // Auto-generate slug from title with date prefix (year/month/day/name).
+  // Stops for good once the slug has been edited by hand: a title tweak after
+  // that would otherwise silently throw the chosen URL away.
   useEffect(() => {
+    if (slugTouched.current) return;
     if (isNew && post.title) {
       const now = new Date();
       const year = now.getFullYear();
@@ -714,8 +719,8 @@ export default function EditPostClient({
                 aria-pressed={mode === "write"}
                 onClick={() => setMode("write")}
               >
-                <PencilIcon className="w-3.5 h-3.5 sm:mr-1.5" />
-                <span className="hidden sm:inline">Viết</span>
+                <PencilIcon className="w-3.5 h-3.5 lg:mr-1.5" />
+                <span className="hidden lg:inline">Viết</span>
               </Button>
               <Button
                 type="button"
@@ -725,8 +730,8 @@ export default function EditPostClient({
                 aria-pressed={mode === "preview"}
                 onClick={() => setMode("preview")}
               >
-                <EyeIcon className="w-3.5 h-3.5 sm:mr-1.5" />
-                <span className="hidden sm:inline">Xem trước</span>
+                <EyeIcon className="w-3.5 h-3.5 lg:mr-1.5" />
+                <span className="hidden lg:inline">Xem trước</span>
               </Button>
             </div>
 
@@ -771,58 +776,58 @@ export default function EditPostClient({
               <>
                 <Button
                   variant="outline"
-                  className="px-2.5 sm:px-4"
+                  className="px-2.5 lg:px-4"
                   onClick={() => handleSave(false, "unpublish")}
                   disabled={!!loadingAction}
                 >
                   {loadingAction === "unpublish" ? (
-                    <Loader2Icon className="w-4 h-4 animate-spin sm:mr-2" />
+                    <Loader2Icon className="w-4 h-4 animate-spin lg:mr-2" />
                   ) : (
-                    <LogOutIcon className="w-4 h-4 sm:mr-2" />
+                    <LogOutIcon className="w-4 h-4 lg:mr-2" />
                   )}
-                  <span className="hidden sm:inline">Unpublish</span>
+                  <span className="hidden lg:inline">Unpublish</span>
                 </Button>
 
                 <Button
-                  className="px-2.5 sm:px-4"
+                  className="px-2.5 lg:px-4"
                   onClick={() => handleSave(true, "save")}
                   disabled={!!loadingAction}
                 >
                   {loadingAction === "save" ? (
-                    <Loader2Icon className="w-4 h-4 animate-spin sm:mr-2" />
+                    <Loader2Icon className="w-4 h-4 animate-spin lg:mr-2" />
                   ) : (
-                    <SaveIcon className="w-4 h-4 sm:mr-2" />
+                    <SaveIcon className="w-4 h-4 lg:mr-2" />
                   )}
-                  <span className="hidden sm:inline">Save</span>
+                  <span className="hidden lg:inline">Save</span>
                 </Button>
               </>
             ) : (
               <>
                 <Button
                   variant="outline"
-                  className="px-2.5 sm:px-4"
+                  className="px-2.5 lg:px-4"
                   onClick={() => handleSave(false, "save-draft")}
                   disabled={!!loadingAction}
                 >
                   {loadingAction === "save-draft" ? (
-                    <Loader2Icon className="w-4 h-4 animate-spin sm:mr-2" />
+                    <Loader2Icon className="w-4 h-4 animate-spin lg:mr-2" />
                   ) : (
-                    <SaveIcon className="w-4 h-4 sm:mr-2" />
+                    <SaveIcon className="w-4 h-4 lg:mr-2" />
                   )}
-                  <span className="hidden sm:inline">Save Draft</span>
+                  <span className="hidden lg:inline">Save Draft</span>
                 </Button>
 
                 <Button
-                  className="bg-pink-500 hover:bg-pink-600 text-white px-2.5 sm:px-4"
+                  className="bg-pink-500 hover:bg-pink-600 text-white px-2.5 lg:px-4"
                   onClick={() => handleSave(true, "publish")}
                   disabled={!!loadingAction}
                 >
                   {loadingAction === "publish" ? (
-                    <Loader2Icon className="w-4 h-4 animate-spin sm:mr-2" />
+                    <Loader2Icon className="w-4 h-4 animate-spin lg:mr-2" />
                   ) : (
-                    <SendIcon className="w-4 h-4 sm:mr-2" />
+                    <SendIcon className="w-4 h-4 lg:mr-2" />
                   )}
-                  <span className="hidden sm:inline">Publish</span>
+                  <span className="hidden lg:inline">Publish</span>
                 </Button>
               </>
             )}
@@ -1174,31 +1179,33 @@ export default function EditPostClient({
               <input
                 type="text"
                 value={post.slug}
-                onChange={(e) => setPost({ ...post, slug: e.target.value })}
+                onChange={(e) => {
+                  slugTouched.current = true;
+                  setPost({ ...post, slug: e.target.value });
+                }}
                 placeholder="chapter-slug"
                 className="font-mono bg-muted px-2 py-1 rounded outline-none min-w-0 flex-1 sm:flex-none sm:min-w-[240px] focus-visible:ring-1 focus-visible:ring-ring"
               />
             </div>
           ) : (
-            (() => {
-              const now = new Date();
-              const datePrefix = `${now.getFullYear()}/${String(
-                now.getMonth() + 1,
-              ).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
-              const slugName = post.title
-                ? removeVietnameseTones(post.title)
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]+/g, "-")
-                    .replace(/^-|-$/g, "")
-                : "post-slug";
-              return (
-                <div className="text-sm text-muted-foreground">
-                  <span className="font-mono bg-muted px-2 py-1 rounded inline-block max-w-full break-all">
-                    /blog/{datePrefix}/{slugName}
-                  </span>
-                </div>
-              );
-            })()
+            /* Editable, and bound to the slug that actually gets saved. This
+               used to recompute a preview from the title, which left out the
+               random suffix the real slug carries — so it showed a URL the post
+               was never going to have. */
+            <div className="text-sm text-muted-foreground flex items-center gap-1">
+              <span className="font-mono shrink-0">/blog/</span>
+              <input
+                type="text"
+                value={post.slug}
+                onChange={(e) => {
+                  slugTouched.current = true;
+                  setPost({ ...post, slug: e.target.value });
+                }}
+                placeholder="2026/09/09/ten-bai"
+                aria-label="Đường dẫn bài viết"
+                className="font-mono bg-muted px-2 py-1 rounded outline-none min-w-0 flex-1 focus-visible:ring-1 focus-visible:ring-ring"
+              />
+            </div>
           )}
 
           {/* Type + Tags */}

@@ -77,6 +77,16 @@ export function nestListIntoPreviousList(editor: Editor): boolean {
   return true;
 }
 
+/**
+ * Indent the list item the caret is in: the standard sink, falling back to
+ * moving the whole list under the one above. Exported so the toolbar button and
+ * the Tab key run the same decision.
+ */
+export function indentList(editor: Editor): boolean {
+  if (editor.commands.sinkListItem("listItem")) return true;
+  return nestListIntoPreviousList(editor);
+}
+
 export const ListNesting = Extension.create({
   name: "listNesting",
   // Above ListItem's own Tab binding, so this decides what Tab means: it tries
@@ -85,10 +95,7 @@ export const ListNesting = Extension.create({
 
   addKeyboardShortcuts() {
     return {
-      Tab: () => {
-        if (this.editor.commands.sinkListItem("listItem")) return true;
-        return nestListIntoPreviousList(this.editor);
-      },
+      Tab: () => indentList(this.editor),
     };
   },
 });

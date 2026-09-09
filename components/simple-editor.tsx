@@ -11,7 +11,7 @@ import { LinkCard } from "./extensions/link-card";
 import { Callout } from "./extensions/callout";
 import { CodeAutoPairs } from "./extensions/code-auto-pairs";
 import { CodeHighlighting } from "./extensions/code-highlighting";
-import { ListNesting } from "./extensions/list-nesting";
+import { ListNesting, indentList } from "./extensions/list-nesting";
 import { SmartArrows } from "./extensions/smart-arrows";
 import { bareUrl, type UnfurlResult } from "@/lib/unfurl";
 import { parseYoutubeUrl, youtubeEmbedSrc } from "@/lib/youtube";
@@ -27,6 +27,9 @@ import {
   Heading3,
   Quote,
   Minus,
+  IndentIncrease,
+  IndentDecrease,
+  Plus,
   Undo,
   Redo,
   Link2,
@@ -41,6 +44,12 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
@@ -504,53 +513,85 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
           <Link2 className="w-4 h-4" />
         </ToolbarButton>
 
-        {/* Image */}
+        {/* Indent / outdent. Tab and Shift-Tab do the same thing, but a list
+            nested under another list is not a discoverable feature without a
+            control that says it exists. */}
         <ToolbarButton
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-          tooltip="Upload Image"
+          onClick={() => indentList(editor)}
+          disabled={!editor.isActive("listItem")}
+          tooltip="Thụt vào (Tab)"
         >
-          {isUploading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <ImageIcon className="w-4 h-4" />
-          )}
+          <IndentIncrease className="w-4 h-4" />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().liftListItem("listItem").run()}
+          disabled={!editor.isActive("listItem")}
+          tooltip="Thụt ra (Shift+Tab)"
+        >
+          <IndentDecrease className="w-4 h-4" />
         </ToolbarButton>
 
         <div className="w-px h-6 bg-border mx-1" />
 
-        {/* Blockquote & Code Block */}
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          isActive={editor.isActive("blockquote")}
-          tooltip="Quote"
-        >
-          <Quote className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          isActive={editor.isActive("codeBlock")}
-          tooltip="Code Block"
-        >
-          <Code2 className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleCallout("note").run()}
-          isActive={editor.isActive("callout")}
-          tooltip="Callout"
-        >
-          <Lightbulb className="w-4 h-4" />
-        </ToolbarButton>
-
-        <div className="w-px h-6 bg-border mx-1" />
-
-        {/* Horizontal Rule */}
-        <ToolbarButton
-          onClick={() => editor.chain().focus().setHorizontalRule().run()}
-          tooltip="Horizontal Line"
-        >
-          <Minus className="w-4 h-4" />
-        </ToolbarButton>
+        {/* Blocks you reach for occasionally, behind one control.
+            Inline they pushed the toolbar onto a second row, which cost more
+            vertical space on every screen than the clicks it saved. Formatting
+            you use in every paragraph stays out here; a thing you insert once
+            or twice a post does not need to. */}
+        <DropdownMenu>
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2"
+                  disabled={isUploading}
+                >
+                  {isUploading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={5}>
+              Chèn
+            </TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="start" className="w-44">
+            <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
+              <ImageIcon className="w-4 h-4 mr-2" />
+              Ảnh
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => editor.chain().focus().toggleBlockquote().run()}
+            >
+              <Quote className="w-4 h-4 mr-2" />
+              Trích dẫn
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => editor.chain().focus().toggleCodeBlock().run()}
+            >
+              <Code2 className="w-4 h-4 mr-2" />
+              Khối code
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => editor.chain().focus().toggleCallout("note").run()}
+            >
+              <Lightbulb className="w-4 h-4 mr-2" />
+              Callout
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => editor.chain().focus().setHorizontalRule().run()}
+            >
+              <Minus className="w-4 h-4 mr-2" />
+              Đường kẻ ngang
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Editor */}
