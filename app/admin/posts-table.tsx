@@ -10,18 +10,17 @@ import {
   type SortKey,
 } from "@/lib/admin-posts";
 import type { UnifiedPost } from "@/lib/posts";
+import { cn } from "@/lib/utils";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
-  FileTextIcon,
   Loader2Icon,
-  PencilIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useAdminNav } from "./admin-nav";
+import { usePostsQuery } from "./posts-query";
 import { AdminPostActions } from "./post-actions";
 
 interface PostsTableProps {
@@ -36,6 +35,10 @@ type BulkAction = "publish" | "unpublish" | "trash" | "restore" | "purge";
 export function PostsTable({ posts, query, isTrash, total }: PostsTableProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Phones start with no checkbox column at all: every row carrying one costs
+  // width the title needs, for an action that is mostly a desktop workflow.
+  // "Chọn" in a row's menu turns the column on. Desktop always shows it.
+  const [selecting, setSelecting] = useState(false);
   const [pending, setPending] = useState<BulkAction | null>(null);
 
   const ids = useMemo(() => selectableIds(posts), [posts]);
@@ -43,10 +46,17 @@ export function PostsTable({ posts, query, isTrash, total }: PostsTableProps) {
 
   // Carrying a selection across a filter change is how you delete the wrong
   // posts: the rows you ticked in "drafts" are not the rows on screen now.
+  //
+  // Reset during render rather than in an effect. The filter fully determines
+  // that the selection is void, so waiting for an effect would paint one frame
+  // of the new list still showing the old ticks.
   const queryKey = buildQueryString(query);
-  useEffect(() => {
+  const [lastQueryKey, setLastQueryKey] = useState(queryKey);
+  if (queryKey !== lastQueryKey) {
+    setLastQueryKey(queryKey);
     setSelected(new Set());
-  }, [queryKey]);
+    setSelecting(false);
+  }
 
   const selectedIds = useMemo(
     () => ids.filter((id) => selected.has(id)),
@@ -102,15 +112,29 @@ export function PostsTable({ posts, query, isTrash, total }: PostsTableProps) {
   }
 
   const busy = pending !== null;
+  // Both are literal strings so Tailwind still sees the column templates.
+  const gridCols = selecting
+    ? "grid-cols-[22px_minmax(0,1fr)_36px] sm:grid-cols-[28px_minmax(0,1fr)_64px_84px_110px_96px]"
+    : "grid-cols-[minmax(0,1fr)_36px] sm:grid-cols-[28px_minmax(0,1fr)_64px_84px_110px_96px]";
+  const checkboxCell = selecting ? "" : "hidden sm:block";
+  // Selection mode opens the bar before anything is ticked, so every bulk
+  // action has to sit out until it has targets. Without this they run against
+  // an empty list and report "0 bài đã publish", which reads as a failure.
+  const noTargets = selectedIds.length === 0;
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span className="tabular-nums">
           {posts.length} / {total}
         </span>
+        <span className="flex items-center gap-2.5">
+          <LegendDot className="bg-emerald-500" label="published" />
+          <LegendDot className="bg-amber-500" label="draft" />
+          {isTrash && <LegendDot className="bg-red-500" label="deleted" />}
+        </span>
         {skipped > 0 && !isTrash && (
-          <span className="font-mono">{skipped} mdx không chọn được</span>
+          <span className="font-mono ml-auto">{skipped} mdx không chọn được</span>
         )}
       </div>
 
@@ -124,13 +148,20 @@ export function PostsTable({ posts, query, isTrash, total }: PostsTableProps) {
         )
       ) : (
         <div className="border rounded-md divide-y">
-          <div className="grid grid-cols-[28px_minmax(0,1fr)_84px] sm:grid-cols-[28px_minmax(0,1fr)_64px_84px_110px_96px] items-center gap-3 px-3 py-2 text-xs text-muted-foreground bg-muted/30">
-            <Checkbox
-              checked={allSelected}
-              onCheckedChange={(v) => toggleAll(v === true)}
-              disabled={ids.length === 0 || busy}
-              aria-label="Select all"
-            />
+          <div
+            className={cn(
+              "grid items-center gap-2 sm:gap-3 px-1.5 sm:px-3 py-2 text-xs text-muted-foreground bg-muted/30",
+              gridCols,
+            )}
+          >
+            <div className={checkboxCell}>
+              <Checkbox
+                checked={allSelected}
+                onCheckedChange={(v) => toggleAll(v === true)}
+                disabled={ids.length === 0 || busy}
+                aria-label="Select all"
+              />
+            </div>
             <SortHeader label="title" sort="title" query={query} />
             <span className="hidden sm:block">type</span>
             <span className="hidden sm:block">source</span>
@@ -151,28 +182,57 @@ export function PostsTable({ posts, query, isTrash, total }: PostsTableProps) {
               checked={selected.has(post.id)}
               disabled={busy}
               onToggle={toggleRow}
+              selecting={selecting}
+              gridCols={gridCols}
+              checkboxCell={checkboxCell}
+              onStartSelect={() => {
+                setSelecting(true);
+                toggleRow(post.id, true);
+              }}
             />
           ))}
         </div>
       )}
 
-      {selectedIds.length > 0 && (
+      {(selectedIds.length > 0 || selecting) && (
         <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-2 rounded-md border bg-background/95 backdrop-blur px-3 py-2 shadow-lg">
           <span className="text-sm font-medium">
-            {selectedIds.length} selected
-            {skipped > 0 && (
-              <span className="ml-1.5 font-mono text-xs font-normal text-muted-foreground">
-                · {skipped} mdx bỏ qua
+            {noTargets ? (
+              <span className="text-muted-foreground font-normal">
+                Chọn bài để thao tác
               </span>
+            ) : (
+              <>
+                {selectedIds.length} selected
+                {skipped > 0 && (
+                  <span className="ml-1.5 font-mono text-xs font-normal text-muted-foreground">
+                    · {skipped} mdx bỏ qua
+                  </span>
+                )}
+              </>
             )}
           </span>
           <div className="flex flex-wrap gap-2 ml-auto">
+            {selecting && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="sm:hidden"
+                disabled={busy}
+                onClick={() => {
+                  setSelecting(false);
+                  setSelected(new Set());
+                }}
+              >
+                Xong
+              </Button>
+            )}
             {isTrash ? (
               <>
                 <BulkButton
                   onClick={() => runBulk("restore", selectedIds)}
                   pending={pending === "restore"}
-                  busy={busy}
+                  busy={busy || noTargets}
                 >
                   Restore
                 </BulkButton>
@@ -180,7 +240,7 @@ export function PostsTable({ posts, query, isTrash, total }: PostsTableProps) {
                   variant="destructive"
                   onClick={() => runBulk("purge", selectedIds)}
                   pending={pending === "purge"}
-                  busy={busy}
+                  busy={busy || noTargets}
                 >
                   Delete permanently
                 </BulkButton>
@@ -190,14 +250,14 @@ export function PostsTable({ posts, query, isTrash, total }: PostsTableProps) {
                 <BulkButton
                   onClick={() => runBulk("publish", selectedIds)}
                   pending={pending === "publish"}
-                  busy={busy}
+                  busy={busy || noTargets}
                 >
                   Publish
                 </BulkButton>
                 <BulkButton
                   onClick={() => runBulk("unpublish", selectedIds)}
                   pending={pending === "unpublish"}
-                  busy={busy}
+                  busy={busy || noTargets}
                 >
                   Unpublish
                 </BulkButton>
@@ -205,7 +265,7 @@ export function PostsTable({ posts, query, isTrash, total }: PostsTableProps) {
                   variant="destructive"
                   onClick={() => runBulk("trash", selectedIds)}
                   pending={pending === "trash"}
-                  busy={busy}
+                  busy={busy || noTargets}
                 >
                   Move to trash
                 </BulkButton>
@@ -224,7 +284,7 @@ export function PostsTable({ posts, query, isTrash, total }: PostsTableProps) {
  * hunt the sidebar for what you set three clicks ago.
  */
 function EmptyFilters({ query }: { query: AdminPostsQuery }) {
-  const { navigate } = useAdminNav();
+  const { setQuery } = usePostsQuery();
   // With one view at a time, an empty table can only mean the search term.
   return (
     <div className="text-center py-16 space-y-3">
@@ -236,7 +296,7 @@ function EmptyFilters({ query }: { query: AdminPostsQuery }) {
       <Button
         variant="outline"
         size="sm"
-        onClick={() => navigate(`/admin${buildQueryString({ ...query, q: "" })}`)}
+        onClick={() => setQuery({ q: "" })}
       >
         Clear search
       </Button>
@@ -307,7 +367,7 @@ function SortHeader({
   query: AdminPostsQuery;
   className?: string;
 }) {
-  const { navigate } = useAdminNav();
+  const { setQuery } = usePostsQuery();
   const active = query.sort === sort;
   // Clicking the active column flips direction; a new column starts descending,
   // which for dates means newest first.
@@ -319,7 +379,7 @@ function SortHeader({
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
         e.preventDefault();
-        navigate(href);
+        setQuery({ sort, dir });
       }}
       className={`inline-flex items-center gap-1 hover:text-foreground transition-colors ${
         active ? "text-foreground" : ""
@@ -342,14 +402,27 @@ function Row({
   checked,
   disabled,
   onToggle,
+  selecting,
+  gridCols,
+  checkboxCell,
+  onStartSelect,
 }: {
   post: UnifiedPost;
   isTrash: boolean;
   checked: boolean;
   disabled: boolean;
   onToggle: (id: string, checked: boolean) => void;
+  selecting: boolean;
+  gridCols: string;
+  checkboxCell: string;
+  onStartSelect: () => void;
 }) {
   const selectable = isSelectable(post);
+  const status = post.deletedAt
+    ? { label: "deleted", className: "bg-red-500" }
+    : post.isPublished
+      ? { label: "published", className: "bg-emerald-500" }
+      : { label: "draft", className: "bg-amber-500" };
   const dateLabel = new Date(post.updatedAt).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
@@ -362,36 +435,57 @@ function Row({
     : `/blog/${post.slug}`;
 
   return (
-    <div className="grid grid-cols-[28px_minmax(0,1fr)_84px] sm:grid-cols-[28px_minmax(0,1fr)_64px_84px_110px_96px] items-center gap-3 px-3 py-2 hover:bg-muted/40 transition-colors">
-      <Checkbox
-        checked={checked}
-        onCheckedChange={(v) => onToggle(post.id, v === true)}
-        disabled={!selectable || disabled}
-        aria-label={selectable ? `Select ${post.title}` : "MDX posts cannot be bulk edited"}
-      />
+    <div
+      className={cn(
+        "grid items-start sm:items-center gap-2 sm:gap-3 px-1.5 sm:px-3 py-2 hover:bg-muted/40 transition-colors",
+        gridCols,
+      )}
+    >
+      <div className={cn(checkboxCell, "mt-0.5 sm:mt-0")}>
+        {selectable ? (
+          <Checkbox
+            checked={checked}
+            onCheckedChange={(v) => onToggle(post.id, v === true)}
+            disabled={disabled}
+            aria-label={`Select ${post.title}`}
+          />
+        ) : (
+          // MDX posts are files, with no row for a bulk action to touch. A
+          // dashed outline holds the column straight and reads as unavailable
+          // rather than as a box you have not ticked yet.
+          <span
+            title="Bài MDX là file, không chọn được"
+            className="block h-4 w-4 rounded-sm border border-dashed border-muted-foreground/40"
+          />
+        )}
+      </div>
       <div className="min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-start sm:items-center gap-1.5 sm:gap-2 min-w-0">
+          {/* A dot instead of the word: it says the same thing in a fraction of
+              the width, which on a phone is width the title gets back. The
+              legend above the table carries the meaning. */}
+          <span
+            title={status.label}
+            aria-label={status.label}
+            className={cn(
+              "shrink-0 h-2 w-2 rounded-full mt-[7px] sm:mt-0",
+              status.className,
+            )}
+          />
           {href ? (
             <Link
               href={href}
               target={selectable ? undefined : "_blank"}
-              className="font-medium truncate hover:underline"
+              className="font-medium text-sm sm:text-base line-clamp-2 sm:line-clamp-1 hover:underline"
             >
               {post.title}
             </Link>
           ) : (
-            <span className="font-medium truncate">{post.title}</span>
-          )}
-          {!isTrash && !post.isPublished && (
-            <span className="shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300">
-              draft
+            <span className="font-medium text-sm sm:text-base line-clamp-2 sm:line-clamp-1">
+              {post.title}
             </span>
           )}
-          {post.deletedAt && (
-            <span className="shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
-              deleted
-            </span>
-          )}
+
         </div>
         <div className="text-xs text-muted-foreground font-mono truncate">
           /{post.slug}
@@ -412,30 +506,25 @@ function Row({
       <span className="hidden sm:block tabular-nums text-xs text-muted-foreground text-right">
         {dateLabel}
       </span>
-      <div className="flex gap-1 shrink-0 justify-end">
-        {selectable ? (
-          <>
-            {!isTrash && (
-              <Button variant="ghost" size="sm" asChild>
-                <Link href={`/admin/edit/${post.id}`} aria-label="Edit">
-                  <PencilIcon className="w-4 h-4" />
-                </Link>
-              </Button>
-            )}
-            <AdminPostActions
-              id={post.id}
-              title={post.title}
-              isDeleted={!!post.deletedAt}
-            />
-          </>
-        ) : (
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/blog/${post.slug}`} target="_blank" aria-label="View">
-              <FileTextIcon className="w-4 h-4" />
-            </Link>
-          </Button>
-        )}
+      <div className="shrink-0">
+        <AdminPostActions
+          id={post.id}
+          title={post.title}
+          slug={post.slug}
+          isDeleted={!!post.deletedAt}
+          selectable={selectable}
+          onStartSelect={selecting ? undefined : onStartSelect}
+        />
       </div>
     </div>
+  );
+}
+
+function LegendDot({ className, label }: { className: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className={cn("h-2 w-2 rounded-full", className)} />
+      {label}
+    </span>
   );
 }
