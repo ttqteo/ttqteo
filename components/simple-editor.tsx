@@ -9,6 +9,7 @@ import Image from "@tiptap/extension-image";
 import { CodeBlockWithLanguage } from "./extensions/code-block-language";
 import { LinkCard } from "./extensions/link-card";
 import { Callout } from "./extensions/callout";
+import { CodeAutoPairs } from "./extensions/code-auto-pairs";
 import { ListNesting } from "./extensions/list-nesting";
 import { SmartArrows } from "./extensions/smart-arrows";
 import { bareUrl, type UnfurlResult } from "@/lib/unfurl";
@@ -133,6 +134,7 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
       }),
       LinkCard,
       Callout,
+      CodeAutoPairs,
       ListNesting,
       SmartArrows,
     ],
