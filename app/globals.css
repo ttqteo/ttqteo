@@ -482,7 +482,7 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
      line is short. */
   display: inline-block;
   min-width: 100%;
-  padding: 0 1rem !important;
+  padding: 0 1.25rem !important;
 }
 
 /* Code blocks in a rendered post. The bar and button are built by PostHtml at
@@ -495,7 +495,7 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   @apply relative my-5 overflow-hidden rounded-lg border bg-muted/30;
 }
 .code-shell-bar {
-  @apply flex items-center justify-between gap-2 border-b bg-muted/50 px-3 py-1;
+  @apply flex items-center justify-between gap-2 border-b bg-muted/50 px-5 py-1;
 }
 .code-shell-lang {
   @apply font-mono text-[10px] uppercase tracking-widest text-muted-foreground;
@@ -514,7 +514,7 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   /* See the note on `.code-block-shell > pre > code`. */
   display: inline-block;
   min-width: 100%;
-  padding: 0 1rem !important;
+  padding: 0 1.25rem !important;
 }
 
 /* Sơ đồ mermaid trong bài viết. Dùng lại `.code-shell` và thanh của nó, chỉ
