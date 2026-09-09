@@ -2,8 +2,21 @@ import { generateHTML, generateJSON } from "@tiptap/html";
 import StarterKit from "@tiptap/starter-kit";
 import { describe, expect, it } from "vitest";
 import { CALLOUT_VARIANTS, Callout } from "./callout";
+import { CodeBlockWithLanguage } from "./code-block-language";
+import { LinkCard } from "./link-card";
 
-const extensions = [StarterKit, Callout];
+// Mirrors how SimpleEditor is wired, giống code-block-language.test.ts: khối
+// code của StarterKit tắt đi, khối có picker thay chỗ, và link card đứng cạnh
+// callout. Chạy `[StarterKit, Callout]` là chạy một cấu hình không hề ship, và
+// đúng thứ nó bỏ sót là xung đột parse giữa các node cùng giành một thẻ, thứ
+// đã bắt link-card.ts phải đặt priority. Link/Underline/Image/ListNesting/
+// SmartArrows không có mặt vì không cái nào giành `div` hay `pre`.
+const extensions = [
+  StarterKit.configure({ codeBlock: false }),
+  CodeBlockWithLanguage,
+  LinkCard,
+  Callout,
+];
 
 const doc = (variant: string | null, text: string) => ({
   type: "doc",
