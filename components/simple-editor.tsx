@@ -9,6 +9,7 @@ import Image from "@tiptap/extension-image";
 import { CodeBlockWithLanguage } from "./extensions/code-block-language";
 import { LinkCard } from "./extensions/link-card";
 import { Callout } from "./extensions/callout";
+import { PrivateNote } from "./extensions/private-note";
 import { CodeAutoPairs } from "./extensions/code-auto-pairs";
 import { CodeHighlighting } from "./extensions/code-highlighting";
 import { ListNesting, indentList } from "./extensions/list-nesting";
@@ -44,6 +45,7 @@ import {
   Bookmark,
   MonitorPlay,
   Lightbulb,
+  StickyNote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -211,6 +213,7 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
       }),
       LinkCard,
       Callout,
+      PrivateNote,
       CodeAutoPairs,
       CodeHighlighting,
       ListNesting,
@@ -644,6 +647,12 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
             >
               <Lightbulb className="w-4 h-4 mr-2" />
               Callout
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => editor.chain().focus().togglePrivateNote().run()}
+            >
+              <StickyNote className="w-4 h-4 mr-2" />
+              Ghi chú riêng
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={() => editor.chain().focus().setHorizontalRule().run()}

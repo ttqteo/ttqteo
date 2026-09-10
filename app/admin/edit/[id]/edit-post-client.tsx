@@ -54,6 +54,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PostBody } from "@/components/post-body";
+import { stripPrivateNotes } from "@/lib/private-note";
 import {
   AlignCenterIcon,
   AlignLeftIcon,
@@ -1218,7 +1219,9 @@ export default function EditPostClient({
                 </div>
               )}
               {post.content.trim() ? (
-                <PostBody html={post.content} />
+                // Cắt ghi chú riêng như trang công khai, vì preview là bản
+                // người đọc nhận. Ghi chú vẫn nằm nguyên trong editor.
+                <PostBody html={stripPrivateNotes(post.content)} />
               ) : (
                 <p className="text-sm text-muted-foreground">
                   Bài chưa có nội dung.

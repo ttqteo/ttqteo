@@ -1,5 +1,6 @@
 import { Typography } from "@/components/typography";
 import { buttonVariants } from "@/components/ui/button";
+import { stripPrivateNotes } from "@/lib/private-note";
 import { supabasePublic } from "@/lib/supabase-public";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { formatDate } from "@/lib/utils";
@@ -118,7 +119,7 @@ export default async function LabSlugPage(props: PageProps) {
       <div className="!w-full text-lg">
         {data.content ? (
           <Typography>
-            <div dangerouslySetInnerHTML={{ __html: data.content }} />
+            <div dangerouslySetInnerHTML={{ __html: stripPrivateNotes(data.content) }} />
           </Typography>
         ) : (
           <p className="text-muted-foreground italic">No content yet.</p>

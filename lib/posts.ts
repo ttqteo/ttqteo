@@ -1,5 +1,6 @@
 import { getAllBlogs } from "@/lib/markdown";
 import { normalizeType, toUnifiedMdxPost } from "@/lib/post-mapping";
+import { stripPrivateNotes } from "@/lib/private-note";
 import { supabasePublic } from "@/lib/supabase-public";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -165,7 +166,11 @@ export async function getPublishedSupabasePostBySlug(
     .is("deleted_at", null)
     .maybeSingle();
 
-  return mapPostRow(data, error);
+  const post = mapPostRow(data, error);
+  // Ghi chú riêng của người viết bị cắt ngay tại đây, nên không trang công khai
+  // nào nhận được nó: không thân bài, không mục lục (tính từ chính chuỗi này),
+  // không payload RSC gửi xuống trình duyệt.
+  return post && { ...post, content: stripPrivateNotes(post.content) };
 }
 
 function mapPostRow(

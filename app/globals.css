@@ -641,6 +641,23 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   @apply absolute right-2 top-2 z-10 rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground outline-none;
 }
 
+/* Ghi chú riêng của người viết. Chỉ tồn tại trong khung soạn thảo: mọi đường
+   đọc công khai cắt nó khỏi HTML trên server (lib/private-note.ts), nên các
+   quy tắc này không bao giờ khớp gì trên trang public. Viền đứt và nền giấy
+   nhớ để không bao giờ bị nhầm với callout, thứ người đọc có thấy. */
+.private-note {
+  @apply relative my-5 rounded-md border border-dashed border-amber-400/70 bg-amber-50/60 px-4 pb-3 pt-7 text-[0.95em] dark:border-amber-500/40 dark:bg-amber-950/20;
+}
+.private-note-label {
+  @apply absolute left-3 top-1.5 flex select-none items-center gap-1 font-mono text-[10px] uppercase tracking-wide text-amber-700/80 dark:text-amber-400/70;
+}
+.private-note-body > :first-child {
+  @apply mt-0;
+}
+.private-note-body > :last-child {
+  @apply mb-0;
+}
+
 
 /* Two lists in a row are one thought continued, not two sections. Tailwind
    Typography gives each list a full block margin, so a bullet list under a
