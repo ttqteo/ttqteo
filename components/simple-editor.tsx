@@ -715,12 +715,28 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
   );
 }
 
+/**
+ * Both handed to BubbleMenu from module scope rather than rebuilt in render.
+ *
+ * tiptap's BubbleMenu dispatches an `updateOptions` transaction whenever its
+ * `shouldShow` or `options` prop changes identity, and this editor re-renders
+ * on every transaction (`shouldRerenderOnTransaction`). Written inline, both
+ * were new on every render, so each render dispatched and each dispatch
+ * rendered again until React stopped it with "Maximum update depth exceeded".
+ * BubbleMenu skips its first update after registering, so the loop only armed
+ * after mount and fired on the next re-render — on the editor page, the first
+ * scroll. `shouldShow` reads nothing but its argument, so nothing is lost by
+ * lifting it out.
+ */
+const LINK_BUBBLE_OPTIONS = { placement: "bottom" } as const;
+
+function linkBubbleShouldShow({ editor }: { editor: Editor }): boolean {
+  return editor.isEditable && editor.isActive("link");
+}
+
 function LinkBubble({ editor }: { editor: Editor }) {
   const [href, setHref] = useState("");
   const [text, setText] = useState("");
-
-  const shouldShow = ({ editor: e }: { editor: Editor }) =>
-    e.isEditable && e.isActive("link");
 
   const lastLinkKeyRef = useRef<string>("");
   useEffect(() => {
@@ -840,8 +856,8 @@ function LinkBubble({ editor }: { editor: Editor }) {
   return (
     <BubbleMenu
       editor={editor}
-      shouldShow={shouldShow}
-      options={{ placement: "bottom" }}
+      shouldShow={linkBubbleShouldShow}
+      options={LINK_BUBBLE_OPTIONS}
     >
       <div
         className="flex flex-col gap-2 rounded-md border bg-popover p-2 shadow-md w-96"
