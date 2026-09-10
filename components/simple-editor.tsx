@@ -132,6 +132,47 @@ function blockStyleLabel(editor: Editor): string {
   return "Đoạn văn";
 }
 
+/**
+ * Nằm ở cấp module chứ không trong thân SimpleEditor. Định nghĩa trong render
+ * thì mỗi lần render ra một kiểu component mới, React tháo cả Tooltip lẫn
+ * Button ra rồi lắp lại. Trước đây chỉ gõ chữ mới kích render nên ít ai để ý,
+ * nhưng giờ thanh công cụ render lại ở mọi transaction, kể cả khi chỉ di
+ * chuyển con trỏ, nên để trong thân hàm thì tooltip nháy mỗi lần bấm nút.
+ */
+function ToolbarButton({
+  onClick,
+  isActive,
+  disabled,
+  tooltip,
+  children,
+}: {
+  onClick: () => void;
+  isActive?: boolean;
+  disabled?: boolean;
+  tooltip: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip delayDuration={0}>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant={isActive ? "secondary" : "ghost"}
+          size="sm"
+          onClick={onClick}
+          disabled={disabled}
+          className="h-8 px-2"
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" sideOffset={5}>
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEditorProps) {
   const { uploadImage, isUploading } = useImageUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -384,39 +425,6 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
       fileInputRef.current.value = "";
     }
   };
-
-  // Toolbar button helper
-  const ToolbarButton = ({
-    onClick,
-    isActive,
-    disabled,
-    tooltip,
-    children,
-  }: {
-    onClick: () => void;
-    isActive?: boolean;
-    disabled?: boolean;
-    tooltip: string;
-    children: React.ReactNode;
-  }) => (
-    <Tooltip delayDuration={0}>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant={isActive ? "secondary" : "ghost"}
-          size="sm"
-          onClick={onClick}
-          disabled={disabled}
-          className="h-8 px-2"
-        >
-          {children}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="bottom" sideOffset={5}>
-        {tooltip}
-      </TooltipContent>
-    </Tooltip>
-  );
 
   return (
     <div>
