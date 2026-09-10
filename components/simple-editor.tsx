@@ -177,6 +177,13 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
     ],
     content: content || "",
     immediatelyRender: false,
+    // Bắt buộc từ tiptap v3: mặc định `useEditor` KHÔNG render lại React khi có
+    // transaction, nên mọi `editor.isActive(...)`, `editor.can()` và nhãn kiểu
+    // khối trên thanh công cụ đọc được một lần rồi đứng hình. Gõ chữ thì chúng
+    // tươi lại nhờ `onUpdate` đẩy state lên cha, nhưng chỉ di chuyển con trỏ
+    // thì không có gì kích render, nên bấm vào một tiêu đề mà menu vẫn ghi
+    // "Đoạn văn".
+    shouldRerenderOnTransaction: true,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
@@ -187,7 +194,7 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
         // block on Tailwind Typography's own margin, which is what made the
         // gaps look uneven. Sizes and weights stay as utilities.
         class:
-          "editor-prose prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[max(500px,60vh)] p-4 text-base leading-normal prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-h1:font-bold prose-h2:font-semibold prose-h3:font-semibold",
+          "editor-prose prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[max(500px,60vh)] p-4 pb-[clamp(400px,50vh,600px)] text-base leading-normal prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-h1:font-bold prose-h2:font-semibold prose-h3:font-semibold",
       },
       handlePaste: (view, event) => {
         const url = bareUrl(event.clipboardData?.getData("text/plain"));
