@@ -1031,6 +1031,10 @@ export default function EditPostClient({
                     type="button"
                     variant="outline"
                     size="sm"
+                    // Desktop only: narrow/wide and centre/left have nothing to
+                    // do on a column that is already the full width, and the
+                    // popover ends up covering the text it exists to arrange.
+                    className="hidden lg:inline-flex"
                     aria-label="Tuỳ chọn bố cục"
                   >
                     <Settings2Icon className="w-4 h-4" />
@@ -1106,6 +1110,7 @@ export default function EditPostClient({
               type="button"
               variant={showTldraw ? "default" : "outline"}
               size="sm"
+              className={cn(!showTldraw && "hidden lg:inline-flex")}
               onClick={() =>
                 setShowTldraw((v) => {
                   const next = !v;
