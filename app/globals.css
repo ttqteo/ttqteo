@@ -339,19 +339,24 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   margin-top: 0.75em;
   margin-bottom: 0.75em;
 }
+/* Lead của heading tính bằng `rem`, không phải `em`. `em` ở đây nhân với cỡ
+   chữ của chính thẻ heading, mà cỡ đó mỗi bề mặt một khác (editor ép
+   `prose-h1:text-3xl`, trang đọc lấy theo `--reader-fs`), nên cùng một con số
+   ra hai khoảng trống khác nhau, và h1 to nhất thì bị phóng to nhiều nhất.
+   Thang 28/24/20px giữ h1 > h2 > h3 mà không để h1 tách hẳn khỏi đoạn trên. */
 .editor-prose > h1,
 .editor-html > h1 {
-  margin-top: 1.6em;
+  margin-top: 1.75rem;
   margin-bottom: 0.5em;
 }
 .editor-prose > h2,
 .editor-html > h2 {
-  margin-top: 1.4em;
+  margin-top: 1.5rem;
   margin-bottom: 0.45em;
 }
 .editor-prose > h3,
 .editor-html > h3 {
-  margin-top: 1.2em;
+  margin-top: 1.25rem;
   margin-bottom: 0.4em;
 }
 .editor-prose > :first-child,
