@@ -4,13 +4,15 @@ import { syncMdxToSupabase } from "../lib/sync-mdx-supabase";
 
 async function main() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // Service role only. The anon key used to be the fallback, and it could only
+  // write while `blogs` let anyone write (fix_permissions.sql). Under the
+  // admin-only policies RLS drops the update without an error, so the run would
+  // report rows as soft-deleted that were never touched.
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !key) {
     console.warn(
-      "[sync] missing SUPABASE env vars; skipping MDX↔Supabase sync.",
+      "[sync] missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY; skipping MDX↔Supabase sync.",
     );
     return 0;
   }

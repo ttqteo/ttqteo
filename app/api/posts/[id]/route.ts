@@ -13,6 +13,19 @@ type RouteParams = {
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   const { id } = await params;
 
+  // Nothing in the app calls this, but left open it hands the raw `content` of
+  // any published post to whoever has its id, private notes included, which the
+  // public pages strip out. Same gate as PUT and DELETE below.
+  const user = await getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const admin = await isAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("blogs")
