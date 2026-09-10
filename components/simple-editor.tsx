@@ -10,6 +10,7 @@ import { CodeBlockWithLanguage } from "./extensions/code-block-language";
 import { LinkCard } from "./extensions/link-card";
 import { Callout } from "./extensions/callout";
 import { PrivateNote } from "./extensions/private-note";
+import { SlashCommand } from "./extensions/slash-command";
 import { CodeAutoPairs } from "./extensions/code-auto-pairs";
 import { CodeHighlighting } from "./extensions/code-highlighting";
 import { ListNesting, indentList } from "./extensions/list-nesting";
@@ -214,6 +215,7 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
       LinkCard,
       Callout,
       PrivateNote,
+      SlashCommand,
       CodeAutoPairs,
       CodeHighlighting,
       ListNesting,
