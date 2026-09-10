@@ -1,7 +1,21 @@
 import type { NextConfig } from "next";
 
+/**
+ * Stamped once per build and handed to both sides: the browser bakes it into
+ * the page it loaded, and /api/version reports the one the server is currently
+ * running. A difference between them means a deploy happened under a tab that
+ * is still open.
+ *
+ * The commit SHA on Vercel, a timestamp locally, so `next dev` restarts do not
+ * all look like the same build.
+ */
+const buildId =
+  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? `dev-${Date.now().toString(36)}`;
+
 const nextConfig: NextConfig = {
   /* config options here */
+  generateBuildId: () => buildId,
+  env: { NEXT_PUBLIC_BUILD_ID: buildId },
   images: {
     remotePatterns: [
       {

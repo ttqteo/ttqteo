@@ -6,6 +6,7 @@ import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
 import { ResumeOrchestrator } from "@/components/resume/resume-orchestrator";
 import { Toaster } from "@/components/ui/sonner";
+import { UpdatePrompt } from "@/components/update-prompt";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { KeyboardNav } from "@/lib/keyboard-nav";
 import type { Metadata } from "next";
@@ -72,6 +73,7 @@ export default function RootLayout({
               <TooltipProvider delayDuration={0}>
                 <KeyboardNav />
                 <ResumeOrchestrator />
+                <UpdatePrompt />
                 <div className="app-shell min-h-screen flex flex-col">
                   <div className="focus-mode-hidden">
                     <AdminToolbar />
