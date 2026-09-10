@@ -379,6 +379,17 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   margin-top: 0;
   margin-bottom: 0;
 }
+/* Same for a list nested in an item. It is not a direct child of the body, so
+   the block rhythm above never reached it and it kept Tailwind Typography's
+   `ul ul` margin (~0.57em in the editor, 0.75em on the reading page): a
+   sub-item sat visibly further from its parent than siblings sit from each
+   other. At 0 its margins collapse into the items' own 0.15em, so every step
+   in the list is the same gap whatever the level. */
+.editor-prose li > :is(ul, ol),
+.editor-html li > :is(ul, ol) {
+  margin-top: 0;
+  margin-bottom: 0;
+}
 
 /* Legacy YouTube embeds. Kept because published posts saved by the first cut of
    this feature still carry this markup on the public page; the editor upgrades
