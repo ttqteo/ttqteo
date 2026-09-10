@@ -1,6 +1,6 @@
 import { getAllBlogs } from "@/lib/markdown";
 import { normalizeType, toUnifiedMdxPost } from "@/lib/post-mapping";
-import { stripPrivateNotes } from "@/lib/private-note";
+import { extractPrivateNotes, PRIVATE_NOTE_ATTR, stripPrivateNotes } from "@/lib/private-note";
 import { supabasePublic } from "@/lib/supabase-public";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -171,6 +171,55 @@ export async function getPublishedSupabasePostBySlug(
   // nào nhận được nó: không thân bài, không mục lục (tính từ chính chuỗi này),
   // không payload RSC gửi xuống trình duyệt.
   return post && { ...post, content: stripPrivateNotes(post.content) };
+}
+
+export type PostWithNotes = {
+  id: string;
+  slug: string;
+  title: string;
+  isPublished: boolean;
+  updatedAt: string;
+  notes: string[];
+};
+
+/**
+ * Every post outside the trash that carries private notes, with each note's
+ * inner HTML, for /admin/notes. Notes live inside `content`, so there is no
+ * table to read them from: `ilike` narrows the rows so the page does not pull
+ * every post body, and `extractPrivateNotes` does the real parsing. A post that
+ * only mentions the attribute in its text passes the filter, parses to no
+ * notes, and is dropped here.
+ *
+ * Cookie client on purpose: RLS only lets the admin read drafts.
+ */
+export async function getPostsWithPrivateNotes(): Promise<PostWithNotes[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("blogs")
+    .select("id, slug, title, is_published, created_at, updated_at, content")
+    .is("deleted_at", null)
+    .ilike("content", `%${PRIVATE_NOTE_ATTR}%`)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error("[posts] supabase error:", error.message);
+    return [];
+  }
+
+  return ((data || []) as Record<string, unknown>[]).flatMap((r) => {
+    const notes = extractPrivateNotes((r.content as string) || "");
+    if (notes.length === 0) return [];
+    return [
+      {
+        id: String(r.id),
+        slug: String(r.slug),
+        title: (r.title as string) || "Untitled",
+        isPublished: !!r.is_published,
+        updatedAt: (r.updated_at as string) || (r.created_at as string) || new Date().toISOString(),
+        notes,
+      },
+    ];
+  });
 }
 
 function mapPostRow(

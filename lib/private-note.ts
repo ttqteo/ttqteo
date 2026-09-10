@@ -16,12 +16,17 @@ export const PRIVATE_NOTE_ATTR = "data-private-note";
 const ASIDE_TAG = /<(\/?)aside\b[^>]*>/gi;
 const OPENS_NOTE = new RegExp(`\\s${PRIVATE_NOTE_ATTR}(?=[\\s=/>])`, "i");
 
-export function stripPrivateNotes(html: string): string {
-  if (!html.includes(PRIVATE_NOTE_ATTR)) return html;
+/** Vị trí một ghi chú: `start`/`end` bao cả thẻ bọc, `body*` chỉ phần ruột. */
+type NoteSpan = { start: number; bodyStart: number; bodyEnd: number; end: number };
 
-  let out = "";
-  let cursor = 0;
-  // Độ sâu `<aside>` tính từ thẻ mở của ghi chú đang cắt; 0 là đang ở ngoài.
+/** Các ghi chú ngoài cùng theo thứ tự; ghi chú lồng trong ghi chú thuộc về cái bọc nó. */
+function findNotes(html: string): NoteSpan[] {
+  const spans: NoteSpan[] = [];
+  if (!html.includes(PRIVATE_NOTE_ATTR)) return spans;
+
+  let start = 0;
+  let bodyStart = 0;
+  // Độ sâu `<aside>` tính từ thẻ mở của ghi chú đang quét; 0 là đang ở ngoài.
   let depth = 0;
   let match: RegExpExecArray | null;
   ASIDE_TAG.lastIndex = 0;
@@ -30,17 +35,37 @@ export function stripPrivateNotes(html: string): string {
     const closing = match[1] === "/";
     if (depth === 0) {
       if (closing || !OPENS_NOTE.test(match[0])) continue;
-      out += html.slice(cursor, match.index);
+      start = match.index;
+      bodyStart = match.index + match[0].length;
       depth = 1;
       continue;
     }
     // Mọi `<aside>` bên trong đều được đếm, kể cả loại không phải ghi chú, để
     // thẻ đóng khớp đúng thẻ mở của ghi chú chứ không phải thẻ đầu tiên gặp.
     depth += closing ? -1 : 1;
-    if (depth === 0) cursor = match.index + match[0].length;
+    if (depth === 0) {
+      spans.push({ start, bodyStart, bodyEnd: match.index, end: match.index + match[0].length });
+    }
   }
 
-  // Ghi chú không có thẻ đóng: bỏ luôn phần còn lại. Lỡ cắt thừa một đoạn còn
-  // hơn để ghi chú lọt lên trang công khai.
-  return depth > 0 ? out : out + html.slice(cursor);
+  // Ghi chú không có thẻ đóng thì kéo tới hết chuỗi. Với việc cắt, lỡ cắt thừa
+  // một đoạn còn hơn để ghi chú lọt lên trang công khai; với việc đọc ở trang
+  // admin, hiện thừa còn hơn làm mất ghi chú.
+  if (depth > 0) spans.push({ start, bodyStart, bodyEnd: html.length, end: html.length });
+  return spans;
+}
+
+export function stripPrivateNotes(html: string): string {
+  let out = "";
+  let cursor = 0;
+  for (const span of findNotes(html)) {
+    out += html.slice(cursor, span.start);
+    cursor = span.end;
+  }
+  return out + html.slice(cursor);
+}
+
+/** Phần ruột HTML của từng ghi chú, không kèm thẻ bọc, cho trang /admin/notes. */
+export function extractPrivateNotes(html: string): string[] {
+  return findNotes(html).map((span) => html.slice(span.bodyStart, span.bodyEnd));
 }

@@ -1,7 +1,7 @@
 import { generateHTML, generateJSON } from "@tiptap/html";
 import StarterKit from "@tiptap/starter-kit";
 import { describe, expect, it } from "vitest";
-import { stripPrivateNotes } from "@/lib/private-note";
+import { extractPrivateNotes, stripPrivateNotes } from "@/lib/private-note";
 import { Callout } from "./callout";
 import { CodeBlockWithLanguage } from "./code-block-language";
 import { LinkCard } from "./link-card";
@@ -104,5 +104,25 @@ describe("stripPrivateNotes trên HTML editor thật sự phát ra", () => {
       extensions,
     );
     expect(stripPrivateNotes(html)).toBe("<p>Trước</p><p>Sau</p>");
+  });
+});
+
+// Nửa còn lại của hợp đồng: trang /admin/notes đọc đúng ruột ghi chú từ HTML
+// editor ghi xuống, không dính thẻ bọc hay đoạn văn xung quanh.
+describe("extractPrivateNotes trên HTML editor thật sự phát ra", () => {
+  it("lấy ruột của từng ghi chú, kể cả cái nằm trong callout", () => {
+    const html = generateHTML(
+      doc(
+        paragraph("Trước"),
+        note(paragraph("Một")),
+        {
+          type: "callout",
+          attrs: { variant: "tip" },
+          content: [paragraph("Mẹo"), note(paragraph("Hai"), paragraph("Ba"))],
+        },
+      ),
+      extensions,
+    );
+    expect(extractPrivateNotes(html)).toEqual(["<p>Một</p>", "<p>Hai</p><p>Ba</p>"]);
   });
 });

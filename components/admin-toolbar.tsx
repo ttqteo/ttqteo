@@ -1,6 +1,6 @@
 "use client";
 
-import { FileTextIcon, MoonIcon, PencilIcon, SunIcon } from "lucide-react";
+import { FileTextIcon, MoonIcon, PencilIcon, StickyNoteIcon, SunIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useTheme } from "next-themes";
@@ -70,6 +70,11 @@ export function AdminToolbar({ editPostId }: AdminToolbarProps) {
           <AdminNavLink href="/admin" exact>
             <FileTextIcon className="w-3.5 h-3.5" />
             <span>posts</span>
+          </AdminNavLink>
+          <AdminNavLink href="/admin/notes">
+            <StickyNoteIcon className="w-3.5 h-3.5 shrink-0" />
+            {/* Icon only on a phone, same as Edit Post, so the bar still fits. */}
+            <span className="hidden sm:inline">notes</span>
           </AdminNavLink>
           {editPostId && (
             <AdminNavLink href={`/admin/edit/${editPostId}`}>
