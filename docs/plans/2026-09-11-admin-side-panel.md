@@ -30,7 +30,7 @@
 
 1. API dùng `PUT /…/[id]` upsert thay cho `POST` + `PATCH`. Id do trình duyệt tạo, nên tạo mới, tự lưu, tick xong và Undo đều là một lệnh.
 2. CSS chừa chỗ khoá theo `:has(.admin-side-rail)`, để khoảng chừa không ở lại trên trang công khai sau khi rời `/admin`.
-3. Panel đang mở đọc bằng `useSyncExternalStore` từ localStorage. Không có effect nào gọi setState lúc nạp trang.
+3. Panel đang mở đọc bằng `useSyncExternalStore`, bắt đầu từ dấu trên `<html>` mà script `<head>` lấy từ localStorage. Không có effect nào gọi setState lúc nạp trang.
 
 **Về z-index:** toolbar là `z-[60]`, header dính của editor là `z-[55]`. Rail và panel dùng `z-[56]`: trên editor, dưới toolbar. Tooltip và popover mở từ bên trong chúng phải là `z-[70]`, vì mặc định của shadcn là `z-50` và sẽ nằm dưới panel.
 
