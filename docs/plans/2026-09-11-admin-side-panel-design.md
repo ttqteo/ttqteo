@@ -112,6 +112,8 @@ create table if not exists public.admin_tasks (
 
 Mỗi bảng bật RLS và có đúng một policy "Admin full access", cùng điều kiện với `blogs` trong `restrict_blogs_to_admin.sql`: `(auth.jwt() -> 'app_metadata' ->> 'admin') = 'true'`. Không có policy đọc công khai.
 
+File SQL dừng lại nếu chưa tài khoản nào có claim admin, thu hết quyền của `anon` trên hai bảng, và chỉ cho `authenticated` bốn lệnh select, insert, update, delete.
+
 ## API
 
 Theo kiểu của `app/api/posts/[id]/route.ts`: chặn bằng `getUser()` và `isAdmin()`, rồi dùng `createSupabaseServerClient()` mang token của người gọi, nên RLS là lớp chặn thứ hai.
@@ -187,8 +189,10 @@ Route calendar:
 | `app/api/admin/calendar/route.ts` | Mới |
 | `components/admin/side-panel/` | Mới: provider, rail, khung panel, sheet, ba panel, ba kho dữ liệu |
 | `app/admin/layout.tsx` | Mount sidebar, CSS chừa chỗ |
-| `app/layout.tsx` | Script `<head>` set thêm `data-admin-panel`, Toaster dời vào |
-| `components/admin-toolbar.tsx` | Icon mở sheet trên điện thoại |
+| `app/layout.tsx` | Script `<head>` set thêm `data-admin-panel`, Toaster có `offset` theo `--admin-side-w` |
+| `components/admin-toolbar.tsx` | Icon mở sheet trên điện thoại; trên điện thoại chữ `posts`, `notes` chỉ còn cho trình đọc màn hình |
+| `components/admin/logout-form.tsx` | Trên điện thoại chữ `logout` chỉ còn cho trình đọc màn hình |
+| `lib/supabase-server.ts` | Thêm `isAdminUser` thuần, để route chỉ hỏi Supabase một lần |
 | `app/admin/edit/[id]/edit-post-client.tsx` | Khung split và cụm nút góc phải chừa `--admin-side-w` |
 | `.env.example` | Thêm `ADMIN_CALENDAR_FEEDS` |
 | `package.json` | Thêm `ical.js` |
@@ -224,3 +228,4 @@ Mỗi bước merge riêng, xong bước nào dùng được bước đó.
 - **Lần đầu mở mỗi tháng có thể chậm**: file ICS vài MB mất khoảng nửa giây tới một giây để parse. Các lần sau lấy từ cache.
 - **Khung split của editor** có sẵn một panel bảng vẽ ở bên phải. Khi mở cả panel admin lẫn bảng vẽ trên màn nhỏ hơn 1280px, panel admin nổi đè lên bảng vẽ. Chấp nhận được.
 - **Dưới 1280px panel nổi đè lên cụm nút góc dưới của editor, còn toast hiện đè lên panel.** Chấp nhận được: đóng panel là nút hiện lại, và toast vẫn đọc được.
+- **Quyền admin nằm ở hai chỗ.** Code kiểm email (`ADMIN_EMAIL`), RLS kiểm claim `app_metadata.admin`. Muốn tước quyền một tài khoản thì phải gỡ claim của nó, và token cũ vẫn giữ claim tới khi hết hạn (tối đa khoảng một giờ). Mọi tài khoản có claim dùng chung một kho note và task, vì bảng không có cột chủ sở hữu.

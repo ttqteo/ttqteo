@@ -1098,8 +1098,9 @@ Tạo cả hai bảng một lần để chỉ phải chạy SQL một lần.
 -- (admin_tasks). Xem docs/plans/2026-09-11-admin-side-panel-design.md.
 --
 -- Chi admin doc va ghi duoc, cung dieu kien voi blogs trong
--- restrict_blogs_to_admin.sql. Chay file do truoc: no dat app_metadata.admin
--- cho tai khoan cua ban, thieu no thi chinh ban cung bi RLS chan.
+-- restrict_blogs_to_admin.sql. Tai khoan cua ban phai co app_metadata.admin
+-- truoc: chay cau update o dau file do mot lan, roi dang xuat va dang nhap lai.
+-- Chua ai co thi file nay dung lai o buoc kiem ben duoi.
 --
 -- id do trinh duyet tao (crypto.randomUUID) de tu luu va Undo cung la mot
 -- lenh upsert; default o day chi de insert tay trong SQL editor van chay.
@@ -1107,6 +1108,17 @@ Tạo cả hai bảng một lần để chỉ phải chạy SQL một lần.
 -- Chay lai bao nhieu lan cung duoc.
 
 begin;
+
+-- Tao bang xong ma khong ai doc duoc thi panel chi hien danh sach rong, rat
+-- kho doan ra vi sao. Nen dung lai ngay tu day.
+do $$
+begin
+  if not exists (
+    select 1 from auth.users where raw_app_meta_data ->> 'admin' = 'true'
+  ) then
+    raise exception 'Chua user nao co app_metadata.admin = true. Chay cau update o dau restrict_blogs_to_admin.sql truoc.';
+  end if;
+end $$;
 
 create table if not exists public.admin_notes (
   id uuid primary key default gen_random_uuid(),
@@ -1144,21 +1156,30 @@ to authenticated
 using ((auth.jwt() -> 'app_metadata' ->> 'admin') = 'true')
 with check ((auth.jwt() -> 'app_metadata' ->> 'admin') = 'true');
 
+-- Chi authenticated dung duoc hai bang, va chi bon lenh ma API can; RLS o tren
+-- quyet dinh ai trong so do. anon khong co gi, ke ca xem cot trong OpenAPI.
+revoke all on public.admin_notes, public.admin_tasks from anon;
+revoke truncate, references, trigger on public.admin_notes, public.admin_tasks from authenticated;
+grant select, insert, update, delete on public.admin_notes, public.admin_tasks to authenticated;
+
 commit;
 
 -- PostgREST phai biet hai bang moi thi API moi thay chung.
 notify pgrst, 'reload schema';
 
--- Kiem lai: moi bang dung mot policy "Admin full access".
+-- Kiem lai: moi bang dung mot policy "Admin full access", va RLS dang bat (t).
 --
 --   select tablename, policyname, cmd from pg_policies
 --   where tablename in ('admin_notes', 'admin_tasks');
+--
+--   select relname, relrowsecurity from pg_class
+--   where oid in ('public.admin_notes'::regclass, 'public.admin_tasks'::regclass);
 ```
 
 **Step 2: Người dùng chạy file (dừng lại và nhờ người dùng)**
 
 Supabase Dashboard → SQL Editor → dán nội dung file → Run. File cần `restrict_blogs_to_admin.sql` đã chạy trước đó, vì cả hai dựa vào `app_metadata.admin`. Chạy câu kiểm ở cuối file.
-Expected: 2 dòng, `admin_notes` và `admin_tasks`, cùng policy "Admin full access", cmd `ALL`.
+Expected: 2 dòng, `admin_notes` và `admin_tasks`, cùng policy "Admin full access", cmd `ALL`. Câu thứ hai trả `t` cho cả hai bảng. Nếu file dừng ở bước kiểm với lỗi "Chua user nao co app_metadata.admin = true", chạy câu `update auth.users ...` ở đầu `restrict_blogs_to_admin.sql`, đăng xuất, đăng nhập lại, rồi chạy lại file này.
 
 **Step 3: Commit**
 
@@ -1209,12 +1230,23 @@ describe("isUuid", () => {
 describe("parseTimestamp", () => {
   it("normalises to ISO", () => {
     expect(parseTimestamp("2026-09-11T03:00:00.123456+00:00")).toBe("2026-09-11T03:00:00.123Z");
+    expect(parseTimestamp("2026-09-11T10:00+07:00")).toBe("2026-09-11T03:00:00.000Z");
   });
 
   it("is null for anything it cannot read", () => {
     expect(parseTimestamp(undefined)).toBeNull();
     expect(parseTimestamp("yesterday")).toBeNull();
     expect(parseTimestamp(1_757_000_000_000)).toBeNull();
+  });
+
+  it.each([
+    ["a time with no offset, which each machine would read in its own zone", "2026-09-11T03:00:00"],
+    ["a day that does not exist", "2026-02-30T00:00:00Z"],
+    ["a date alone", "2026-09-11"],
+    ["a year outside four digits", "+010000-01-01T00:00:00Z"],
+    ["a loose date string", "11/09/2026"],
+  ])("refuses %s", (_label, value) => {
+    expect(parseTimestamp(value)).toBeNull();
   });
 });
 ```
@@ -1233,7 +1265,7 @@ Expected: FAIL, `Failed to resolve import "@/lib/admin-db"`.
  * imported by a test.
  */
 
-export type DbError = { code?: string; message?: string };
+export type DbError = { code?: string; message?: string; details?: string; hint?: string };
 
 /**
  * The table is not there: supabase/add_admin_side_panel.sql was never run.
@@ -1254,9 +1286,23 @@ export function isUuid(value: unknown): value is string {
   return typeof value === "string" && UUID.test(value);
 }
 
-/** A timestamp from a request body as ISO; null when absent or unreadable. */
+// An instant with an explicit offset, as toISOString() and Postgres write it.
+// Without an offset, a string would be read in whatever zone the server runs.
+const ISO_INSTANT =
+  /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/i;
+
+/**
+ * A timestamp from a request body as ISO; null when absent or unreadable.
+ * Stricter than Date.parse, which also takes "1", "11/09/2026", strings with
+ * no offset, and 2026-02-30 (rolled over to 2 March).
+ */
 export function parseTimestamp(value: unknown): string | null {
   if (typeof value !== "string") return null;
+  const match = ISO_INSTANT.exec(value);
+  if (!match) return null;
+  const [year, month, day] = [match[1], match[2], match[3]].map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
   const ms = Date.parse(value);
   return Number.isNaN(ms) ? null : new Date(ms).toISOString();
 }
@@ -1265,7 +1311,7 @@ export function parseTimestamp(value: unknown): string | null {
 **Step 4: Chạy lại**
 
 Run: `pnpm vitest run lib/admin-db.test.ts`
-Expected: PASS, 5 tests.
+Expected: PASS, 10 tests.
 
 **Step 5: Commit**
 
@@ -1278,6 +1324,7 @@ git commit -m "feat: recognise a missing table and check ids for the admin route
 
 **Files:**
 - Create: `lib/admin-api.ts`
+- Modify: `lib/supabase-server.ts`
 
 File này import `next/headers` (qua `supabase-server`) nên không test bằng vitest.
 
@@ -1285,19 +1332,22 @@ File này import `next/headers` (qua `supabase-server`) nên không test bằng 
 
 ```ts
 import { isMissingTableError, type DbError } from "@/lib/admin-db";
-import { getUser, isAdmin } from "@/lib/supabase-server";
+import { getUser, isAdminUser } from "@/lib/supabase-server";
 import { NextResponse } from "next/server";
 
 /**
- * The same gate as app/api/posts/[id]/route.ts. The Supabase client a route
- * uses afterwards carries the caller's token, so RLS on the admin_* tables is
- * a second wall behind this one rather than the only one.
+ * The same gate as app/api/posts/[id]/route.ts, with one auth round trip:
+ * cache() does not dedupe inside a route handler, so isAdmin() after
+ * getUser() would ask Supabase for the user twice. The Supabase client a
+ * route uses afterwards carries the caller's token, so RLS on the admin_*
+ * tables is a second wall behind this one rather than the only one.
  */
 export async function requireAdmin(): Promise<NextResponse | null> {
-  if (!(await getUser())) {
+  const user = await getUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!(await isAdmin())) {
+  if (!isAdminUser(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   return null;
@@ -1310,22 +1360,57 @@ export function badRequest(error: string): NextResponse {
 /** A Supabase error as a response. A missing table gets a code the panel shows its own hint for. */
 export function dbError(error: DbError, route: string): NextResponse {
   if (isMissingTableError(error)) {
+    console.error(`[${route}] table missing: run supabase/add_admin_side_panel.sql`);
     return NextResponse.json({ error: "missing_table", code: "missing_table" }, { status: 500 });
   }
-  console.error(`[${route}] supabase error:`, error.message);
-  return NextResponse.json({ error: error.message ?? "Database error" }, { status: 500 });
+  console.error(
+    `[${route}] supabase error`,
+    error.code ?? "",
+    error.message,
+    error.details ?? "",
+    error.hint ?? "",
+  );
+  return NextResponse.json({ error: error.message || "Database error" }, { status: 500 });
 }
 ```
 
-**Step 2: Kiểm kiểu**
+**Step 2: `isAdminUser` trong `lib/supabase-server.ts`**
+
+Thêm hàm thuần `isAdminUser` và cho `isAdmin` dùng nó, để route chỉ hỏi Supabase một lần mỗi request (`cache()` không gộp lời gọi trong route handler).
+
+Thay `isAdmin` cũ (từ `// Check if user is the admin (your email)` tới cuối file) bằng:
+
+```ts
+/**
+ * Whether this user is the admin, by ADMIN_EMAIL. Unset means nobody, never
+ * everybody. Pure, so a route handler can check a user it already has.
+ */
+export function isAdminUser(user: { email?: string } | null): boolean {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  return Boolean(adminEmail) && user?.email === adminEmail;
+}
+
+// Check if user is the admin (your email)
+export const isAdmin = cache(async () => isAdminUser(await getUser()));
+```
+
+Thay hai dòng comment trên `export const getUser` bằng:
+
+```ts
+// `cache()` dedupes within a server render: `getUser()` hits the Supabase auth
+// server over the network, and several components used to each call it
+// independently. It does not dedupe in a route handler; see isAdminUser.
+```
+
+**Step 3: Kiểm kiểu**
 
 Run: `pnpm exec tsc --noEmit`
 Expected: không lỗi.
 
-**Step 3: Commit**
+**Step 4: Commit**
 
 ```bash
-git add lib/admin-api.ts
+git add lib/admin-api.ts lib/supabase-server.ts
 git commit -m "feat: shared admin gate and error responses for the side panel routes"
 ```
 
@@ -5302,7 +5387,7 @@ Người dùng thêm `ADMIN_CALENDAR_FEEDS` vào Project Settings → Environmen
 **Step 1: Test**
 
 Run: `pnpm test`
-Expected: mọi file test đều PASS, gồm 105 test mới.
+Expected: mọi file test đều PASS, gồm 110 test mới.
 
 **Step 2: Kiểu và lint**
 
