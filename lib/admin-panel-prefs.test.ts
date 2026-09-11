@@ -21,21 +21,31 @@ afterEach(() => {
 });
 
 describe("readAdminPanel / writeAdminPanel", () => {
-  it("is closed when nothing is stored", async () => {
+  it("is closed when the page was not marked", async () => {
     const { readAdminPanel } = await load();
     expect(readAdminPanel()).toBeNull();
   });
 
-  it("starts from what the last page load stored", async () => {
-    const { ADMIN_PANEL_KEY, readAdminPanel } = await load();
+  it("starts from the panel the head script marked on <html>", async () => {
+    const { ADMIN_PANEL_HEAD_SNIPPET, ADMIN_PANEL_KEY, readAdminPanel } = await load();
     localStorage.setItem(ADMIN_PANEL_KEY, "tasks");
+    new Function(ADMIN_PANEL_HEAD_SNIPPET)();
     expect(readAdminPanel()).toBe("tasks");
   });
 
-  it("ignores a stored value it does not know", async () => {
-    const { ADMIN_PANEL_KEY, readAdminPanel } = await load();
-    localStorage.setItem(ADMIN_PANEL_KEY, "mail");
+  it("ignores a mark it does not know", async () => {
+    const { readAdminPanel } = await load();
+    document.documentElement.dataset.adminPanel = "mail";
     expect(readAdminPanel()).toBeNull();
+  });
+
+  it("follows <html>, not storage, when another tab changed storage after the page loaded", async () => {
+    // The first read can come long after page load, on a client-side
+    // navigation into /admin; <html> is what the CSS is showing.
+    const { ADMIN_PANEL_KEY, readAdminPanel } = await load();
+    document.documentElement.dataset.adminPanel = "notes";
+    localStorage.setItem(ADMIN_PANEL_KEY, "calendar");
+    expect(readAdminPanel()).toBe("notes");
   });
 
   it("round-trips a panel and stores it for the next page load", async () => {
@@ -52,8 +62,10 @@ describe("readAdminPanel / writeAdminPanel", () => {
     expect(localStorage.getItem(ADMIN_PANEL_KEY)).toBeNull();
   });
 
-  it("keeps a panel the storage refused to save", async () => {
-    const { readAdminPanel, writeAdminPanel } = await load();
+  it("keeps a panel the storage refused to save, and still says so", async () => {
+    const { readAdminPanel, subscribeAdminPanel, writeAdminPanel } = await load();
+    const listener = vi.fn();
+    subscribeAdminPanel(listener);
     // On the instance, not Storage.prototype: happy-dom binds Storage methods
     // onto the instance the first time they are used, so a prototype spy is
     // never reached once an earlier test has touched localStorage.
@@ -63,6 +75,7 @@ describe("readAdminPanel / writeAdminPanel", () => {
     writeAdminPanel("calendar");
     expect(setItem).toHaveBeenCalled();
     expect(readAdminPanel()).toBe("calendar");
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it("does not move when another tab changes the stored value", async () => {
