@@ -17,13 +17,11 @@ import { ListNesting, indentList } from "./extensions/list-nesting";
 import { SmartArrows } from "./extensions/smart-arrows";
 import { EditorTable } from "./extensions/table";
 import { TableBubble } from "./table-bubble";
+import { FormatBubble } from "./format-bubble";
+import { linkBubbleShouldShow } from "./editor-bubbles";
 import { bareUrl, type UnfurlResult } from "@/lib/unfurl";
 import { parseYoutubeUrl, youtubeEmbedSrc } from "@/lib/youtube";
 import {
-  Bold,
-  Italic,
-  Strikethrough,
-  Code,
   List,
   ListOrdered,
   Heading1,
@@ -36,10 +34,7 @@ import {
   Plus,
   ChevronDown,
   Pilcrow,
-  Undo,
-  Redo,
   Link2,
-  UnderlineIcon,
   Code2,
   ImageIcon,
   Loader2,
@@ -405,22 +400,6 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
     setPastePrompt(null);
   };
 
-  const addLink = () => {
-    const previous = editor.getAttributes("link").href as string | undefined;
-    const url = window.prompt("URL (để trống để xoá link):", previous ?? "");
-    if (url === null) return;
-    if (url === "") {
-      editor.chain().focus().extendMarkRange("link").unsetLink().run();
-      return;
-    }
-    editor
-      .chain()
-      .focus()
-      .extendMarkRange("link")
-      .setLink({ href: url })
-      .run();
-  };
-
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -448,23 +427,9 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
         className={`z-30 flex flex-wrap gap-1 p-2 bg-background/95 backdrop-blur ${stickyTop !== null ? "sticky" : ""}`}
         style={stickyTop !== null ? { top: stickyTop } : undefined}
       >
-        {/* Undo/Redo */}
-        <ToolbarButton
-          onClick={() => editor.chain().focus().undo().run()}
-          disabled={!editor.can().undo()}
-          tooltip="Undo (⌘Z)"
-        >
-          <Undo className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().redo().run()}
-          disabled={!editor.can().redo()}
-          tooltip="Redo (⌘⇧Z)"
-        >
-          <Redo className="w-4 h-4" />
-        </ToolbarButton>
-
-        <div className="w-px h-6 bg-border mx-1" />
+        {/* Chỉ còn thứ dùng ở mọi dòng: kiểu khối, list, thụt lề và "+".
+            Định dạng chữ nằm trong FormatBubble, hiện khi bôi đen; undo/redo
+            để cho Ctrl+Z. Thanh này từng lên 14 nút và tràn sang hàng hai. */}
 
         {/* Block style in one control, the way Substack keeps its Style menu.
             Four buttons that are mutually exclusive read better as a menu
@@ -534,54 +499,6 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
         </ToolbarButton>
 
         <div className="w-px h-6 bg-border mx-1" />
-
-        {/* Text Formatting */}
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          isActive={editor.isActive("bold")}
-          tooltip="Bold (⌘B)"
-        >
-          <Bold className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          isActive={editor.isActive("italic")}
-          tooltip="Italic (⌘I)"
-        >
-          <Italic className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-          isActive={editor.isActive("underline")}
-          tooltip="Underline (⌘U)"
-        >
-          <UnderlineIcon className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-          isActive={editor.isActive("strike")}
-          tooltip="Strikethrough"
-        >
-          <Strikethrough className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleCode().run()}
-          isActive={editor.isActive("code")}
-          tooltip="Inline Code"
-        >
-          <Code className="w-4 h-4" />
-        </ToolbarButton>
-
-        <div className="w-px h-6 bg-border mx-1" />
-
-        {/* Link */}
-        <ToolbarButton
-          onClick={addLink}
-          isActive={editor.isActive("link")}
-          tooltip="Add Link"
-        >
-          <Link2 className="w-4 h-4" />
-        </ToolbarButton>
 
         {/* Indent / outdent. Tab and Shift-Tab do the same thing, but a list
             nested under another list is not a discoverable feature without a
@@ -747,6 +664,7 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
           other. */}
       {!pastePrompt && <LinkBubble editor={editor} />}
       <TableBubble editor={editor} />
+      <FormatBubble editor={editor} />
     </div>
   );
 }
@@ -765,10 +683,6 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
  * lifting it out.
  */
 const LINK_BUBBLE_OPTIONS = { placement: "bottom" } as const;
-
-function linkBubbleShouldShow({ editor }: { editor: Editor }): boolean {
-  return editor.isEditable && editor.isActive("link");
-}
 
 function LinkBubble({ editor }: { editor: Editor }) {
   const [href, setHref] = useState("");

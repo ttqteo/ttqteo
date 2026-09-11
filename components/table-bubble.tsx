@@ -12,70 +12,18 @@ import {
   X,
 } from "lucide-react";
 import { useCallback } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { BubbleButton } from "@/components/bubble-button";
+import { tableBubbleShouldShow } from "@/components/editor-bubbles";
 
 /**
- * Cùng lý do với `LINK_BUBBLE_OPTIONS` trong simple-editor.tsx: BubbleMenu phát
- * một transaction `updateOptions` mỗi khi `shouldShow`, `options` hay
+ * Ở cấp module, cùng lý do với `shouldShow` trong editor-bubbles.ts: BubbleMenu
+ * phát một transaction `updateOptions` mỗi khi `options` hay
  * `getReferencedVirtualElement` đổi identity, mà editor render lại ở mọi
- * transaction. Viết inline là vòng lặp "Maximum update depth exceeded".
+ * transaction.
  */
 const TABLE_BUBBLE_OPTIONS = { placement: "top-start", offset: 6 } as const;
 
-function tableBubbleShouldShow({ editor }: { editor: Editor }): boolean {
-  // Con trỏ trong một link thì LinkBubble đang mở, hai menu sẽ chồng lên nhau.
-  return editor.isEditable && editor.isActive("table") && !editor.isActive("link");
-}
-
 const findTable = findParentNode((node) => node.type.name === "table");
-
-function BubbleButton({
-  label,
-  onClick,
-  disabled,
-  active,
-  destructive,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  active?: boolean;
-  destructive?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Tooltip delayDuration={0}>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant={active ? "secondary" : "ghost"}
-          size="sm"
-          className={cn(
-            "h-7 w-7 p-0",
-            destructive && "text-destructive hover:text-destructive",
-          )}
-          onClick={onClick}
-          disabled={disabled}
-          aria-label={label}
-          aria-pressed={active}
-        >
-          {children}
-        </Button>
-      </TooltipTrigger>
-      {/* Dưới chứ không trên: menu đã nằm sát header dính của trang soạn. */}
-      <TooltipContent side="bottom" sideOffset={5}>
-        {label}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
 
 /**
  * Thêm, xoá hàng cột của bảng đang chứa con trỏ.
