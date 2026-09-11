@@ -50,8 +50,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (result.data.length > 0) return NextResponse.json({ note: result.data[0] });
 
   // A newer version is stored; hand it back so the browser can show it.
-  const stored = await supabase.from("admin_notes").select(NOTE_COLUMNS).eq("id", id).single();
+  const stored = await supabase.from("admin_notes").select(NOTE_COLUMNS).eq("id", id).maybeSingle();
   if (stored.error) return dbError(stored.error, "admin notes PUT");
+  // Deleted elsewhere in the moment between the write and this read.
+  if (!stored.data) {
+    return NextResponse.json({ error: "Note vừa bị xoá ở nơi khác" }, { status: 404 });
+  }
   return NextResponse.json({ note: stored.data });
 }
 
