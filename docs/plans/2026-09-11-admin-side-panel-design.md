@@ -128,7 +128,7 @@ Theo kiểu của `app/api/posts/[id]/route.ts`: chặn bằng `requireAdmin()`,
 | `DELETE /api/admin/tasks/[id]` | Xoá thật |
 | `GET /api/admin/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD[&fresh=1]` | Sự kiện đã trải ra trong khoảng ngày |
 
-`id` do trình duyệt tạo (`crypto.randomUUID()`), nên tạo mới, tự lưu, tick xong và Undo sau khi xoá đều là cùng một lệnh `PUT`. Client luôn gửi cả bản ghi, không gửi body một phần. Với task, server tự đặt `updated_at`. Với note, trình duyệt đóng dấu `updated_at` cho mỗi lần sửa và server chỉ ghi đè bản cũ hơn, nên một lần lưu tới muộn (request chậm, hay lần gửi `keepalive` lúc đóng tab) không đè được bản mới hơn; khi thua, server trả về bản đang lưu để panel hiện nó. Trong một tab, mỗi note chỉ có một request đang chạy, nên cũng không tạo lại được note vừa xoá. Giữa hai tab, bản sửa sau cùng thắng, và tab nào quay lại màn hình thì tải lại danh sách nếu không còn gì chờ lưu. Một tab cũ vẫn có thể tạo lại note vừa bị xoá ở tab khác; chặn được việc đó phải chuyển sang xoá mềm, nên chưa làm.
+`id` do trình duyệt tạo (`crypto.randomUUID()`), nên tạo mới, tự lưu, tick xong và Undo sau khi xoá đều là cùng một lệnh `PUT`. Client luôn gửi cả bản ghi, không gửi body một phần. Với task, server tự đặt `updated_at`. Với note, trình duyệt đóng dấu `updated_at` cho mỗi lần sửa và server chỉ ghi đè bản cũ hơn, nên một lần lưu tới muộn (request chậm, hay lần gửi `keepalive` lúc đóng tab) không đè được bản mới hơn; khi thua, server trả về bản đang lưu để panel hiện nó. Cách này tin vào đồng hồ của máy. Mỗi lần sửa được đóng dấu sau bản mà nó sửa lên, nên sửa tiếp trên bản đến từ một máy chạy nhanh giờ vẫn được tính là mới hơn; server từ chối dấu thời gian nhanh hơn giờ server quá 5 phút, và trả 404 nếu note bị xoá đúng lúc đang lưu. Trong một tab, mỗi note chỉ có một request đang chạy, nên cũng không tạo lại được note vừa xoá. Giữa hai tab, bản sửa sau cùng thắng, và tab nào quay lại màn hình thì tải lại danh sách nếu không còn gì chờ lưu. Một tab cũ vẫn có thể tạo lại note vừa bị xoá ở tab khác; chặn được việc đó phải chuyển sang xoá mềm, nên chưa làm.
 
 ## Nguồn lịch Google
 
@@ -165,6 +165,7 @@ Route calendar:
 
 - Sửa note và task: giao diện đổi ngay trước khi server trả lời. Server lỗi thì trả về như cũ và báo bằng toast.
 - Tự lưu note lỗi: chấm đỏ, chữ vẫn nằm nguyên, lần gõ sau lưu lại. Thẻ note giữ chấm đỏ cho tới khi lưu được.
+- Giờ trên máy nhanh hơn server quá 5 phút: lần lưu note bị từ chối, toast nhắc chỉnh lại giờ máy.
 - 401 hoặc 403: toast "Hết phiên đăng nhập" kèm link về `/admin`.
 - Supabase báo bảng không tồn tại: panel ghi rõ cần chạy `supabase/add_admin_side_panel.sql`.
 - Calendar: lịch tải hỏng hiện dòng "Không tải được: MIT". Thiếu hoặc sai `ADMIN_CALENDAR_FEEDS`: panel vẫn hiện task theo ngày, kèm hướng dẫn cấu hình.

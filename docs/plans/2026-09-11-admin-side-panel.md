@@ -1505,6 +1505,7 @@ import {
   filterNotes,
   foldText,
   isBlankNote,
+  MAX_CLOCK_AHEAD_MS,
   MAX_NOTE_LENGTH,
   notePreview,
   noteTitle,
@@ -1571,6 +1572,15 @@ describe("sortNotes", () => {
       note({ body: "browser", updated_at: "2026-09-11T03:00:00.900Z" }),
     ]);
     expect(sorted.map((n) => n.body)).toEqual(["browser", "server"]);
+  });
+
+  it("leaves the list it was given as it was", () => {
+    const notes = [
+      note({ body: "old", updated_at: "2026-09-01T00:00:00.000Z" }),
+      note({ body: "new", updated_at: "2026-09-10T00:00:00.000Z" }),
+    ];
+    sortNotes(notes);
+    expect(notes.map((n) => n.body)).toEqual(["old", "new"]);
   });
 });
 
@@ -1641,6 +1651,32 @@ describe("parseNoteInput", () => {
     expect(parseNoteInput({ body: `a${nul}b`, pinned: false, updated_at: T })).toMatchObject({
       ok: true,
       input: { body: "ab" },
+    });
+  });
+
+  it("replaces half a surrogate pair, which Postgres cannot store either", () => {
+    expect(parseNoteInput({ body: "a\uD83Db", pinned: false, updated_at: T })).toMatchObject({
+      ok: true,
+      input: { body: "a\uFFFDb" },
+    });
+  });
+
+  it("reads updated_at as an instant, whatever offset it was written with", () => {
+    expect(
+      parseNoteInput({ body: "hi", pinned: false, updated_at: "2026-09-11T10:00:00+07:00" }),
+    ).toMatchObject({ ok: true, input: { updated_at: "2026-09-11T03:00:00.000Z" } });
+  });
+
+  it("takes a null created_at as none", () => {
+    const result = parseNoteInput({ body: "hi", pinned: false, updated_at: T, created_at: null });
+    expect(result.ok && Object.keys(result.input).sort()).toEqual(["body", "pinned", "updated_at"]);
+  });
+
+  it("refuses a stamp more than five minutes ahead of the server", () => {
+    const now = Date.parse(T) - MAX_CLOCK_AHEAD_MS;
+    expect(parseNoteInput({ body: "hi", pinned: false, updated_at: T }, now)).toMatchObject({ ok: true });
+    expect(parseNoteInput({ body: "hi", pinned: false, updated_at: T }, now - 1)).toMatchObject({
+      ok: false,
     });
   });
 
@@ -1740,21 +1776,31 @@ export function filterNotes(notes: AdminNote[], query: string): AdminNote[] {
 
 export type NoteInput = { body: string; pinned: boolean; updated_at: string; created_at?: string };
 
+/**
+ * How far ahead of the server's clock an edit's stamp may be. The newest edit
+ * wins, so a stamp from a clock running fast would pin the note: every edit
+ * made on a right clock would count as older and lose until that time came.
+ */
+export const MAX_CLOCK_AHEAD_MS = 5 * 60_000;
+
 const NUL = String.fromCharCode(0);
 
 /**
  * Checks a PUT body for /api/admin/notes/[id]. `updated_at` is the browser's
- * stamp for this edit, and decides which of two saves wins, so it is required.
+ * stamp for this edit and decides which of two saves wins, so it is required,
+ * and refused when it is further ahead of `now` than MAX_CLOCK_AHEAD_MS.
  * `created_at` comes back only with Undo; unreadable, it is refused rather
  * than quietly replaced with now.
  */
 export function parseNoteInput(
   value: unknown,
+  now = Date.now(),
 ): { ok: true; input: NoteInput } | { ok: false; error: string } {
   const data = (value ?? {}) as Record<string, unknown>;
   if (typeof data.body !== "string") return { ok: false, error: "body phải là chuỗi" };
-  // Postgres text cannot hold NUL; left in, every retry of the save would fail.
-  const body = data.body.split(NUL).join("");
+  // Postgres stores neither NUL nor half of a surrogate pair, and left in,
+  // either would fail every retry of the save. U+FFFD keeps the length.
+  const body = data.body.split(NUL).join("").toWellFormed();
   if (body.length > MAX_NOTE_LENGTH) {
     return { ok: false, error: `Note dài quá ${MAX_NOTE_LENGTH.toLocaleString("vi-VN")} ký tự` };
   }
@@ -1762,6 +1808,9 @@ export function parseNoteInput(
 
   const updatedAt = parseTimestamp(data.updated_at);
   if (!updatedAt) return { ok: false, error: "updated_at không đọc được" };
+  if (Date.parse(updatedAt) - now > MAX_CLOCK_AHEAD_MS) {
+    return { ok: false, error: "Giờ trên máy đang nhanh hơn server, chỉnh lại giờ máy rồi thử lại" };
+  }
 
   let createdAt: string | undefined;
   if (data.created_at != null) {
@@ -1785,7 +1834,7 @@ export function parseNoteInput(
 **Step 4: Chạy lại**
 
 Run: `pnpm vitest run lib/admin-notes.test.ts`
-Expected: PASS, 25 tests.
+Expected: PASS, 30 tests.
 
 **Step 5: Commit**
 
@@ -1882,8 +1931,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (result.data.length > 0) return NextResponse.json({ note: result.data[0] });
 
   // A newer version is stored; hand it back so the browser can show it.
-  const stored = await supabase.from("admin_notes").select(NOTE_COLUMNS).eq("id", id).single();
+  const stored = await supabase.from("admin_notes").select(NOTE_COLUMNS).eq("id", id).maybeSingle();
   if (stored.error) return dbError(stored.error, "admin notes PUT");
+  // Deleted elsewhere in the moment between the write and this read.
+  if (!stored.data) {
+    return NextResponse.json({ error: "Note vừa bị xoá ở nơi khác" }, { status: 404 });
+  }
   return NextResponse.json({ note: stored.data });
 }
 
@@ -5573,7 +5626,7 @@ Người dùng thêm `ADMIN_CALENDAR_FEEDS` vào Project Settings → Environmen
 **Step 1: Test**
 
 Run: `pnpm test`
-Expected: mọi file test đều PASS, gồm 125 test mới.
+Expected: mọi file test đều PASS, gồm 130 test mới.
 
 **Step 2: Kiểu và lint**
 
