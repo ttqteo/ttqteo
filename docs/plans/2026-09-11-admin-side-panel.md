@@ -492,7 +492,11 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
     const focused = document.activeElement;
     const active = focused instanceof HTMLElement && focused !== document.body ? focused : null;
     const focusInPanel = active?.closest(".admin-side-panel") != null;
-    if (next && !previous) returnFocus.current = focusInPanel ? null : active;
+    // Remember what had focus before the panel took it, the first time there
+    // is something to remember: on opening, or on the first switch after a
+    // panel was restored on load. A switch made from inside the panel keeps
+    // what was remembered.
+    if (next && !focusInPanel && !returnFocus.current) returnFocus.current = active;
 
     setOpenedByUser(next !== null);
     writeAdminPanel(next);
@@ -500,14 +504,25 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
     if (next) root.dataset.adminPanel = next;
     else delete root.dataset.adminPanel;
 
-    if (next) return;
+    // preventScroll throughout: a plain focus() on the editor can scroll the
+    // page to its start before ProseMirror puts the caret back.
+    if (next) {
+      // A switch unmounts the content under the cursor. The close button
+      // stays mounted across switches, so focus waits there: Calendar has no
+      // field of its own, and Task and Ghi nhanh move it on to theirs.
+      if (focusInPanel && next !== previous) {
+        document.querySelector<HTMLElement>("[data-panel-close]")?.focus({ preventScroll: true });
+      }
+      return;
+    }
     // Closing hides the panel under the cursor; hand focus back rather than
     // let it fall to <body>.
     if (focusInPanel) {
-      const back = returnFocus.current?.isConnected
-        ? returnFocus.current
-        : document.querySelector<HTMLElement>(`.admin-side-rail [data-panel="${previous}"]`);
-      back?.focus();
+      const rail = document.querySelector<HTMLElement>(`.admin-side-rail [data-panel="${previous}"]`);
+      const back = returnFocus.current?.isConnected ? returnFocus.current : rail;
+      back?.focus({ preventScroll: true });
+      // An opener hidden or disabled since then cannot take focus: use the rail.
+      if (document.activeElement !== back) rail?.focus({ preventScroll: true });
     }
     returnFocus.current = null;
   }, []);
@@ -686,6 +701,7 @@ export function SidePanelFrame() {
             <button
               type="button"
               onClick={close}
+              data-panel-close
               aria-label="Đóng panel"
               title="Đóng (Esc)"
               className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -1036,8 +1052,8 @@ git commit -m "fix: keep the editor's fixed pieces and toasts clear of the side 
 2. F5 khi panel đang mở: khung panel có ngay từ lúc trang hiện, bảng không bị giật.
 3. Khoảng 1024px: panel nổi đè lên bảng, có bóng; bảng giữ nguyên độ rộng.
 4. 390px (DevTools, chế độ thiết bị): không có rail. Toolbar có icon panel; bấm vào mở sheet từ dưới lên, có ba tab; đóng được. Mở rộng cửa sổ khi sheet đang mở: sheet tự đóng, không còn lớp phủ.
-5. Alt+1, Alt+2, Alt+3 mở đúng panel; bấm lại thì đóng. Bấm vào nút trong panel rồi Esc: panel đóng.
-6. Đang gõ trong editor, bấm Alt+3 rồi Esc: con trỏ quay về đúng chỗ đang gõ. Mở panel bằng chuột, Tab tới nút đóng, Enter: con trỏ về nút tương ứng trên rail, không rơi xuống trang.
+5. Alt+1, Alt+2, Alt+3 mở đúng panel; bấm lại thì đóng. Tab tới nút đóng của panel rồi Esc: panel đóng, con trỏ về nút tương ứng trên rail.
+6. Mở panel bằng chuột, Tab tới nút đóng, Enter: con trỏ về nút tương ứng trên rail, không rơi xuống trang. Phần quay về editor kiểm ở giai đoạn 2 (Task 16), khi panel đã có ô để gõ.
 7. Khi panel đang mở, rê chuột vào một icon trên rail: tooltip hiện đè lên panel.
 8. Windows scale 125% (hoặc DevTools với viewport 767px): lúc nào cũng có rail hoặc nút mở sheet trên toolbar, không bao giờ mất cả hai.
 9. `/admin/edit/<id>`, chế độ split: khung split và bảng vẽ dừng trước rail; cụm nút góc dưới phải không nằm dưới rail. Bật focus mode: rail và panel ẩn, không còn khoảng trống bên phải.
@@ -2513,6 +2529,8 @@ git commit -m "feat: Ghi nhanh panel in the admin sidebar"
 5. F5: các note còn nguyên. Mở panel bằng cách F5 khi panel Ghi nhanh đang mở: con trỏ không tự nhảy vào ô (chỉ mở bằng tay mới focus).
 6. Gõ một dòng rồi đóng tab ngay: mở lại, dòng đó đã được lưu.
 7. DevTools → Network → Offline, gõ vào một note: chấm đỏ và đúng một toast. Online lại, gõ tiếp: chấm xanh.
+8. Đang gõ giữa một bài dài trong editor, bấm Alt+3, gõ một note rồi Esc: con trỏ quay về đúng chỗ đang gõ, trang không bị cuộn.
+9. Đang ở ô gõ của Ghi nhanh, bấm Alt+1 để sang Calendar rồi Esc: panel đóng.
 
 ---
 
@@ -4768,7 +4786,11 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
     const focused = document.activeElement;
     const active = focused instanceof HTMLElement && focused !== document.body ? focused : null;
     const focusInPanel = active?.closest(".admin-side-panel") != null;
-    if (next && !previous) returnFocus.current = focusInPanel ? null : active;
+    // Remember what had focus before the panel took it, the first time there
+    // is something to remember: on opening, or on the first switch after a
+    // panel was restored on load. A switch made from inside the panel keeps
+    // what was remembered.
+    if (next && !focusInPanel && !returnFocus.current) returnFocus.current = active;
 
     setOpenedByUser(next !== null);
     writeAdminPanel(next);
@@ -4776,14 +4798,25 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
     if (next) root.dataset.adminPanel = next;
     else delete root.dataset.adminPanel;
 
-    if (next) return;
+    // preventScroll throughout: a plain focus() on the editor can scroll the
+    // page to its start before ProseMirror puts the caret back.
+    if (next) {
+      // A switch unmounts the content under the cursor. The close button
+      // stays mounted across switches, so focus waits there: Calendar has no
+      // field of its own, and Task and Ghi nhanh move it on to theirs.
+      if (focusInPanel && next !== previous) {
+        document.querySelector<HTMLElement>("[data-panel-close]")?.focus({ preventScroll: true });
+      }
+      return;
+    }
     // Closing hides the panel under the cursor; hand focus back rather than
     // let it fall to <body>.
     if (focusInPanel) {
-      const back = returnFocus.current?.isConnected
-        ? returnFocus.current
-        : document.querySelector<HTMLElement>(`.admin-side-rail [data-panel="${previous}"]`);
-      back?.focus();
+      const rail = document.querySelector<HTMLElement>(`.admin-side-rail [data-panel="${previous}"]`);
+      const back = returnFocus.current?.isConnected ? returnFocus.current : rail;
+      back?.focus({ preventScroll: true });
+      // An opener hidden or disabled since then cannot take focus: use the rail.
+      if (document.activeElement !== back) rail?.focus({ preventScroll: true });
     }
     returnFocus.current = null;
   }, []);
