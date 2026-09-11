@@ -35,8 +35,9 @@ export const getSession = cache(async () => {
   return session;
 });
 
-// `cache()` dedupes per request: `getUser()` hits the Supabase auth server over
-// the network, and several components used to each call it independently.
+// `cache()` dedupes within a server render: `getUser()` hits the Supabase auth
+// server over the network, and several components used to each call it
+// independently. It does not dedupe in a route handler; see isAdminUser.
 export const getUser = cache(async () => {
   const supabase = await createSupabaseServerClient();
   const {
@@ -45,9 +46,14 @@ export const getUser = cache(async () => {
   return user;
 });
 
-// Check if user is the admin (your email)
-export const isAdmin = cache(async () => {
-  const user = await getUser();
+/**
+ * Whether this user is the admin, by ADMIN_EMAIL. Unset means nobody, never
+ * everybody. Pure, so a route handler can check a user it already has.
+ */
+export function isAdminUser(user: { email?: string } | null): boolean {
   const adminEmail = process.env.ADMIN_EMAIL;
-  return user?.email === adminEmail;
-});
+  return Boolean(adminEmail) && user?.email === adminEmail;
+}
+
+// Check if user is the admin (your email)
+export const isAdmin = cache(async () => isAdminUser(await getUser()));
