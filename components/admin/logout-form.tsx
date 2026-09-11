@@ -17,7 +17,7 @@ export function LogoutForm() {
         className="flex items-center gap-1.5 hover:text-zinc-300 transition-colors"
       >
         <LogOutIcon className="w-3.5 h-3.5" />
-        <span>logout</span>
+        <span className="sr-only sm:not-sr-only">logout</span>
       </button>
     </form>
   );

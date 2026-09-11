@@ -76,15 +76,17 @@ export function AdminToolbar({ editPostId }: AdminToolbarProps) {
             <span className="font-semibold">ttqteo</span>
           </Link>
           <div className="w-px h-4 bg-zinc-700 shrink-0 sm:mx-1" />
-          {/* /admin is the post list now, so dashboard and posts are one item. */}
+          {/* /admin is the post list now, so dashboard and posts are one item.
+              On a phone the labels here are for screen readers only: next to
+              the side panel's button, the bar no longer fits them at 390px. */}
           <AdminNavLink href="/admin" exact>
             <FileTextIcon className="w-3.5 h-3.5" />
-            <span>posts</span>
+            <span className="sr-only sm:not-sr-only">posts</span>
           </AdminNavLink>
           <AdminNavLink href="/admin/notes">
             <StickyNoteIcon className="w-3.5 h-3.5 shrink-0" />
             {/* Icon only on a phone, same as Edit Post, so the bar still fits. */}
-            <span className="hidden sm:inline">notes</span>
+            <span className="sr-only sm:not-sr-only">notes</span>
           </AdminNavLink>
           {editPostId && (
             <AdminNavLink href={`/admin/edit/${editPostId}`}>
