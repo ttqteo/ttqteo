@@ -24,7 +24,7 @@
   - Lint: `pnpm lint`. Trên master cả repo có 0 error và 36 warning, phần lớn là các luật React Compiler mà `eslint.config.mjs` đã hạ xuống warning (3 cái trong số đó ở `app/admin/edit/[id]/edit-post-client.tsx`). Sau mỗi task vẫn phải là 0 error và 36 warning.
 - Quy ước: comment trong code viết tiếng Anh, chữ trên giao diện tiếng Việt, không dùng em dash trong chữ trên giao diện. Import nội bộ dùng `@/lib/...`.
 - Chỉ test hàm thuần trong `lib/`. UI kiểm bằng tay ở cuối mỗi giai đoạn, như các plan trước.
-- Bản cuối của code trong plan này đã được chạy thử trên một bản sao của repo: `tsc` sạch, lint không thêm warning, 90 test mới và toàn bộ test cũ đều qua, và một test render tạm (không nằm trong plan) đã bấm qua cả ba panel. Các bản trung gian ở giai đoạn 1 đến 3 là tập con của bản cuối, chưa được chạy riêng: nếu `tsc` báo lỗi ở đó thì so với bản cuối.
+- Bản cuối của code trong plan này đã được chạy thử trên một bản sao của repo: `tsc` sạch, lint không thêm warning, 94 test mới và toàn bộ test cũ đều qua, và một test render tạm (không nằm trong plan) đã bấm qua cả ba panel. Các bản trung gian ở giai đoạn 1 đến 3 là tập con của bản cuối, chưa được chạy riêng: nếu `tsc` báo lỗi ở đó thì so với bản cuối.
 
 **Ba chỗ khác với bản design lúc trình bày** (file design đã cập nhật theo):
 
@@ -49,43 +49,84 @@ Xong giai đoạn này: rail và panel rỗng chạy được, đẩy hay đè �
 **Step 1: Viết test**
 
 ```ts
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  ADMIN_PANEL_HEAD_SNIPPET,
-  ADMIN_PANEL_KEY,
-  readAdminPanel,
-  subscribeAdminPanel,
-  writeAdminPanel,
-} from "@/lib/admin-panel-prefs";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The module keeps this tab's choice in module state, so every test loads a
+// fresh copy of it.
+async function load() {
+  vi.resetModules();
+  return import("@/lib/admin-panel-prefs");
+}
 
 beforeEach(() => {
   localStorage.clear();
 });
 
+afterEach(() => {
+  // resetAllMocks first: vitest cannot remove a spy from happy-dom's Storage
+  // proxy, so restoreAllMocks alone would leave a throwing setItem in place
+  // for the tests after it. Resetting puts the real implementation back.
+  vi.resetAllMocks();
+  vi.restoreAllMocks();
+  delete document.documentElement.dataset.adminPanel;
+});
+
 describe("readAdminPanel / writeAdminPanel", () => {
-  it("is closed when nothing is stored", () => {
+  it("is closed when nothing is stored", async () => {
+    const { readAdminPanel } = await load();
     expect(readAdminPanel()).toBeNull();
   });
 
-  it("round-trips a panel", () => {
-    writeAdminPanel("tasks");
+  it("starts from what the last page load stored", async () => {
+    const { ADMIN_PANEL_KEY, readAdminPanel } = await load();
+    localStorage.setItem(ADMIN_PANEL_KEY, "tasks");
     expect(readAdminPanel()).toBe("tasks");
   });
 
-  it("removes the key when the panel closes", () => {
+  it("ignores a stored value it does not know", async () => {
+    const { ADMIN_PANEL_KEY, readAdminPanel } = await load();
+    localStorage.setItem(ADMIN_PANEL_KEY, "mail");
+    expect(readAdminPanel()).toBeNull();
+  });
+
+  it("round-trips a panel and stores it for the next page load", async () => {
+    const { ADMIN_PANEL_KEY, readAdminPanel, writeAdminPanel } = await load();
+    writeAdminPanel("tasks");
+    expect(readAdminPanel()).toBe("tasks");
+    expect(localStorage.getItem(ADMIN_PANEL_KEY)).toBe("tasks");
+  });
+
+  it("removes the key when the panel closes", async () => {
+    const { ADMIN_PANEL_KEY, writeAdminPanel } = await load();
     writeAdminPanel("tasks");
     writeAdminPanel(null);
     expect(localStorage.getItem(ADMIN_PANEL_KEY)).toBeNull();
   });
 
-  it("ignores a value it does not know", () => {
-    localStorage.setItem(ADMIN_PANEL_KEY, "mail");
+  it("keeps a panel the storage refused to save", async () => {
+    const { readAdminPanel, writeAdminPanel } = await load();
+    // On the instance, not Storage.prototype: happy-dom binds Storage methods
+    // onto the instance the first time they are used, so a prototype spy is
+    // never reached once an earlier test has touched localStorage.
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new Error("QuotaExceededError");
+    });
+    writeAdminPanel("calendar");
+    expect(setItem).toHaveBeenCalled();
+    expect(readAdminPanel()).toBe("calendar");
+  });
+
+  it("does not move when another tab changes the stored value", async () => {
+    const { ADMIN_PANEL_KEY, readAdminPanel } = await load();
+    expect(readAdminPanel()).toBeNull();
+    localStorage.setItem(ADMIN_PANEL_KEY, "notes");
     expect(readAdminPanel()).toBeNull();
   });
 });
 
 describe("subscribeAdminPanel", () => {
-  it("tells subscribers about each change until they unsubscribe", () => {
+  it("tells subscribers about each change until they unsubscribe", async () => {
+    const { subscribeAdminPanel, writeAdminPanel } = await load();
     const listener = vi.fn();
     const unsubscribe = subscribeAdminPanel(listener);
     writeAdminPanel("calendar");
@@ -98,22 +139,32 @@ describe("subscribeAdminPanel", () => {
 });
 
 describe("ADMIN_PANEL_HEAD_SNIPPET", () => {
-  // Runs the snippet the way the head script does, with `r` standing in for <html>.
-  function run(): string | undefined {
-    const r = { dataset: {} as Record<string, string> };
-    new Function("r", ADMIN_PANEL_HEAD_SNIPPET)(r);
-    return r.dataset.adminPanel;
+  // Runs the snippet the way the head script does, then reads <html>.
+  async function run(): Promise<string | undefined> {
+    const { ADMIN_PANEL_HEAD_SNIPPET } = await load();
+    new Function(ADMIN_PANEL_HEAD_SNIPPET)();
+    return document.documentElement.dataset.adminPanel;
   }
 
-  it("marks <html> with the stored panel", () => {
+  it("marks <html> with the stored panel", async () => {
+    const { ADMIN_PANEL_KEY } = await load();
     localStorage.setItem(ADMIN_PANEL_KEY, "notes");
-    expect(run()).toBe("notes");
+    expect(await run()).toBe("notes");
   });
 
-  it("leaves <html> alone for anything else", () => {
-    expect(run()).toBeUndefined();
+  it("leaves <html> alone for anything else", async () => {
+    const { ADMIN_PANEL_KEY } = await load();
+    expect(await run()).toBeUndefined();
     localStorage.setItem(ADMIN_PANEL_KEY, "mail");
-    expect(run()).toBeUndefined();
+    expect(await run()).toBeUndefined();
+  });
+
+  it("swallows its own errors, so blocked storage cannot stop the page", async () => {
+    const getItem = vi.spyOn(localStorage, "getItem").mockImplementation(() => {
+      throw new Error("SecurityError");
+    });
+    await expect(run()).resolves.toBeUndefined();
+    expect(getItem).toHaveBeenCalled();
   });
 });
 ```
@@ -131,11 +182,16 @@ Expected: FAIL, `Failed to resolve import "@/lib/admin-panel-prefs"`.
  * a bare string, not JSON, because the head script in app/layout.tsx reads it
  * before first paint and has to stay tiny. Also a small external store, so
  * the provider can read it with useSyncExternalStore.
+ *
+ * Each tab keeps its own choice once loaded, as Edge's sidebar does; storage
+ * only carries it to the next page load. Reading storage live would let
+ * another tab, or a write the storage refused, change the snapshot without
+ * a notification, and useSyncExternalStore depends on being told.
  */
 
-export type AdminPanelId = "calendar" | "tasks" | "notes";
+export const ADMIN_PANEL_IDS = ["calendar", "tasks", "notes"] as const;
 
-export const ADMIN_PANEL_IDS: readonly AdminPanelId[] = ["calendar", "tasks", "notes"];
+export type AdminPanelId = (typeof ADMIN_PANEL_IDS)[number];
 
 export const ADMIN_PANEL_KEY = "ttqteo:admin-panel:v1";
 
@@ -146,28 +202,32 @@ export function isAdminPanelId(value: unknown): value is AdminPanelId {
   return typeof value === "string" && (ADMIN_PANEL_IDS as readonly string[]).includes(value);
 }
 
-// Where the choice lives when storage is blocked, so the rail still works for this page.
-let inMemory: AdminPanelId | null = null;
+// This tab's choice: loaded from storage on the first read, then changed only
+// by writeAdminPanel. undefined until that first read.
+let current: AdminPanelId | null | undefined;
 const listeners = new Set<() => void>();
 
 export function readAdminPanel(): AdminPanelId | null {
   if (typeof window === "undefined") return null;
-  try {
-    const value = window.localStorage.getItem(ADMIN_PANEL_KEY);
-    return isAdminPanelId(value) ? value : null;
-  } catch {
-    return inMemory;
+  if (current === undefined) {
+    try {
+      const value = window.localStorage.getItem(ADMIN_PANEL_KEY);
+      current = isAdminPanelId(value) ? value : null;
+    } catch {
+      current = null;
+    }
   }
+  return current;
 }
 
 export function writeAdminPanel(panel: AdminPanelId | null): void {
   if (typeof window === "undefined") return;
-  inMemory = panel;
+  current = panel;
   try {
     if (panel) window.localStorage.setItem(ADMIN_PANEL_KEY, panel);
     else window.localStorage.removeItem(ADMIN_PANEL_KEY);
   } catch {
-    /* blocked: inMemory carries it */
+    /* blocked or full: this tab still has it in `current` */
   }
   for (const listener of listeners) listener();
 }
@@ -181,20 +241,22 @@ export function subscribeAdminPanel(listener: () => void): () => void {
 }
 
 /**
- * Spliced into the head script in app/layout.tsx, inside its try block and
- * with its `r` (document.documentElement) in scope. Marks <html> with the
- * open panel so the padding that makes room for it applies from the first
- * frame, not after hydration. Outside /admin nothing reads the attribute.
+ * Appended to the head script in app/layout.tsx, after its try block, in a
+ * try of its own: a failure earlier in that script cannot stop it, and a
+ * blocked storage here cannot break the page. Marks <html> with the open
+ * panel so the padding that makes room for it applies from the first frame,
+ * not after hydration. Outside /admin nothing reads the attribute.
  */
 export const ADMIN_PANEL_HEAD_SNIPPET =
-  `var ap=localStorage.getItem(${JSON.stringify(ADMIN_PANEL_KEY)});` +
-  `if(${JSON.stringify(ADMIN_PANEL_IDS)}.indexOf(ap)>-1)r.dataset.adminPanel=ap;`;
+  `try{var ap=localStorage.getItem(${JSON.stringify(ADMIN_PANEL_KEY)});` +
+  `if(${JSON.stringify(ADMIN_PANEL_IDS)}.indexOf(ap)>-1)` +
+  `document.documentElement.dataset.adminPanel=ap;}catch(e){}`;
 ```
 
 **Step 4: Chạy lại**
 
 Run: `pnpm vitest run lib/admin-panel-prefs.test.ts`
-Expected: PASS, 7 tests.
+Expected: PASS, 11 tests.
 
 **Step 5: Commit**
 
@@ -218,10 +280,10 @@ import { ADMIN_PANEL_HEAD_SNIPPET } from "@/lib/admin-panel-prefs";
 
 **Step 2: Chèn vào script `<head>`**
 
-Trong chuỗi `__html`, chèn `${ADMIN_PANEL_HEAD_SNIPPET}` ngay sau `r.classList.add('is-admin');` và trước `}catch(e){}`. Đuôi chuỗi thành:
+Trong chuỗi `__html`, chèn `${ADMIN_PANEL_HEAD_SNIPPET}` ngay sau `}catch(e){}` và trước `})();`. Đoạn chèn vào có `try` riêng, nên dù phần đọc `reader-prefs` phía trước có lỗi thì panel vẫn được đánh dấu. Đuôi chuỗi thành:
 
 ```tsx
-r.classList.add('is-admin');${ADMIN_PANEL_HEAD_SNIPPET}}catch(e){}})();`,
+r.classList.add('is-admin');}catch(e){}${ADMIN_PANEL_HEAD_SNIPPET}})();`,
 ```
 
 Không đụng phần đầu chuỗi, kể cả `\\s`.
@@ -5038,7 +5100,7 @@ Người dùng thêm `ADMIN_CALENDAR_FEEDS` vào Project Settings → Environmen
 **Step 1: Test**
 
 Run: `pnpm test`
-Expected: mọi file test đều PASS, gồm 90 test mới.
+Expected: mọi file test đều PASS, gồm 94 test mới.
 
 **Step 2: Kiểu và lint**
 
