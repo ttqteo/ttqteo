@@ -63,7 +63,7 @@ with check ((auth.jwt() -> 'app_metadata' ->> 'admin') = 'true');
 -- Chi authenticated dung duoc hai bang, va chi bon lenh ma API can; RLS o tren
 -- quyet dinh ai trong so do. anon khong co gi, ke ca xem cot trong OpenAPI.
 revoke all on public.admin_notes, public.admin_tasks from anon;
-revoke truncate, references, trigger on public.admin_notes, public.admin_tasks from authenticated;
+revoke all on public.admin_notes, public.admin_tasks from authenticated;
 grant select, insert, update, delete on public.admin_notes, public.admin_tasks to authenticated;
 
 commit;
