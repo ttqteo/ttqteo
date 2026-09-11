@@ -116,7 +116,7 @@ File SQL dừng lại nếu chưa tài khoản nào có claim admin, thu hết q
 
 ## API
 
-Theo kiểu của `app/api/posts/[id]/route.ts`: chặn bằng `getUser()` và `isAdmin()`, rồi dùng `createSupabaseServerClient()` mang token của người gọi, nên RLS là lớp chặn thứ hai.
+Theo kiểu của `app/api/posts/[id]/route.ts`: chặn bằng `requireAdmin()`, chỉ hỏi Supabase một lần (`getUser()` rồi `isAdminUser()`), rồi dùng `createSupabaseServerClient()` mang token của người gọi, nên RLS là lớp chặn thứ hai.
 
 | Route | Việc |
 |---|---|
