@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ShortcutKeys } from "@/lib/admin-panel-prefs";
 
 // The module keeps this tab's choice in module state, so every test loads a
 // fresh copy of it.
@@ -127,5 +128,46 @@ describe("ADMIN_PANEL_HEAD_SNIPPET", () => {
     });
     await expect(run()).resolves.toBeUndefined();
     expect(getItem).toHaveBeenCalled();
+  });
+});
+
+describe("shortcutPanel / shortcutLabel", () => {
+  const alt = (code: string, extra: Partial<ShortcutKeys> = {}): ShortcutKeys => ({
+    altKey: true,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    repeat: false,
+    code,
+    ...extra,
+  });
+
+  it("maps Alt+1, Alt+2, Alt+3 to the panels in rail order", async () => {
+    const { shortcutPanel } = await load();
+    expect(["Digit1", "Digit2", "Digit3"].map((code) => shortcutPanel(alt(code)))).toEqual([
+      "calendar",
+      "tasks",
+      "notes",
+    ]);
+  });
+
+  it.each([
+    ["no Alt", alt("Digit1", { altKey: false })],
+    ["AltGr, which Windows reports as Ctrl+Alt", alt("Digit1", { ctrlKey: true })],
+    ["Shift", alt("Digit1", { shiftKey: true })],
+    ["Meta", alt("Digit1", { metaKey: true })],
+    ["a held key repeating", alt("Digit1", { repeat: true })],
+    ["the number pad", alt("Numpad1")],
+    ["a digit with no panel", alt("Digit4")],
+    ["Alt+0", alt("Digit0")],
+  ])("ignores %s", async (_label, keys) => {
+    const { shortcutPanel } = await load();
+    expect(shortcutPanel(keys)).toBeNull();
+  });
+
+  it("labels each panel with its shortcut", async () => {
+    const { shortcutLabel } = await load();
+    expect(shortcutLabel("calendar")).toBe("Alt+1");
+    expect(shortcutLabel("notes")).toBe("Alt+3");
   });
 });

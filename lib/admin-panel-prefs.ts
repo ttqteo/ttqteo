@@ -59,6 +59,31 @@ export function subscribeAdminPanel(listener: () => void): () => void {
   };
 }
 
+/** The keys a panel shortcut looks at: a KeyboardEvent, or a plain object in tests. */
+export type ShortcutKeys = Pick<
+  KeyboardEvent,
+  "altKey" | "ctrlKey" | "metaKey" | "shiftKey" | "code" | "repeat"
+>;
+
+/**
+ * Alt+1, Alt+2, Alt+3 open the panels in ADMIN_PANEL_IDS order. Matched by key
+ * position (`code`), so every keyboard layout works; the number pad does not
+ * count. Ctrl is refused, which also refuses AltGr, since Windows reports it
+ * as Ctrl+Alt. A held key's repeats are ignored, or holding Alt+1 would flick
+ * the panel open and shut.
+ */
+export function shortcutPanel(keys: ShortcutKeys): AdminPanelId | null {
+  if (!keys.altKey || keys.ctrlKey || keys.metaKey || keys.shiftKey || keys.repeat) return null;
+  const digit = /^Digit(\d)$/.exec(keys.code);
+  if (!digit) return null;
+  return ADMIN_PANEL_IDS[Number(digit[1]) - 1] ?? null;
+}
+
+/** The hint the rail shows for a panel: "Alt+1" for the first, and so on. */
+export function shortcutLabel(id: AdminPanelId): string {
+  return `Alt+${ADMIN_PANEL_IDS.indexOf(id) + 1}`;
+}
+
 /**
  * Appended to the head script in app/layout.tsx, after its try block, in a
  * try of its own: a failure earlier in that script cannot stop it, and a

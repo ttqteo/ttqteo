@@ -1,4 +1,4 @@
-import type { AdminPanelId } from "@/lib/admin-panel-prefs";
+import { shortcutLabel, type AdminPanelId } from "@/lib/admin-panel-prefs";
 import {
   CalendarDaysIcon,
   SquareCheckBigIcon,
@@ -13,11 +13,11 @@ export type PanelMeta = {
   icon: LucideIcon;
 };
 
-/** Rail order, which is also the Alt+1/2/3 order. */
+/** Rail order. Keep it the order of ADMIN_PANEL_IDS, which the shortcuts follow. */
 export const PANELS: readonly PanelMeta[] = [
-  { id: "calendar", label: "Calendar", shortcut: "Alt+1", icon: CalendarDaysIcon },
-  { id: "tasks", label: "Task", shortcut: "Alt+2", icon: SquareCheckBigIcon },
-  { id: "notes", label: "Ghi nhanh", shortcut: "Alt+3", icon: StickyNoteIcon },
+  { id: "calendar", label: "Calendar", shortcut: shortcutLabel("calendar"), icon: CalendarDaysIcon },
+  { id: "tasks", label: "Task", shortcut: shortcutLabel("tasks"), icon: SquareCheckBigIcon },
+  { id: "notes", label: "Ghi nhanh", shortcut: shortcutLabel("notes"), icon: StickyNoteIcon },
 ];
 
 export function panelMeta(id: AdminPanelId): PanelMeta {
