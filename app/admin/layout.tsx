@@ -10,11 +10,12 @@ export default function AdminLayout({
       {/* Everything under /admin has the admin toolbar for navigation, so the
           public navbar is redundant across the whole segment. A server-rendered
           style keeps it hidden from first paint instead of flashing in and then
-          disappearing on hydration; React drops it again when you navigate out
-          of /admin. */}
+          disappearing on hydration. React does not remove a hoisted style when
+          you navigate out of /admin, so every rule here is keyed on the side
+          panel's rail, which is only in the DOM under /admin. */}
       <style href="admin-shell" precedence="high">
         {`
-          html.is-admin .site-navbar { display: none; }
+          html.is-admin:has(.admin-side-rail) .site-navbar { display: none; }
 
           /* The shared <main> is w-[90vw] on phones, which reads well for an
              article but costs the posts table ~19px a side before its own
@@ -22,7 +23,7 @@ export default function AdminLayout({
              it takes the full width and sets its own gutters. Unchanged from
              sm up, where sm:container takes over anyway. */
           @media (max-width: 639px) {
-            .app-shell > main { width: 100%; }
+            .app-shell:has(.admin-side-rail) > main { width: 100%; }
           }
 
           /* Room for the side panel (components/admin/side-panel): a 48px
@@ -33,10 +34,9 @@ export default function AdminLayout({
              over it, since 408px out of a laptop screen leaves the post table
              too tight. Under 768px neither shows and a phone gets a sheet.
 
-             Keyed on :has() the rail rather than on this stylesheet being
-             present, so the room goes with the rail when you leave /admin
-             even if the hoisted style stays. data-admin-panel is set before
-             first paint by the head script in app/layout.tsx. */
+             Keyed on :has() the rail, like the rules above: the style stays
+             after you leave /admin, the rail does not. data-admin-panel is
+             set before first paint by the head script in app/layout.tsx. */
           .admin-side-rail,
           .admin-side-panel { display: none; }
           @media (min-width: 768px) {
@@ -52,6 +52,11 @@ export default function AdminLayout({
           }
           /* Focus mode hides rail and panel (focus-mode-hidden); hand their room back too. */
           body.focus-mode { --admin-side-w: 0px; }
+
+          /* A dialog, alert dialog or sheet (all z-50) must not open under the
+             rail (z-57) or the panel (z-56). Radix marks <body> with
+             data-scroll-locked while one of them is open. */
+          body[data-scroll-locked] :is(.admin-side-rail, .admin-side-panel) { z-index: 49; }
         `}
       </style>
       {children}
