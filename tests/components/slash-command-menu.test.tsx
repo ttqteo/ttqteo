@@ -7,6 +7,7 @@ import { Callout } from "@/components/extensions/callout";
 import { CodeBlockWithLanguage } from "@/components/extensions/code-block-language";
 import { PrivateNote } from "@/components/extensions/private-note";
 import { SlashCommand } from "@/components/extensions/slash-command";
+import { EditorTable } from "@/components/extensions/table";
 
 /**
  * The menu is a ReactRenderer, and a ReactRenderer only renders once an
@@ -20,6 +21,7 @@ function Harness({ content, onReady }: { content: string; onReady: (editor: Edit
       CodeBlockWithLanguage,
       Callout,
       PrivateNote,
+      EditorTable,
       SlashCommand,
     ],
     content,
@@ -60,12 +62,21 @@ const options = () =>
   Array.from(document.body.querySelectorAll('[role="option"]')).map((o) => o.textContent);
 
 describe("slash menu", () => {
-  it("gõ / ở dòng trống thì hiện bốn khối", async () => {
+  it("gõ / ở dòng trống thì hiện năm khối", async () => {
     const editor = await open("<p></p>");
     await type(editor, "/");
     await waitFor(() =>
-      expect(options()).toEqual(["Callout", "Khối code", "Ghi chú riêng", "Trích dẫn"]),
+      expect(options()).toEqual(["Callout", "Khối code", "Ghi chú riêng", "Trích dẫn", "Table"]),
     );
+  });
+
+  it("gõ /table rồi Enter thì chèn bảng", async () => {
+    const editor = await open("<p></p>");
+    await type(editor, "/table");
+    await waitFor(() => expect(options()).toEqual(["Table"]));
+    await press(editor, "Enter");
+    expect(editor.getHTML()).toContain('<div class="tableWrapper"><table');
+    await waitFor(() => expect(menu()).toBeNull());
   });
 
   it("gõ tiếp thì lọc, Enter chọn mục đang sáng", async () => {
@@ -80,7 +91,7 @@ describe("slash menu", () => {
   it("mũi tên xuống rồi Enter chọn mục thứ hai", async () => {
     const editor = await open("<p></p>");
     await type(editor, "/");
-    await waitFor(() => expect(options()).toHaveLength(4));
+    await waitFor(() => expect(options()).toHaveLength(5));
     await press(editor, "ArrowDown");
     await press(editor, "Enter");
     expect(editor.getHTML()).toMatch(/<pre[^>]*><code[^>]*><\/code><\/pre>/);

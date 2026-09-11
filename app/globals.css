@@ -669,6 +669,50 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   @apply mb-0;
 }
 
+/* Bảng soạn bằng editor. HTML đã lưu là `div.tableWrapper > table > colgroup +
+   tbody`, và hàng tiêu đề là `<th>` nằm trong `<tbody>` chứ không có `<thead>`,
+   nên style bảng của Tailwind Typography (nhắm `thead th`) không chạm tới nó.
+   Viết một lần cho cả khung soạn lẫn trang đọc, như nhịp khối ở trên, để Xem
+   trước khớp với lúc soạn. Bảng của bài MDX vẫn theo Typography. */
+.tableWrapper {
+  @apply overflow-x-auto;
+}
+.editor-prose table,
+.editor-html table {
+  @apply my-0 w-full border-collapse;
+  /* Một cỡ cho cả hai bề mặt. Typography cho `prose-sm` (editor) và `prose`
+     (trang đọc) hai cỡ chữ bảng khác nhau. */
+  font-size: 0.9em;
+}
+.editor-prose :is(th, td),
+.editor-html :is(th, td) {
+  @apply border border-border px-3 py-1.5 text-left align-top;
+}
+.editor-prose th,
+.editor-html th {
+  @apply bg-muted/50 font-semibold;
+}
+/* Mỗi ô chứa khối (ít nhất một `<p>`), và margin đoạn văn của Typography làm
+   ô nào cũng cao gấp đôi chữ bên trong. */
+.editor-prose :is(th, td) > *,
+.editor-html :is(th, td) > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.editor-prose :is(th, td) > * + *,
+.editor-html :is(th, td) > * + * {
+  margin-top: 0.5em;
+}
+/* Kéo chuột qua nhiều ô thì prosemirror-tables gắn `.selectedCell` cho từng ô.
+   Không có quy tắc này thì vùng chọn không hiện gì. Chỉ có trong editor. */
+.editor-prose :is(th, td) {
+  position: relative;
+}
+.editor-prose .selectedCell::after {
+  @apply pointer-events-none absolute inset-0 bg-primary/10;
+  content: "";
+}
+
 
 /* Two lists in a row are one thought continued, not two sections. Tailwind
    Typography gives each list a full block margin, so a bullet list under a

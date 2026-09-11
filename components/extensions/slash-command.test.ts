@@ -5,23 +5,27 @@ import { Callout } from "./callout";
 import { CodeBlockWithLanguage } from "./code-block-language";
 import { PrivateNote } from "./private-note";
 import { applySlashItem, filterSlashItems } from "./slash-command";
+import { EditorTable } from "./table";
 
 const ids = (query: string) => filterSlashItems(query).map((item) => item.id);
 
 describe("filterSlashItems", () => {
-  it("chưa gõ gì thì hiện đủ bốn mục, theo thứ tự cố định", () => {
-    expect(ids("")).toEqual(["callout", "code", "note", "quote"]);
+  it("chưa gõ gì thì hiện đủ năm mục, theo thứ tự cố định", () => {
+    expect(ids("")).toEqual(["callout", "code", "note", "quote", "table"]);
   });
 
   it("lọc theo tên tiếng Anh", () => {
     expect(ids("code")).toEqual(["code"]);
     expect(ids("quote")).toEqual(["quote"]);
+    expect(ids("table")).toEqual(["table"]);
   });
 
   it("lọc theo tên tiếng Việt, có dấu hay không đều được", () => {
     expect(ids("trích")).toEqual(["quote"]);
     expect(ids("trich")).toEqual(["quote"]);
     expect(ids("ghichu")).toEqual(["note"]);
+    expect(ids("bảng")).toEqual(["table"]);
+    expect(ids("bang")).toEqual(["table"]);
   });
 
   it("không phân biệt hoa thường", () => {
@@ -49,6 +53,7 @@ function typed(query: string): Editor {
       CodeBlockWithLanguage,
       Callout,
       PrivateNote,
+      EditorTable,
     ],
     content: `<p>Trước</p><p>/${query}</p>`,
   });
@@ -77,5 +82,19 @@ describe("applySlashItem", () => {
     expect(html).toContain("<p>Trước</p>");
     // So trên chữ, không trên HTML: `</code>` tự nó đã chứa "/code".
     expect(e.state.doc.textContent).toBe("Trước");
+  });
+
+  it("table: xoá chữ vừa gõ rồi chèn bảng 3x3 có hàng tiêu đề, con trỏ ở ô đầu", () => {
+    const e = typed("table");
+    const item = filterSlashItems("").find((i) => i.id === "table")!;
+    applySlashItem(e, slashRange(e, "table"), item);
+    const html = e.getHTML();
+    expect(html).toContain("<p>Trước</p>");
+    expect(html).toContain('<div class="tableWrapper"><table');
+    expect(html.match(/<th\b/g)).toHaveLength(3);
+    expect(html.match(/<td\b/g)).toHaveLength(6);
+    expect(e.state.doc.textContent).toBe("Trước");
+    expect(e.state.selection.$from.parent.type.name).toBe("paragraph");
+    expect(e.state.selection.$from.node(-1).type.name).toBe("tableHeader");
   });
 });

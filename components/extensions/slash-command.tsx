@@ -3,12 +3,12 @@
 import { Extension, ReactRenderer, type ChainedCommands, type Editor, type Range } from "@tiptap/react";
 import { PluginKey } from "@tiptap/pm/state";
 import Suggestion from "@tiptap/suggestion";
-import { Code2, Lightbulb, Quote, StickyNote, type LucideIcon } from "lucide-react";
+import { Code2, Lightbulb, Quote, StickyNote, Table2, type LucideIcon } from "lucide-react";
 import { forwardRef, useImperativeHandle, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export type SlashItem = {
-  id: "callout" | "code" | "note" | "quote";
+  id: "callout" | "code" | "note" | "quote" | "table";
   label: string;
   /** Tên khác để gõ tìm, ngoài `label`. So khớp bỏ dấu, bỏ khoảng trắng. */
   keywords: string[];
@@ -45,6 +45,13 @@ const SLASH_ITEMS: SlashItem[] = [
     keywords: ["quote", "blockquote"],
     icon: Quote,
     apply: (chain) => chain.toggleBlockquote(),
+  },
+  {
+    id: "table",
+    label: "Table",
+    keywords: ["bảng"],
+    icon: Table2,
+    apply: (chain) => chain.insertTable({ rows: 3, cols: 3, withHeaderRow: true }),
   },
 ];
 

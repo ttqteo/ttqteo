@@ -15,6 +15,8 @@ import { CodeAutoPairs } from "./extensions/code-auto-pairs";
 import { CodeHighlighting } from "./extensions/code-highlighting";
 import { ListNesting, indentList } from "./extensions/list-nesting";
 import { SmartArrows } from "./extensions/smart-arrows";
+import { EditorTable } from "./extensions/table";
+import { TableBubble } from "./table-bubble";
 import { bareUrl, type UnfurlResult } from "@/lib/unfurl";
 import { parseYoutubeUrl, youtubeEmbedSrc } from "@/lib/youtube";
 import {
@@ -47,6 +49,7 @@ import {
   MonitorPlay,
   Lightbulb,
   StickyNote,
+  Table2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -215,6 +218,7 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
       LinkCard,
       Callout,
       PrivateNote,
+      EditorTable,
       SlashCommand,
       CodeAutoPairs,
       CodeHighlighting,
@@ -645,6 +649,18 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
               Khối code
             </DropdownMenuItem>
             <DropdownMenuItem
+              onSelect={() =>
+                editor
+                  .chain()
+                  .focus()
+                  .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+                  .run()
+              }
+            >
+              <Table2 className="w-4 h-4 mr-2" />
+              Table
+            </DropdownMenuItem>
+            <DropdownMenuItem
               onSelect={() => editor.chain().focus().toggleCallout("note").run()}
             >
               <Lightbulb className="w-4 h-4 mr-2" />
@@ -730,6 +746,7 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
           `isActive("link")` fires and the two menus stack on top of each
           other. */}
       {!pastePrompt && <LinkBubble editor={editor} />}
+      <TableBubble editor={editor} />
     </div>
   );
 }
