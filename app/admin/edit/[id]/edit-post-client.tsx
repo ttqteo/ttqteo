@@ -31,13 +31,13 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -68,7 +68,7 @@ import {
   ArrowLeftIcon,
   ArrowUpIcon,
   CheckIcon,
-  CopyIcon,
+  EllipsisIcon,
   EyeIcon,
   FileCodeIcon,
   FileTextIcon,
@@ -324,6 +324,7 @@ export default function EditPostClient({
   // guards below key off.
   const [dirtyVsServer, setDirtyVsServer] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Layout prefs live in localStorage, which the server cannot see. Reading
   // them during render would desync hydration, so they land after mount and the
@@ -764,6 +765,8 @@ export default function EditPostClient({
               lastSaved ? ` ${lastSaved.toLocaleTimeString("vi-VN")}` : ""
             }`;
 
+  const nothingToCopy = !post.title.trim() && !post.content.trim();
+
   return (
     <div
       className={
@@ -868,71 +871,80 @@ export default function EditPostClient({
               </Button>
             </div>
 
-            {/* Copy cả bài. Một nút mở menu chứ không phải hai nút: trên điện
-                thoại header này còn phải chứa xoá, lưu và đăng. */}
-            <DropdownMenu>
+            {/* Việc ít làm, gom sau một nút: copy bài và xoá bài. Trên điện
+                thoại header này còn phải chứa xem trước, lưu và đăng.
+                `modal={false}` để menu đang đóng và dialog xoá đang mở không
+                giành focus với nhau. */}
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
                   className="h-9 w-9 shrink-0"
-                  disabled={!post.title.trim() && !post.content.trim()}
-                  aria-label="Copy bài"
-                  title="Copy bài"
+                  aria-label="Thao tác khác"
+                  title="Thao tác khác"
                 >
-                  <CopyIcon className="w-4 h-4" />
+                  {loadingAction === "delete" ? (
+                    <Loader2Icon className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <EllipsisIcon className="w-4 h-4" />
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               {/* z-50 mặc định của menu nằm dưới header dính (z-[55]). */}
-              <DropdownMenuContent align="end" className="z-[70] w-44">
-                <DropdownMenuItem onSelect={() => void copyPost("markdown")}>
+              <DropdownMenuContent align="end" className="z-[70] w-52">
+                <DropdownMenuItem
+                  disabled={nothingToCopy}
+                  onSelect={() => void copyPost("markdown")}
+                >
                   <FileCodeIcon className="w-4 h-4 mr-2" />
                   Copy Markdown
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void copyPost("text")}>
+                <DropdownMenuItem
+                  disabled={nothingToCopy}
+                  onSelect={() => void copyPost("text")}
+                >
                   <FileTextIcon className="w-4 h-4 mr-2" />
                   Copy text
                 </DropdownMenuItem>
+                {!isNew && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      disabled={!!loadingAction}
+                      onSelect={() => setConfirmDelete(true)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <TrashIcon className="w-4 h-4 mr-2" />
+                      Chuyển vào thùng rác
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {!isNew && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    disabled={!!loadingAction}
+            {/* Mở từ mục cuối của menu trên, nên không có trigger riêng. */}
+            <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Move to trash?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This post will be moved to the trash. You can restore it
+                    later.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    {loadingAction === "delete" ? (
-                      <Loader2Icon className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <TrashIcon className="w-4 h-4" />
-                    )}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Move to trash?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This post will be moved to the trash. You can restore it
-                      later.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDelete}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      Move to Trash
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
+                    Move to Trash
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {post.is_published ? (
               <>
