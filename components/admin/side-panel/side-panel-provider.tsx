@@ -67,7 +67,11 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
     const focused = document.activeElement;
     const active = focused instanceof HTMLElement && focused !== document.body ? focused : null;
     const focusInPanel = active?.closest(".admin-side-panel") != null;
-    if (next && !previous) returnFocus.current = focusInPanel ? null : active;
+    // Remember what had focus before the panel took it, the first time there
+    // is something to remember: on opening, or on the first switch after a
+    // panel was restored on load. A switch made from inside the panel keeps
+    // what was remembered.
+    if (next && !focusInPanel && !returnFocus.current) returnFocus.current = active;
 
     setOpenedByUser(next !== null);
     writeAdminPanel(next);
@@ -75,14 +79,25 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
     if (next) root.dataset.adminPanel = next;
     else delete root.dataset.adminPanel;
 
-    if (next) return;
+    // preventScroll throughout: a plain focus() on the editor can scroll the
+    // page to its start before ProseMirror puts the caret back.
+    if (next) {
+      // A switch unmounts the content under the cursor. The close button
+      // stays mounted across switches, so focus waits there: Calendar has no
+      // field of its own, and Task and Ghi nhanh move it on to theirs.
+      if (focusInPanel && next !== previous) {
+        document.querySelector<HTMLElement>("[data-panel-close]")?.focus({ preventScroll: true });
+      }
+      return;
+    }
     // Closing hides the panel under the cursor; hand focus back rather than
     // let it fall to <body>.
     if (focusInPanel) {
-      const back = returnFocus.current?.isConnected
-        ? returnFocus.current
-        : document.querySelector<HTMLElement>(`.admin-side-rail [data-panel="${previous}"]`);
-      back?.focus();
+      const rail = document.querySelector<HTMLElement>(`.admin-side-rail [data-panel="${previous}"]`);
+      const back = returnFocus.current?.isConnected ? returnFocus.current : rail;
+      back?.focus({ preventScroll: true });
+      // An opener hidden or disabled since then cannot take focus: use the rail.
+      if (document.activeElement !== back) rail?.focus({ preventScroll: true });
     }
     returnFocus.current = null;
   }, []);

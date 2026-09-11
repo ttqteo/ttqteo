@@ -36,6 +36,7 @@ export function SidePanelFrame() {
             <button
               type="button"
               onClick={close}
+              data-panel-close
               aria-label="Đóng panel"
               title="Đóng (Esc)"
               className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
