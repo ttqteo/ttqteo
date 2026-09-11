@@ -831,6 +831,7 @@ git commit -m "feat: side panel rail, frame and phone sheet"
 **Files:**
 - Modify: `app/admin/layout.tsx` (thay cả file)
 - Modify: `components/admin-toolbar.tsx`
+- Modify: `components/admin/logout-form.tsx`
 
 **Step 1: Admin layout**
 
@@ -849,11 +850,12 @@ export default function AdminLayout({
       {/* Everything under /admin has the admin toolbar for navigation, so the
           public navbar is redundant across the whole segment. A server-rendered
           style keeps it hidden from first paint instead of flashing in and then
-          disappearing on hydration; React drops it again when you navigate out
-          of /admin. */}
+          disappearing on hydration. React does not remove a hoisted style when
+          you navigate out of /admin, so every rule here is keyed on the side
+          panel's rail, which is only in the DOM under /admin. */}
       <style href="admin-shell" precedence="high">
         {`
-          html.is-admin .site-navbar { display: none; }
+          html.is-admin:has(.admin-side-rail) .site-navbar { display: none; }
 
           /* The shared <main> is w-[90vw] on phones, which reads well for an
              article but costs the posts table ~19px a side before its own
@@ -861,7 +863,7 @@ export default function AdminLayout({
              it takes the full width and sets its own gutters. Unchanged from
              sm up, where sm:container takes over anyway. */
           @media (max-width: 639px) {
-            .app-shell > main { width: 100%; }
+            .app-shell:has(.admin-side-rail) > main { width: 100%; }
           }
 
           /* Room for the side panel (components/admin/side-panel): a 48px
@@ -872,10 +874,9 @@ export default function AdminLayout({
              over it, since 408px out of a laptop screen leaves the post table
              too tight. Under 768px neither shows and a phone gets a sheet.
 
-             Keyed on :has() the rail rather than on this stylesheet being
-             present, so the room goes with the rail when you leave /admin
-             even if the hoisted style stays. data-admin-panel is set before
-             first paint by the head script in app/layout.tsx. */
+             Keyed on :has() the rail, like the rules above: the style stays
+             after you leave /admin, the rail does not. data-admin-panel is
+             set before first paint by the head script in app/layout.tsx. */
           .admin-side-rail,
           .admin-side-panel { display: none; }
           @media (min-width: 768px) {
@@ -891,6 +892,11 @@ export default function AdminLayout({
           }
           /* Focus mode hides rail and panel (focus-mode-hidden); hand their room back too. */
           body.focus-mode { --admin-side-w: 0px; }
+
+          /* A dialog, alert dialog or sheet (all z-50) must not open under the
+             rail (z-57) or the panel (z-56). Radix marks <body> with
+             data-scroll-locked while one of them is open. */
+          body[data-scroll-locked] :is(.admin-side-rail, .admin-side-panel) { z-index: 49; }
         `}
       </style>
       {children}
@@ -947,6 +953,18 @@ Trong `<div className="flex shrink-0 items-center gap-3 sm:gap-4">`, chèn trư�
           )}
 ```
 
+Trên điện thoại, chữ của `posts`, `notes` và `logout` chỉ còn cho trình đọc màn hình, vì thêm nút này thì toolbar tràn ở 390px. Đổi `<span>posts</span>` thành `<span className="sr-only sm:not-sr-only">posts</span>` và sửa comment ngay trên link đó như trong code; đổi `<span className="hidden sm:inline">notes</span>` thành `<span className="sr-only sm:not-sr-only">notes</span>`; và trong `components/admin/logout-form.tsx` đổi `<span>logout</span>` thành `<span className="sr-only sm:not-sr-only">logout</span>`.
+
+```tsx
+          {/* /admin is the post list now, so dashboard and posts are one item.
+              On a phone the labels here are for screen readers only: next to
+              the side panel's button, the bar no longer fits them at 390px. */}
+          <AdminNavLink href="/admin" exact>
+            <FileTextIcon className="w-3.5 h-3.5" />
+            <span className="sr-only sm:not-sr-only">posts</span>
+          </AdminNavLink>
+```
+
 **Step 3: Kiểm**
 
 Run: `pnpm exec tsc --noEmit` rồi `pnpm lint`
@@ -955,7 +973,7 @@ Expected: không lỗi kiểu; lint vẫn 0 error, 36 warning như trên master.
 **Step 4: Commit**
 
 ```bash
-git add app/admin/layout.tsx components/admin-toolbar.tsx
+git add app/admin/layout.tsx components/admin-toolbar.tsx components/admin/logout-form.tsx
 git commit -m "feat: mount the side panel in /admin and make room for it"
 ```
 
@@ -1007,7 +1025,7 @@ Thay bằng:
           // With the board open, past the board too: 45% of what the rail leaves.
           right:
             isSplit && panelOpen
-              ? "calc(var(--admin-side-w, 0px) + (100vw - var(--admin-side-w, 0px)) * 0.45 + 1rem)"
+              ? "calc(var(--admin-side-w, 0px) + (100% - var(--admin-side-w, 0px)) * 0.45 + 1rem)"
               : "calc(var(--admin-side-w, 0px) + 1rem)",
         }}
       >
@@ -1057,9 +1075,10 @@ git commit -m "fix: keep the editor's fixed pieces and toasts clear of the side 
 7. Khi panel đang mở, rê chuột vào một icon trên rail: tooltip hiện đè lên panel.
 8. Windows scale 125% (hoặc DevTools với viewport 767px): lúc nào cũng có rail hoặc nút mở sheet trên toolbar, không bao giờ mất cả hai.
 9. `/admin/edit/<id>`, chế độ split: khung split và bảng vẽ dừng trước rail; cụm nút góc dưới phải không nằm dưới rail. Bật focus mode: rail và panel ẩn, không còn khoảng trống bên phải.
-10. Rời `/admin` bằng điều hướng client (ở `/admin`, gõ `g` rồi `h`): trang chủ không còn khoảng trống bên phải.
+10. Rời `/admin` bằng điều hướng client (ở `/admin`, gõ `g` rồi `h`): trang chủ không còn khoảng trống bên phải. Navbar hiện lại.
 11. Toast (ví dụ publish một bài) hiện bên trái rail, không đè lên rail.
-12. 390px ở `/admin/edit/<id>`: toolbar không tràn. Nếu tràn, đổi chữ `posts` trong `components/admin-toolbar.tsx` thành `<span className="hidden sm:inline">posts</span>` giống `notes`, rồi commit riêng `fix: fit the admin toolbar on a phone`.
+12. 360px, 375px và 390px ở `/admin` và `/admin/notes`: toolbar không tràn; trên điện thoại posts, notes và logout chỉ còn icon.
+13. Khi panel đang mở, ở khoảng 1024px và 1300px: mở hộp xác nhận xoá một bài (và, dưới 1024px, sheet lọc bài): không phần nào nằm dưới rail hay panel, và lớp tối phủ cả rail lẫn panel.
 
 ---
 

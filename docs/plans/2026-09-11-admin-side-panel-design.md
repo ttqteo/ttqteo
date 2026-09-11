@@ -46,7 +46,7 @@ Mục đích là vừa viết bài hay quản lý bài vừa liếc được l�
 - Panel đang mở được lưu trong localStorage. Script trong `<head>` của `app/layout.tsx` (đang set `is-admin` và `tocExpanded`) set thêm `data-admin-panel` lên `<html>`. CSS đẩy nội dung nằm trong `<style>` của `app/admin/layout.tsx`, nên thuộc tính này không ảnh hưởng gì ngoài `/admin`, và F5 không bị giật.
 - Mỗi tab giữ panel đang mở của riêng nó, như sidebar của Edge. Lúc provider đọc lần đầu, giá trị lấy từ dấu mà script `<head>` đã đặt lên `<html>` khi tải trang, nên panel và khoảng chừa luôn khớp nhau, kể cả khi vào `/admin` bằng điều hướng client lâu sau đó. localStorage chỉ được script `<head>` đọc, ở lần tải trang sau.
 - Rail ẩn hiện theo `html.is-admin`, giống toolbar.
-- Luật CSS chừa chỗ khoá theo `:has(.admin-side-rail)` chứ không dựa vào việc style của admin layout bị gỡ khi rời `/admin`. Rail rời DOM thì chỗ chừa cũng mất, kể cả khi style hoist vẫn còn trong `<head>`.
+- React không gỡ style hoist khi rời `/admin`, nên mọi luật trong style của admin layout, kể cả luật ẩn navbar có từ trước, đều khoá theo `:has(.admin-side-rail)`: rail rời DOM thì các luật đó thôi áp dụng.
 - Toolbar nằm ở root layout, ngoài provider, nên nút mở sheet trên điện thoại gửi một window event (`OPEN_ADMIN_SHEET_EVENT`) để provider nghe.
 - Phím tắt: Alt+1, Alt+2, Alt+3 mở Calendar, Task, Ghi nhanh, bấm lại thì đóng. Esc đóng panel khi con trỏ đang ở trong panel. Không trùng với phím của editor (Ctrl+Alt+N, Ctrl+Alt+C, Ctrl+Shift+C) hay các phím `g` + chữ trong `lib/keyboard-nav.tsx`. Giữ phím thì không lặp, và trong focus mode phím tắt không làm gì. Đóng panel khi con trỏ đang ở trong panel thì con trỏ quay về chỗ nó đứng trước khi mở (ví dụ editor), hoặc về nút trên rail.
 
@@ -56,7 +56,8 @@ Mục đích là vừa viết bài hay quản lý bài vừa liếc được l�
 |---|---|---|
 | Khung split của editor | `fixed inset-0` | chừa cạnh phải `--admin-side-w` |
 | Cụm nút góc dưới phải của editor | `right-4`, hoặc `right-[calc(45%+1rem)]` khi mở bảng vẽ | cộng thêm `--admin-side-w` |
-| Toaster (`bottom-right`) | cách mép phải mặc định | dời vào bằng CSS trong admin layout |
+| Toaster (`bottom-right`) | cách mép phải mặc định | prop `offset` của sonner: `calc(var(--admin-side-w, 0px) + 24px)` |
+| Dialog, alert dialog, sheet (`z-50`) | nằm dưới rail và panel | lúc đang mở, rail và panel hạ xuống `z-49` (`body[data-scroll-locked]`) |
 | Thanh bulk action trong bảng bài | `sticky` | không cần sửa, tự chạy theo padding |
 
 ## Ba panel
@@ -222,3 +223,4 @@ Mỗi bước merge riêng, xong bước nào dùng được bước đó.
 - **Lộ link bí mật** thì ai cũng đọc được lịch. Bấm Reset cạnh link trong Google để đổi link mới, rồi cập nhật biến môi trường.
 - **Lần đầu mở mỗi tháng có thể chậm**: file ICS vài MB mất khoảng nửa giây tới một giây để parse. Các lần sau lấy từ cache.
 - **Khung split của editor** có sẵn một panel bảng vẽ ở bên phải. Khi mở cả panel admin lẫn bảng vẽ trên màn nhỏ hơn 1280px, panel admin nổi đè lên bảng vẽ. Chấp nhận được.
+- **Dưới 1280px panel nổi đè lên cụm nút góc dưới của editor, còn toast hiện đè lên panel.** Chấp nhận được: đóng panel là nút hiện lại, và toast vẫn đọc được.
