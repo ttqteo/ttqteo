@@ -10,11 +10,15 @@ export function SidePanelFrame() {
   const { panel, openedByUser, close } = useSidePanel();
   const meta = panel ? panelMeta(panel) : null;
 
-  // Only for keys pressed inside the panel itself. A popover opened from it
-  // is portalled elsewhere in the DOM but still bubbles here through React,
-  // and its Escape should close the popover, not the panel.
+  // Escape closes the panel only when nothing else wanted it:
+  // - a layer that already handled it, such as a Radix popover or tooltip,
+  //   has called preventDefault;
+  // - an IME composition (Telex, say) uses Escape to cancel itself;
+  // - a popover opened from the panel is portalled elsewhere in the DOM but
+  //   still bubbles here through React, so the key must come from inside.
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === "Escape" && event.currentTarget.contains(event.target as Node)) close();
+    if (event.key !== "Escape" || event.defaultPrevented || event.nativeEvent.isComposing) return;
+    if (event.currentTarget.contains(event.target as Node)) close();
   };
 
   return (

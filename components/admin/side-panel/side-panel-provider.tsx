@@ -4,6 +4,7 @@ import { useIsAdmin } from "@/components/contexts/admin-context";
 import {
   OPEN_ADMIN_SHEET_EVENT,
   readAdminPanel,
+  shortcutPanel,
   subscribeAdminPanel,
   writeAdminPanel,
   type AdminPanelId,
@@ -14,11 +15,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type PropsWithChildren,
 } from "react";
-import { PANELS } from "./panels";
 
 type SidePanelContextValue = {
   /** The open panel, on screens with room for the rail; null when closed. */
@@ -42,8 +43,11 @@ export function useSidePanel(): SidePanelContextValue {
   return value;
 }
 
-const PHONE_QUERY = "(max-width: 767px)";
-const SHORTCUT_CODES = ["Digit1", "Digit2", "Digit3"];
+// Tailwind's max-md, the exact complement of md (min-width: 768px). A plain
+// (max-width: 767px) leaves a gap at fractional widths such as 767.2px, which
+// a 125% display scale produces, where neither the rail nor the sheet works.
+const PHONE_QUERY = "not all and (min-width: 768px)";
+const isPhone = () => window.matchMedia(PHONE_QUERY).matches;
 const closedOnServer = () => null;
 
 export function SidePanelProvider({ children }: PropsWithChildren) {
@@ -54,13 +58,33 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
   const [openedByUser, setOpenedByUser] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetTab, setSheetTab] = useState<AdminPanelId>("tasks");
+  // Where focus goes back to when the panel closes: whatever had it when the
+  // panel opened (the editor, mid-sentence, after Alt+3), else the rail.
+  const returnFocus = useRef<HTMLElement | null>(null);
 
   const apply = useCallback((next: AdminPanelId | null) => {
+    const previous = readAdminPanel();
+    const focused = document.activeElement;
+    const active = focused instanceof HTMLElement && focused !== document.body ? focused : null;
+    const focusInPanel = active?.closest(".admin-side-panel") != null;
+    if (next && !previous) returnFocus.current = focusInPanel ? null : active;
+
     setOpenedByUser(next !== null);
     writeAdminPanel(next);
     const root = document.documentElement;
     if (next) root.dataset.adminPanel = next;
     else delete root.dataset.adminPanel;
+
+    if (next) return;
+    // Closing hides the panel under the cursor; hand focus back rather than
+    // let it fall to <body>.
+    if (focusInPanel) {
+      const back = returnFocus.current?.isConnected
+        ? returnFocus.current
+        : document.querySelector<HTMLElement>(`.admin-side-rail [data-panel="${previous}"]`);
+      back?.focus();
+    }
+    returnFocus.current = null;
   }, []);
 
   const toggle = useCallback(
@@ -69,16 +93,15 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
   );
   const close = useCallback(() => apply(null), [apply]);
 
-  // Alt+1/2/3 in rail order. On a phone they open the sheet instead.
+  // Alt+1/2/3 (shortcutPanel). On a phone they open the sheet instead. In
+  // focus mode, which hides rail and panel, they do nothing.
   useEffect(() => {
     if (!admin) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-      const index = SHORTCUT_CODES.indexOf(event.code);
-      if (index === -1) return;
+      const id = shortcutPanel(event);
+      if (!id || document.body.classList.contains("focus-mode")) return;
       event.preventDefault();
-      const id = PANELS[index].id;
-      if (window.matchMedia(PHONE_QUERY).matches) {
+      if (isPhone()) {
         setSheetTab(id);
         setSheetOpen(true);
       } else {
@@ -90,9 +113,12 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
   }, [admin, toggle]);
 
   // The toolbar is in the root layout, outside this provider, so its phone
-  // button reaches the sheet through an event.
+  // button reaches the sheet through an event. Only where the sheet can show:
+  // opened at 768px or wider it would leave its overlay up over nothing.
   useEffect(() => {
-    const open = () => setSheetOpen(true);
+    const open = () => {
+      if (isPhone()) setSheetOpen(true);
+    };
     window.addEventListener(OPEN_ADMIN_SHEET_EVENT, open);
     return () => window.removeEventListener(OPEN_ADMIN_SHEET_EVENT, open);
   }, []);

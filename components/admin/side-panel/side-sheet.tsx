@@ -18,14 +18,14 @@ export function SideSheet() {
         className="flex h-[85dvh] flex-col gap-0 p-0 md:hidden"
       >
         <SheetTitle className="sr-only">Lịch, task và ghi nhanh</SheetTitle>
-        {/* mr-12 leaves the sheet's own close button its corner. */}
-        <div role="tablist" className="mr-12 flex gap-1 border-b p-2">
+        {/* Toggle buttons like the rail's. mr-12 leaves the sheet's own close
+            button its corner. */}
+        <div className="mr-12 flex gap-1 border-b p-2">
           {PANELS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
-              role="tab"
-              aria-selected={sheetTab === id}
+              aria-pressed={sheetTab === id}
               onClick={() => setSheetTab(id)}
               className={cn(
                 "flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-sm text-muted-foreground transition-colors",
@@ -37,8 +37,10 @@ export function SideSheet() {
             </button>
           ))}
         </div>
+        {/* No autofocus: on a phone it would pull the keyboard up over the
+            sheet every time it opens, even just to look. */}
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <PanelBody id={sheetTab} autoFocus />
+          <PanelBody id={sheetTab} />
         </div>
       </SheetContent>
     </Sheet>
