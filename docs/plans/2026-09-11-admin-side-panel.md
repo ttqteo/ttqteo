@@ -1426,6 +1426,8 @@ git commit -m "feat: shared admin gate and error responses for the side panel ro
 import { describe, expect, it } from "vitest";
 import {
   filterNotes,
+  foldText,
+  isBlankNote,
   MAX_NOTE_LENGTH,
   notePreview,
   noteTitle,
@@ -1456,9 +1458,21 @@ describe("noteTitle / notePreview", () => {
     expect(notePreview(body)).toBe("- lạp vịt\n- bánh\n- mứt");
   });
 
+  it("reads Windows line endings the same way", () => {
+    expect(noteTitle("Tiêu đề\r\n- a\r\n- b")).toBe("Tiêu đề");
+    expect(notePreview("Tiêu đề\r\n- a\r\n- b")).toBe("- a\n- b");
+  });
+
   it("has nothing to show for a blank note", () => {
     expect(noteTitle("  \n ")).toBe("");
     expect(notePreview("  \n ")).toBe("");
+  });
+});
+
+describe("isBlankNote", () => {
+  it("counts whitespace alone as blank", () => {
+    expect(isBlankNote(" \n\t\r\n ")).toBe(true);
+    expect(isBlankNote(" x ")).toBe(false);
   });
 });
 
@@ -1472,12 +1486,23 @@ describe("sortNotes", () => {
     expect(sorted.map((n) => n.body)).toEqual(["pinned", "new", "old"]);
   });
 
-  it("compares Postgres and browser timestamps as times", () => {
+  it("compares timestamps as times, not as text", () => {
+    // As text, "10:00:00+07:00" sorts after "03:00:00.900Z"; as a time it is
+    // 03:00:00Z, the older of the two.
     const sorted = sortNotes([
-      note({ body: "server", updated_at: "2026-09-11T03:00:00.500000+00:00" }),
+      note({ body: "server", updated_at: "2026-09-11T10:00:00+07:00" }),
       note({ body: "browser", updated_at: "2026-09-11T03:00:00.900Z" }),
     ]);
     expect(sorted.map((n) => n.body)).toEqual(["browser", "server"]);
+  });
+});
+
+describe("foldText", () => {
+  it("folds Vietnamese to plain lowercase, in either normal form", () => {
+    expect(foldText("Tết")).toBe("tet");
+    expect(foldText("Tết".normalize("NFD"))).toBe("tet");
+    expect(foldText("ĐỒNG")).toBe("dong");
+    expect(foldText("Ưu tiên ở Phường")).toBe("uu tien o phuong");
   });
 });
 
@@ -1497,26 +1522,59 @@ describe("filterNotes", () => {
   it("returns everything for a blank query", () => {
     expect(filterNotes(notes, "  ")).toHaveLength(3);
   });
+
+  it("finds a note stored decomposed with a query typed precomposed", () => {
+    expect(filterNotes([note({ body: "Mua đồ Tết".normalize("NFD") })], "tết")).toHaveLength(1);
+  });
 });
 
 describe("parseNoteInput", () => {
-  it("accepts a body and a pin", () => {
-    expect(parseNoteInput({ body: "hi", pinned: false })).toEqual({
+  const T = "2026-09-11T03:00:00.000Z";
+
+  it("accepts a body, a pin and the edit's time", () => {
+    expect(parseNoteInput({ body: "hi", pinned: false, updated_at: T })).toEqual({
       ok: true,
-      input: { body: "hi", pinned: false },
+      input: { body: "hi", pinned: false, updated_at: T },
     });
   });
 
   it("keeps a readable created_at, for Undo", () => {
-    const result = parseNoteInput({ body: "hi", pinned: true, created_at: "2026-09-01T00:00:00Z" });
+    const result = parseNoteInput({
+      body: "hi",
+      pinned: true,
+      updated_at: T,
+      created_at: "2026-09-01T00:00:00Z",
+    });
     expect(result).toMatchObject({ ok: true, input: { created_at: "2026-09-01T00:00:00.000Z" } });
   });
 
+  it("takes only the fields it knows, whatever else is sent", () => {
+    const result = parseNoteInput({ body: "hi", pinned: false, updated_at: T, id: "evil", deleted: true });
+    expect(result.ok && Object.keys(result.input).sort()).toEqual(["body", "pinned", "updated_at"]);
+  });
+
+  it("accepts a body exactly at the limit", () => {
+    expect(
+      parseNoteInput({ body: "x".repeat(MAX_NOTE_LENGTH), pinned: false, updated_at: T }),
+    ).toMatchObject({ ok: true });
+  });
+
+  it("drops NUL, which Postgres text cannot hold", () => {
+    const nul = String.fromCharCode(0);
+    expect(parseNoteInput({ body: `a${nul}b`, pinned: false, updated_at: T })).toMatchObject({
+      ok: true,
+      input: { body: "ab" },
+    });
+  });
+
   it.each([
-    ["no body", { pinned: false }],
-    ["a body that is not text", { body: 1, pinned: false }],
-    ["a body that is too long", { body: "x".repeat(MAX_NOTE_LENGTH + 1), pinned: false }],
-    ["no pin", { body: "hi" }],
+    ["no body", { pinned: false, updated_at: T }],
+    ["a body that is not text", { body: 1, pinned: false, updated_at: T }],
+    ["a body that is too long", { body: "x".repeat(MAX_NOTE_LENGTH + 1), pinned: false, updated_at: T }],
+    ["no pin", { body: "hi", updated_at: T }],
+    ["no updated_at", { body: "hi", pinned: false }],
+    ["an unreadable updated_at", { body: "hi", pinned: false, updated_at: "now" }],
+    ["an unreadable created_at", { body: "hi", pinned: false, updated_at: T, created_at: "yesterday" }],
     ["nothing at all", null],
   ])("rejects %s", (_label, value) => {
     expect(parseNoteInput(value)).toMatchObject({ ok: false });
@@ -1549,6 +1607,9 @@ export type AdminNote = {
 };
 
 export const MAX_NOTE_LENGTH = 20_000;
+
+/** The columns every notes route reads and returns. */
+export const NOTE_COLUMNS = "id, body, pinned, created_at, updated_at";
 
 const lines = (body: string) =>
   body
@@ -1600,23 +1661,46 @@ export function filterNotes(notes: AdminNote[], query: string): AdminNote[] {
   });
 }
 
-export type NoteInput = { body: string; pinned: boolean; created_at?: string };
+export type NoteInput = { body: string; pinned: boolean; updated_at: string; created_at?: string };
 
-/** Checks a PUT body for /api/admin/notes/[id]. */
+const NUL = String.fromCharCode(0);
+
+/**
+ * Checks a PUT body for /api/admin/notes/[id]. `updated_at` is the browser's
+ * stamp for this edit, and decides which of two saves wins, so it is required.
+ * `created_at` comes back only with Undo; unreadable, it is refused rather
+ * than quietly replaced with now.
+ */
 export function parseNoteInput(
   value: unknown,
 ): { ok: true; input: NoteInput } | { ok: false; error: string } {
   const data = (value ?? {}) as Record<string, unknown>;
   if (typeof data.body !== "string") return { ok: false, error: "body phải là chuỗi" };
-  if (data.body.length > MAX_NOTE_LENGTH) {
-    return { ok: false, error: `Note dài quá ${MAX_NOTE_LENGTH} ký tự` };
+  // Postgres text cannot hold NUL; left in, every retry of the save would fail.
+  const body = data.body.split(NUL).join("");
+  if (body.length > MAX_NOTE_LENGTH) {
+    return { ok: false, error: `Note dài quá ${MAX_NOTE_LENGTH.toLocaleString("vi-VN")} ký tự` };
   }
   if (typeof data.pinned !== "boolean") return { ok: false, error: "pinned phải là true hoặc false" };
 
-  const createdAt = parseTimestamp(data.created_at);
+  const updatedAt = parseTimestamp(data.updated_at);
+  if (!updatedAt) return { ok: false, error: "updated_at không đọc được" };
+
+  let createdAt: string | undefined;
+  if (data.created_at != null) {
+    const parsed = parseTimestamp(data.created_at);
+    if (!parsed) return { ok: false, error: "created_at không đọc được" };
+    createdAt = parsed;
+  }
+
   return {
     ok: true,
-    input: { body: data.body, pinned: data.pinned, ...(createdAt ? { created_at: createdAt } : {}) },
+    input: {
+      body,
+      pinned: data.pinned,
+      updated_at: updatedAt,
+      ...(createdAt ? { created_at: createdAt } : {}),
+    },
   };
 }
 ```
@@ -1624,7 +1708,7 @@ export function parseNoteInput(
 **Step 4: Chạy lại**
 
 Run: `pnpm vitest run lib/admin-notes.test.ts`
-Expected: PASS, 15 tests.
+Expected: PASS, 25 tests.
 
 **Step 5: Commit**
 
@@ -1643,6 +1727,7 @@ git commit -m "feat: titles, previews, order and search for quick notes"
 
 ```ts
 import { dbError, requireAdmin } from "@/lib/admin-api";
+import { NOTE_COLUMNS } from "@/lib/admin-notes";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { NextResponse } from "next/server";
 
@@ -1656,11 +1741,12 @@ export async function GET() {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("admin_notes")
-    .select("id, body, pinned, created_at, updated_at")
+    .select(NOTE_COLUMNS)
     .order("updated_at", { ascending: false });
 
   if (error) return dbError(error, "admin notes GET");
-  return NextResponse.json({ notes: data });
+  // Private notes: kept by no shared cache, and not by the browser's either.
+  return NextResponse.json({ notes: data }, { headers: { "Cache-Control": "private, no-store" } });
 }
 ```
 
@@ -1669,7 +1755,7 @@ export async function GET() {
 ```ts
 import { isUuid } from "@/lib/admin-db";
 import { badRequest, dbError, requireAdmin } from "@/lib/admin-api";
-import { parseNoteInput } from "@/lib/admin-notes";
+import { NOTE_COLUMNS, parseNoteInput } from "@/lib/admin-notes";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -1678,8 +1764,12 @@ type RouteParams = {
 };
 
 // PUT /api/admin/notes/[id]
-// Creates the note or replaces it. The id comes from the browser, which is
-// what lets autosave, the first save of a new note and Undo be one call.
+// Creates the note or replaces it, and the newest edit wins. The browser
+// stamps every edit with updated_at, and a write lands only over an older
+// version, so a save that arrives late (a slow request, or the keepalive sent
+// as a tab closes) cannot overwrite a newer one. The id comes from the browser
+// too, which is what lets autosave, a new note's first save and Undo be one
+// call. Answers with the note as stored: the newer one when this write lost.
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   const denied = await requireAdmin();
   if (denied) return denied;
@@ -1691,14 +1781,33 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (!parsed.ok) return badRequest(parsed.error);
 
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("admin_notes")
-    .upsert({ id, ...parsed.input, updated_at: new Date().toISOString() })
-    .select("id, body, pinned, created_at, updated_at")
-    .single();
+  const row = { id, ...parsed.input };
+  // Replaces the stored note only if it is older than this edit.
+  const replaceOlder = () =>
+    supabase
+      .from("admin_notes")
+      .update(row)
+      .eq("id", id)
+      .lt("updated_at", row.updated_at)
+      .select(NOTE_COLUMNS);
 
-  if (error) return dbError(error, "admin notes PUT");
-  return NextResponse.json({ note: data });
+  let result = await replaceOlder();
+  if (!result.error && result.data.length === 0) {
+    // Nothing older is stored: create the note. If it exists after all,
+    // because another save created it in between, try replacing once more.
+    result = await supabase
+      .from("admin_notes")
+      .upsert(row, { ignoreDuplicates: true })
+      .select(NOTE_COLUMNS);
+    if (!result.error && result.data.length === 0) result = await replaceOlder();
+  }
+  if (result.error) return dbError(result.error, "admin notes PUT");
+  if (result.data.length > 0) return NextResponse.json({ note: result.data[0] });
+
+  // A newer version is stored; hand it back so the browser can show it.
+  const stored = await supabase.from("admin_notes").select(NOTE_COLUMNS).eq("id", id).single();
+  if (stored.error) return dbError(stored.error, "admin notes PUT");
+  return NextResponse.json({ note: stored.data });
 }
 
 // DELETE /api/admin/notes/[id]
@@ -5387,7 +5496,7 @@ Người dùng thêm `ADMIN_CALENDAR_FEEDS` vào Project Settings → Environmen
 **Step 1: Test**
 
 Run: `pnpm test`
-Expected: mọi file test đều PASS, gồm 110 test mới.
+Expected: mọi file test đều PASS, gồm 120 test mới.
 
 **Step 2: Kiểu và lint**
 

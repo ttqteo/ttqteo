@@ -121,14 +121,14 @@ Theo kiểu của `app/api/posts/[id]/route.ts`: chặn bằng `requireAdmin()`,
 | Route | Việc |
 |---|---|
 | `GET /api/admin/notes` | Mọi note |
-| `PUT /api/admin/notes/[id]` | Tạo hoặc thay note (upsert) với `{ body, pinned, created_at? }` |
+| `PUT /api/admin/notes/[id]` | Tạo hoặc thay note (upsert) với `{ body, pinned, updated_at, created_at? }` |
 | `DELETE /api/admin/notes/[id]` | Xoá thật |
 | `GET /api/admin/tasks` | Task chưa xong, cộng task xong trong 7 ngày |
 | `PUT /api/admin/tasks/[id]` | Tạo hoặc thay task (upsert) với `{ title, due_on, done_at, created_at? }` |
 | `DELETE /api/admin/tasks/[id]` | Xoá thật |
 | `GET /api/admin/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD[&fresh=1]` | Sự kiện đã trải ra trong khoảng ngày |
 
-`id` do trình duyệt tạo (`crypto.randomUUID()`), nên tạo mới, tự lưu, tick xong và Undo sau khi xoá đều là cùng một lệnh `PUT`. Client luôn gửi cả bản ghi, không gửi body một phần. Server tự đặt `updated_at`. Mỗi note chỉ có một request đang chạy tại một thời điểm, nên một lần lưu chậm không thể đè lên lần lưu mới hơn, hay tạo lại note vừa xoá.
+`id` do trình duyệt tạo (`crypto.randomUUID()`), nên tạo mới, tự lưu, tick xong và Undo sau khi xoá đều là cùng một lệnh `PUT`. Client luôn gửi cả bản ghi, không gửi body một phần. Với task, server tự đặt `updated_at`. Với note, trình duyệt đóng dấu `updated_at` cho mỗi lần sửa và server chỉ ghi đè bản cũ hơn, nên một lần lưu tới muộn (request chậm, hay lần gửi `keepalive` lúc đóng tab) không đè được bản mới hơn; khi thua, server trả về bản đang lưu để panel hiện nó. Trong một tab, mỗi note chỉ có một request đang chạy, nên cũng không tạo lại được note vừa xoá. Giữa hai tab, bản sửa sau cùng thắng, và tab nào quay lại màn hình thì tải lại danh sách nếu không còn gì chờ lưu. Một tab cũ vẫn có thể tạo lại note vừa bị xoá ở tab khác; chặn được việc đó phải chuyển sang xoá mềm, nên chưa làm.
 
 ## Nguồn lịch Google
 
