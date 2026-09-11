@@ -35,6 +35,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -55,13 +61,17 @@ import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PostBody } from "@/components/post-body";
 import { stripPrivateNotes } from "@/lib/private-note";
+import { postToMarkdown, postToText } from "@/lib/post-export";
 import {
   AlignCenterIcon,
   AlignLeftIcon,
   ArrowLeftIcon,
   ArrowUpIcon,
   CheckIcon,
+  CopyIcon,
   EyeIcon,
+  FileCodeIcon,
+  FileTextIcon,
   Loader2Icon,
   LogOutIcon,
   PencilIcon,
@@ -708,6 +718,27 @@ export default function EditPostClient({
     }
   };
 
+  // Bản đang soạn, kể cả phần chưa lưu: editor đẩy HTML lên `post.content` ở
+  // mỗi lần gõ. Ghi chú riêng bị bỏ, như ở màn Xem trước.
+  const copyPost = async (format: "markdown" | "text") => {
+    const source = {
+      title: post.title,
+      description: post.description,
+      content: post.content,
+    };
+    const value =
+      format === "markdown" ? postToMarkdown(source) : postToText(source);
+    try {
+      // Safari cũ và trang không chạy HTTPS không có clipboard API. Báo lỗi
+      // còn hơn một cái nút trông như đã chạy.
+      if (!navigator.clipboard) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(value);
+      toast.success(format === "markdown" ? "Đã copy Markdown" : "Đã copy text");
+    } catch {
+      toast.error("Không copy được");
+    }
+  };
+
   // Stay in split layout until the panel has finished sliding out, otherwise the
   // editor would snap back to full width while the board is still on screen.
   const isSplit = showTldraw || panelMounted;
@@ -836,6 +867,35 @@ export default function EditPostClient({
                 <span className="hidden lg:inline">Xem trước</span>
               </Button>
             </div>
+
+            {/* Copy cả bài. Một nút mở menu chứ không phải hai nút: trên điện
+                thoại header này còn phải chứa xoá, lưu và đăng. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  disabled={!post.title.trim() && !post.content.trim()}
+                  aria-label="Copy bài"
+                  title="Copy bài"
+                >
+                  <CopyIcon className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              {/* z-50 mặc định của menu nằm dưới header dính (z-[55]). */}
+              <DropdownMenuContent align="end" className="z-[70] w-44">
+                <DropdownMenuItem onSelect={() => void copyPost("markdown")}>
+                  <FileCodeIcon className="w-4 h-4 mr-2" />
+                  Copy Markdown
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void copyPost("text")}>
+                  <FileTextIcon className="w-4 h-4 mr-2" />
+                  Copy text
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {!isNew && (
               <AlertDialog>
