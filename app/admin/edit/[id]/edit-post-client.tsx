@@ -737,7 +737,8 @@ export default function EditPostClient({
     <div
       className={
         isSplit
-          ? "fixed inset-0 z-40 bg-background flex flex-col pt-[36px]"
+          ? // Stops at the admin side rail, --admin-side-w (app/admin/layout.tsx).
+            "fixed inset-y-0 left-0 right-[var(--admin-side-w,0px)] z-40 bg-background flex flex-col pt-[36px]"
           : "min-h-[80vh]"
       }
     >
@@ -1000,10 +1001,15 @@ export default function EditPostClient({
           the board, because tldraw parks its own watermark in that corner and
           the two were sitting on top of each other. */}
       <div
-        className={cn(
-          "fixed bottom-4 z-[51] flex flex-col gap-2 transition-[right] duration-300 ease-out motion-reduce:transition-none",
-          isSplit && panelOpen ? "right-[calc(45%+1rem)]" : "right-4",
-        )}
+        className="fixed bottom-4 z-[51] flex flex-col gap-2 transition-[right] duration-300 ease-out motion-reduce:transition-none"
+        style={{
+          // Clear of the admin side rail, --admin-side-w (app/admin/layout.tsx).
+          // With the board open, past the board too: 45% of what the rail leaves.
+          right:
+            isSplit && panelOpen
+              ? "calc(var(--admin-side-w, 0px) + (100vw - var(--admin-side-w, 0px)) * 0.45 + 1rem)"
+              : "calc(var(--admin-side-w, 0px) + 1rem)",
+        }}
       >
         {showScrollTop && (
           <Tooltip>

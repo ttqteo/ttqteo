@@ -93,7 +93,14 @@ export default function RootLayout({
                     <Footer />
                   </div>
                 </div>
-                <Toaster richColors closeButton position="bottom-right" />
+                {/* Clear of the admin side rail and panel, which set
+                    --admin-side-w (app/admin/layout.tsx); 0 everywhere else. */}
+                <Toaster
+                  richColors
+                  closeButton
+                  position="bottom-right"
+                  offset={{ right: "calc(var(--admin-side-w, 0px) + 24px)" }}
+                />
               </TooltipProvider>
             </FocusModeProvider>
           </AdminProvider>
