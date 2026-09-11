@@ -44,7 +44,7 @@ Mục đích là vừa viết bài hay quản lý bài vừa liếc được l�
 - Panel rộng 360px, nằm ngay bên trái rail, nội dung cuộn riêng. Bấm icon đang mở thì đóng, bấm icon khác thì đổi panel.
 - Nội dung bị đẩy bằng `padding-right` trên `.app-shell`, cùng cách toolbar đang đẩy `padding-top`. Độ rộng đang chiếm nằm trong biến CSS `--admin-side-w` (48px, hoặc 408px khi panel mở và màn đủ rộng), để các phần tử `fixed` dùng chung.
 - Panel đang mở được lưu trong localStorage. Script trong `<head>` của `app/layout.tsx` (đang set `is-admin` và `tocExpanded`) set thêm `data-admin-panel` lên `<html>`. CSS đẩy nội dung nằm trong `<style>` của `app/admin/layout.tsx`, nên thuộc tính này không ảnh hưởng gì ngoài `/admin`, và F5 không bị giật.
-- Mỗi tab giữ panel đang mở của riêng nó, như sidebar của Edge; localStorage chỉ để nhớ qua lần tải trang sau. Nếu mỗi lần render lại đọc localStorage, tab khác hoặc một lần ghi bị storage từ chối sẽ đổi giá trị mà `useSyncExternalStore` không được báo.
+- Mỗi tab giữ panel đang mở của riêng nó, như sidebar của Edge. Lúc provider đọc lần đầu, giá trị lấy từ dấu mà script `<head>` đã đặt lên `<html>` khi tải trang, nên panel và khoảng chừa luôn khớp nhau, kể cả khi vào `/admin` bằng điều hướng client lâu sau đó. localStorage chỉ được script `<head>` đọc, ở lần tải trang sau.
 - Rail ẩn hiện theo `html.is-admin`, giống toolbar.
 - Luật CSS chừa chỗ khoá theo `:has(.admin-side-rail)` chứ không dựa vào việc style của admin layout bị gỡ khi rời `/admin`. Rail rời DOM thì chỗ chừa cũng mất, kể cả khi style hoist vẫn còn trong `<head>`.
 - Toolbar nằm ở root layout, ngoài provider, nên nút mở sheet trên điện thoại gửi một window event (`OPEN_ADMIN_SHEET_EVENT`) để provider nghe.

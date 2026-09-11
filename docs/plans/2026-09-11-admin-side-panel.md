@@ -24,7 +24,7 @@
   - Lint: `pnpm lint`. Trên master cả repo có 0 error và 36 warning, phần lớn là các luật React Compiler mà `eslint.config.mjs` đã hạ xuống warning (3 cái trong số đó ở `app/admin/edit/[id]/edit-post-client.tsx`). Sau mỗi task vẫn phải là 0 error và 36 warning.
 - Quy ước: comment trong code viết tiếng Anh, chữ trên giao diện tiếng Việt, không dùng em dash trong chữ trên giao diện. Import nội bộ dùng `@/lib/...`.
 - Chỉ test hàm thuần trong `lib/`. UI kiểm bằng tay ở cuối mỗi giai đoạn, như các plan trước.
-- Bản cuối của code trong plan này đã được chạy thử trên một bản sao của repo: `tsc` sạch, lint không thêm warning, 94 test mới và toàn bộ test cũ đều qua, và một test render tạm (không nằm trong plan) đã bấm qua cả ba panel. Các bản trung gian ở giai đoạn 1 đến 3 là tập con của bản cuối, chưa được chạy riêng: nếu `tsc` báo lỗi ở đó thì so với bản cuối.
+- Trước khi bắt đầu, bản cuối của code trong plan này đã được chạy thử trên một bản sao của repo: `tsc` sạch, lint không thêm warning, test mới và toàn bộ test cũ đều qua, và một test render tạm (không nằm trong plan) đã bấm qua cả ba panel. Sau đó Task 1 được sửa qua ba vòng review (mỗi tab giữ panel riêng, bắt đầu từ dấu trên `<html>`) và đã chạy lại riêng trên nhánh. Các bản trung gian ở giai đoạn 1 đến 3 là tập con của bản cuối, chưa được chạy riêng: nếu `tsc` báo lỗi ở đó thì so với bản cuối.
 
 **Ba chỗ khác với bản design lúc trình bày** (file design đã cập nhật theo):
 
@@ -72,21 +72,31 @@ afterEach(() => {
 });
 
 describe("readAdminPanel / writeAdminPanel", () => {
-  it("is closed when nothing is stored", async () => {
+  it("is closed when the page was not marked", async () => {
     const { readAdminPanel } = await load();
     expect(readAdminPanel()).toBeNull();
   });
 
-  it("starts from what the last page load stored", async () => {
-    const { ADMIN_PANEL_KEY, readAdminPanel } = await load();
+  it("starts from the panel the head script marked on <html>", async () => {
+    const { ADMIN_PANEL_HEAD_SNIPPET, ADMIN_PANEL_KEY, readAdminPanel } = await load();
     localStorage.setItem(ADMIN_PANEL_KEY, "tasks");
+    new Function(ADMIN_PANEL_HEAD_SNIPPET)();
     expect(readAdminPanel()).toBe("tasks");
   });
 
-  it("ignores a stored value it does not know", async () => {
-    const { ADMIN_PANEL_KEY, readAdminPanel } = await load();
-    localStorage.setItem(ADMIN_PANEL_KEY, "mail");
+  it("ignores a mark it does not know", async () => {
+    const { readAdminPanel } = await load();
+    document.documentElement.dataset.adminPanel = "mail";
     expect(readAdminPanel()).toBeNull();
+  });
+
+  it("follows <html>, not storage, when another tab changed storage after the page loaded", async () => {
+    // The first read can come long after page load, on a client-side
+    // navigation into /admin; <html> is what the CSS is showing.
+    const { ADMIN_PANEL_KEY, readAdminPanel } = await load();
+    document.documentElement.dataset.adminPanel = "notes";
+    localStorage.setItem(ADMIN_PANEL_KEY, "calendar");
+    expect(readAdminPanel()).toBe("notes");
   });
 
   it("round-trips a panel and stores it for the next page load", async () => {
@@ -103,8 +113,10 @@ describe("readAdminPanel / writeAdminPanel", () => {
     expect(localStorage.getItem(ADMIN_PANEL_KEY)).toBeNull();
   });
 
-  it("keeps a panel the storage refused to save", async () => {
-    const { readAdminPanel, writeAdminPanel } = await load();
+  it("keeps a panel the storage refused to save, and still says so", async () => {
+    const { readAdminPanel, subscribeAdminPanel, writeAdminPanel } = await load();
+    const listener = vi.fn();
+    subscribeAdminPanel(listener);
     // On the instance, not Storage.prototype: happy-dom binds Storage methods
     // onto the instance the first time they are used, so a prototype spy is
     // never reached once an earlier test has touched localStorage.
@@ -114,6 +126,7 @@ describe("readAdminPanel / writeAdminPanel", () => {
     writeAdminPanel("calendar");
     expect(setItem).toHaveBeenCalled();
     expect(readAdminPanel()).toBe("calendar");
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it("does not move when another tab changes the stored value", async () => {
@@ -183,10 +196,13 @@ Expected: FAIL, `Failed to resolve import "@/lib/admin-panel-prefs"`.
  * before first paint and has to stay tiny. Also a small external store, so
  * the provider can read it with useSyncExternalStore.
  *
- * Each tab keeps its own choice once loaded, as Edge's sidebar does; storage
- * only carries it to the next page load. Reading storage live would let
- * another tab, or a write the storage refused, change the snapshot without
- * a notification, and useSyncExternalStore depends on being told.
+ * Each tab keeps its own choice, as Edge's sidebar does. It starts from the
+ * mark the head script put on <html> when the page loaded, so the panel and
+ * the room made for it by that mark always agree, even when the provider
+ * first reads it long after, on a client-side navigation into /admin. After
+ * that only writeAdminPanel changes it, and always tells subscribers, which
+ * is what useSyncExternalStore depends on. Storage is only for the next page
+ * load, and only the head script reads it.
  */
 
 export const ADMIN_PANEL_IDS = ["calendar", "tasks", "notes"] as const;
@@ -202,20 +218,15 @@ export function isAdminPanelId(value: unknown): value is AdminPanelId {
   return typeof value === "string" && (ADMIN_PANEL_IDS as readonly string[]).includes(value);
 }
 
-// This tab's choice: loaded from storage on the first read, then changed only
-// by writeAdminPanel. undefined until that first read.
+// This tab's choice. undefined until the first read seeds it from <html>.
 let current: AdminPanelId | null | undefined;
 const listeners = new Set<() => void>();
 
 export function readAdminPanel(): AdminPanelId | null {
   if (typeof window === "undefined") return null;
   if (current === undefined) {
-    try {
-      const value = window.localStorage.getItem(ADMIN_PANEL_KEY);
-      current = isAdminPanelId(value) ? value : null;
-    } catch {
-      current = null;
-    }
+    const marked = document.documentElement.dataset.adminPanel;
+    current = isAdminPanelId(marked) ? marked : null;
   }
   return current;
 }
@@ -245,7 +256,8 @@ export function subscribeAdminPanel(listener: () => void): () => void {
  * try of its own: a failure earlier in that script cannot stop it, and a
  * blocked storage here cannot break the page. Marks <html> with the open
  * panel so the padding that makes room for it applies from the first frame,
- * not after hydration. Outside /admin nothing reads the attribute.
+ * not after hydration, and so readAdminPanel starts from the same value.
+ * Outside /admin nothing reads the attribute.
  */
 export const ADMIN_PANEL_HEAD_SNIPPET =
   `try{var ap=localStorage.getItem(${JSON.stringify(ADMIN_PANEL_KEY)});` +
@@ -256,7 +268,7 @@ export const ADMIN_PANEL_HEAD_SNIPPET =
 **Step 4: Chạy lại**
 
 Run: `pnpm vitest run lib/admin-panel-prefs.test.ts`
-Expected: PASS, 11 tests.
+Expected: PASS, 12 tests.
 
 **Step 5: Commit**
 
@@ -394,8 +406,8 @@ const closedOnServer = () => null;
 
 export function SidePanelProvider({ children }: PropsWithChildren) {
   const admin = useIsAdmin();
-  // Read from storage, which the head script has already copied onto <html>,
-  // so the room for the panel is there before hydration catches up.
+  // Seeded from the mark the head script put on <html> before first paint,
+  // so the panel and the room made for it always agree.
   const panel = useSyncExternalStore(subscribeAdminPanel, readAdminPanel, closedOnServer);
   const [openedByUser, setOpenedByUser] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -4625,8 +4637,8 @@ const closedOnServer = () => null;
 
 export function SidePanelProvider({ children }: PropsWithChildren) {
   const admin = useIsAdmin();
-  // Read from storage, which the head script has already copied onto <html>,
-  // so the room for the panel is there before hydration catches up.
+  // Seeded from the mark the head script put on <html> before first paint,
+  // so the panel and the room made for it always agree.
   const panel = useSyncExternalStore(subscribeAdminPanel, readAdminPanel, closedOnServer);
   const [openedByUser, setOpenedByUser] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -5100,7 +5112,7 @@ Người dùng thêm `ADMIN_CALENDAR_FEEDS` vào Project Settings → Environmen
 **Step 1: Test**
 
 Run: `pnpm test`
-Expected: mọi file test đều PASS, gồm 94 test mới.
+Expected: mọi file test đều PASS, gồm 95 test mới.
 
 **Step 2: Kiểu và lint**
 
