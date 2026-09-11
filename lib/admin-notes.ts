@@ -14,6 +14,9 @@ export type AdminNote = {
 
 export const MAX_NOTE_LENGTH = 20_000;
 
+/** The columns every notes route reads and returns. */
+export const NOTE_COLUMNS = "id, body, pinned, created_at, updated_at";
+
 const lines = (body: string) =>
   body
     .split("\n")
@@ -64,22 +67,45 @@ export function filterNotes(notes: AdminNote[], query: string): AdminNote[] {
   });
 }
 
-export type NoteInput = { body: string; pinned: boolean; created_at?: string };
+export type NoteInput = { body: string; pinned: boolean; updated_at: string; created_at?: string };
 
-/** Checks a PUT body for /api/admin/notes/[id]. */
+const NUL = String.fromCharCode(0);
+
+/**
+ * Checks a PUT body for /api/admin/notes/[id]. `updated_at` is the browser's
+ * stamp for this edit, and decides which of two saves wins, so it is required.
+ * `created_at` comes back only with Undo; unreadable, it is refused rather
+ * than quietly replaced with now.
+ */
 export function parseNoteInput(
   value: unknown,
 ): { ok: true; input: NoteInput } | { ok: false; error: string } {
   const data = (value ?? {}) as Record<string, unknown>;
   if (typeof data.body !== "string") return { ok: false, error: "body phải là chuỗi" };
-  if (data.body.length > MAX_NOTE_LENGTH) {
-    return { ok: false, error: `Note dài quá ${MAX_NOTE_LENGTH} ký tự` };
+  // Postgres text cannot hold NUL; left in, every retry of the save would fail.
+  const body = data.body.split(NUL).join("");
+  if (body.length > MAX_NOTE_LENGTH) {
+    return { ok: false, error: `Note dài quá ${MAX_NOTE_LENGTH.toLocaleString("vi-VN")} ký tự` };
   }
   if (typeof data.pinned !== "boolean") return { ok: false, error: "pinned phải là true hoặc false" };
 
-  const createdAt = parseTimestamp(data.created_at);
+  const updatedAt = parseTimestamp(data.updated_at);
+  if (!updatedAt) return { ok: false, error: "updated_at không đọc được" };
+
+  let createdAt: string | undefined;
+  if (data.created_at != null) {
+    const parsed = parseTimestamp(data.created_at);
+    if (!parsed) return { ok: false, error: "created_at không đọc được" };
+    createdAt = parsed;
+  }
+
   return {
     ok: true,
-    input: { body: data.body, pinned: data.pinned, ...(createdAt ? { created_at: createdAt } : {}) },
+    input: {
+      body,
+      pinned: data.pinned,
+      updated_at: updatedAt,
+      ...(createdAt ? { created_at: createdAt } : {}),
+    },
   };
 }

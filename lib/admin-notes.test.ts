@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   filterNotes,
+  foldText,
+  isBlankNote,
   MAX_NOTE_LENGTH,
   notePreview,
   noteTitle,
@@ -31,9 +33,21 @@ describe("noteTitle / notePreview", () => {
     expect(notePreview(body)).toBe("- lạp vịt\n- bánh\n- mứt");
   });
 
+  it("reads Windows line endings the same way", () => {
+    expect(noteTitle("Tiêu đề\r\n- a\r\n- b")).toBe("Tiêu đề");
+    expect(notePreview("Tiêu đề\r\n- a\r\n- b")).toBe("- a\n- b");
+  });
+
   it("has nothing to show for a blank note", () => {
     expect(noteTitle("  \n ")).toBe("");
     expect(notePreview("  \n ")).toBe("");
+  });
+});
+
+describe("isBlankNote", () => {
+  it("counts whitespace alone as blank", () => {
+    expect(isBlankNote(" \n\t\r\n ")).toBe(true);
+    expect(isBlankNote(" x ")).toBe(false);
   });
 });
 
@@ -47,12 +61,23 @@ describe("sortNotes", () => {
     expect(sorted.map((n) => n.body)).toEqual(["pinned", "new", "old"]);
   });
 
-  it("compares Postgres and browser timestamps as times", () => {
+  it("compares timestamps as times, not as text", () => {
+    // As text, "10:00:00+07:00" sorts after "03:00:00.900Z"; as a time it is
+    // 03:00:00Z, the older of the two.
     const sorted = sortNotes([
-      note({ body: "server", updated_at: "2026-09-11T03:00:00.500000+00:00" }),
+      note({ body: "server", updated_at: "2026-09-11T10:00:00+07:00" }),
       note({ body: "browser", updated_at: "2026-09-11T03:00:00.900Z" }),
     ]);
     expect(sorted.map((n) => n.body)).toEqual(["browser", "server"]);
+  });
+});
+
+describe("foldText", () => {
+  it("folds Vietnamese to plain lowercase, in either normal form", () => {
+    expect(foldText("Tết")).toBe("tet");
+    expect(foldText("Tết".normalize("NFD"))).toBe("tet");
+    expect(foldText("ĐỒNG")).toBe("dong");
+    expect(foldText("Ưu tiên ở Phường")).toBe("uu tien o phuong");
   });
 });
 
@@ -72,26 +97,59 @@ describe("filterNotes", () => {
   it("returns everything for a blank query", () => {
     expect(filterNotes(notes, "  ")).toHaveLength(3);
   });
+
+  it("finds a note stored decomposed with a query typed precomposed", () => {
+    expect(filterNotes([note({ body: "Mua đồ Tết".normalize("NFD") })], "tết")).toHaveLength(1);
+  });
 });
 
 describe("parseNoteInput", () => {
-  it("accepts a body and a pin", () => {
-    expect(parseNoteInput({ body: "hi", pinned: false })).toEqual({
+  const T = "2026-09-11T03:00:00.000Z";
+
+  it("accepts a body, a pin and the edit's time", () => {
+    expect(parseNoteInput({ body: "hi", pinned: false, updated_at: T })).toEqual({
       ok: true,
-      input: { body: "hi", pinned: false },
+      input: { body: "hi", pinned: false, updated_at: T },
     });
   });
 
   it("keeps a readable created_at, for Undo", () => {
-    const result = parseNoteInput({ body: "hi", pinned: true, created_at: "2026-09-01T00:00:00Z" });
+    const result = parseNoteInput({
+      body: "hi",
+      pinned: true,
+      updated_at: T,
+      created_at: "2026-09-01T00:00:00Z",
+    });
     expect(result).toMatchObject({ ok: true, input: { created_at: "2026-09-01T00:00:00.000Z" } });
   });
 
+  it("takes only the fields it knows, whatever else is sent", () => {
+    const result = parseNoteInput({ body: "hi", pinned: false, updated_at: T, id: "evil", deleted: true });
+    expect(result.ok && Object.keys(result.input).sort()).toEqual(["body", "pinned", "updated_at"]);
+  });
+
+  it("accepts a body exactly at the limit", () => {
+    expect(
+      parseNoteInput({ body: "x".repeat(MAX_NOTE_LENGTH), pinned: false, updated_at: T }),
+    ).toMatchObject({ ok: true });
+  });
+
+  it("drops NUL, which Postgres text cannot hold", () => {
+    const nul = String.fromCharCode(0);
+    expect(parseNoteInput({ body: `a${nul}b`, pinned: false, updated_at: T })).toMatchObject({
+      ok: true,
+      input: { body: "ab" },
+    });
+  });
+
   it.each([
-    ["no body", { pinned: false }],
-    ["a body that is not text", { body: 1, pinned: false }],
-    ["a body that is too long", { body: "x".repeat(MAX_NOTE_LENGTH + 1), pinned: false }],
-    ["no pin", { body: "hi" }],
+    ["no body", { pinned: false, updated_at: T }],
+    ["a body that is not text", { body: 1, pinned: false, updated_at: T }],
+    ["a body that is too long", { body: "x".repeat(MAX_NOTE_LENGTH + 1), pinned: false, updated_at: T }],
+    ["no pin", { body: "hi", updated_at: T }],
+    ["no updated_at", { body: "hi", pinned: false }],
+    ["an unreadable updated_at", { body: "hi", pinned: false, updated_at: "now" }],
+    ["an unreadable created_at", { body: "hi", pinned: false, updated_at: T, created_at: "yesterday" }],
     ["nothing at all", null],
   ])("rejects %s", (_label, value) => {
     expect(parseNoteInput(value)).toMatchObject({ ok: false });
