@@ -1,7 +1,7 @@
 /**
  * Pure helpers shared by the /api/admin routes behind the side panel. Kept
- * apart from lib/admin-api.ts, which pulls in next/headers and so cannot be
- * imported by a test.
+ * apart from lib/admin-api.ts, which reaches the session through
+ * next/headers, so testing these needs no mocks.
  */
 
 export type DbError = { code?: string; message?: string; details?: string; hint?: string };
