@@ -1,4 +1,5 @@
 import { dbError, requireAdmin } from "@/lib/admin-api";
+import { NOTE_COLUMNS } from "@/lib/admin-notes";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { NextResponse } from "next/server";
 
@@ -12,9 +13,10 @@ export async function GET() {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("admin_notes")
-    .select("id, body, pinned, created_at, updated_at")
+    .select(NOTE_COLUMNS)
     .order("updated_at", { ascending: false });
 
   if (error) return dbError(error, "admin notes GET");
-  return NextResponse.json({ notes: data });
+  // Private notes: kept by no shared cache, and not by the browser's either.
+  return NextResponse.json({ notes: data }, { headers: { "Cache-Control": "private, no-store" } });
 }
