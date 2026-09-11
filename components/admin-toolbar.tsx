@@ -1,11 +1,20 @@
 "use client";
 
-import { FileTextIcon, MoonIcon, PencilIcon, StickyNoteIcon, SunIcon } from "lucide-react";
+import {
+  FileTextIcon,
+  MoonIcon,
+  PanelRightIcon,
+  PencilIcon,
+  StickyNoteIcon,
+  SunIcon,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { AdminNavLink } from "@/components/admin-nav-link";
 import { LogoutForm } from "@/components/admin/logout-form";
+import { OPEN_ADMIN_SHEET_EVENT } from "@/lib/admin-panel-prefs";
 
 interface AdminToolbarProps {
   editPostId?: string;
@@ -36,6 +45,7 @@ function ToolbarThemeToggle() {
 }
 
 export function AdminToolbar({ editPostId }: AdminToolbarProps) {
+  const pathname = usePathname();
   // Rendered unconditionally and shown by CSS, not by state. `admin` resolves
   // only after /api/admin/me answers, so returning null until then left the bar
   // missing for a few hundred ms — while the head script had already reserved
@@ -86,6 +96,20 @@ export function AdminToolbar({ editPostId }: AdminToolbarProps) {
           )}
         </div>
         <div className="flex shrink-0 items-center gap-3 sm:gap-4">
+          {/* The side panel's way in on a phone, where its rail does not fit.
+              Only under /admin, the one place the panel is mounted; the
+              toolbar sits outside it, hence the event. */}
+          {pathname.startsWith("/admin") && (
+            <button
+              type="button"
+              aria-label="Lịch, task và ghi nhanh"
+              title="Lịch, task và ghi nhanh"
+              onClick={() => window.dispatchEvent(new Event(OPEN_ADMIN_SHEET_EVENT))}
+              className="grid h-5 w-5 place-items-center text-zinc-300 transition-colors hover:text-white md:hidden"
+            >
+              <PanelRightIcon className="h-3.5 w-3.5" />
+            </button>
+          )}
           <Link
             href="/admin/edit/new"
             className="flex items-center gap-1.5 whitespace-nowrap hover:text-zinc-300 transition-colors text-xs"
