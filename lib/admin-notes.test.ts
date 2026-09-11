@@ -3,6 +3,7 @@ import {
   filterNotes,
   foldText,
   isBlankNote,
+  MAX_CLOCK_AHEAD_MS,
   MAX_NOTE_LENGTH,
   notePreview,
   noteTitle,
@@ -69,6 +70,15 @@ describe("sortNotes", () => {
       note({ body: "browser", updated_at: "2026-09-11T03:00:00.900Z" }),
     ]);
     expect(sorted.map((n) => n.body)).toEqual(["browser", "server"]);
+  });
+
+  it("leaves the list it was given as it was", () => {
+    const notes = [
+      note({ body: "old", updated_at: "2026-09-01T00:00:00.000Z" }),
+      note({ body: "new", updated_at: "2026-09-10T00:00:00.000Z" }),
+    ];
+    sortNotes(notes);
+    expect(notes.map((n) => n.body)).toEqual(["old", "new"]);
   });
 });
 
@@ -139,6 +149,32 @@ describe("parseNoteInput", () => {
     expect(parseNoteInput({ body: `a${nul}b`, pinned: false, updated_at: T })).toMatchObject({
       ok: true,
       input: { body: "ab" },
+    });
+  });
+
+  it("replaces half a surrogate pair, which Postgres cannot store either", () => {
+    expect(parseNoteInput({ body: "a\uD83Db", pinned: false, updated_at: T })).toMatchObject({
+      ok: true,
+      input: { body: "a\uFFFDb" },
+    });
+  });
+
+  it("reads updated_at as an instant, whatever offset it was written with", () => {
+    expect(
+      parseNoteInput({ body: "hi", pinned: false, updated_at: "2026-09-11T10:00:00+07:00" }),
+    ).toMatchObject({ ok: true, input: { updated_at: "2026-09-11T03:00:00.000Z" } });
+  });
+
+  it("takes a null created_at as none", () => {
+    const result = parseNoteInput({ body: "hi", pinned: false, updated_at: T, created_at: null });
+    expect(result.ok && Object.keys(result.input).sort()).toEqual(["body", "pinned", "updated_at"]);
+  });
+
+  it("refuses a stamp more than five minutes ahead of the server", () => {
+    const now = Date.parse(T) - MAX_CLOCK_AHEAD_MS;
+    expect(parseNoteInput({ body: "hi", pinned: false, updated_at: T }, now)).toMatchObject({ ok: true });
+    expect(parseNoteInput({ body: "hi", pinned: false, updated_at: T }, now - 1)).toMatchObject({
+      ok: false,
     });
   });
 

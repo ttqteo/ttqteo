@@ -69,21 +69,31 @@ export function filterNotes(notes: AdminNote[], query: string): AdminNote[] {
 
 export type NoteInput = { body: string; pinned: boolean; updated_at: string; created_at?: string };
 
+/**
+ * How far ahead of the server's clock an edit's stamp may be. The newest edit
+ * wins, so a stamp from a clock running fast would pin the note: every edit
+ * made on a right clock would count as older and lose until that time came.
+ */
+export const MAX_CLOCK_AHEAD_MS = 5 * 60_000;
+
 const NUL = String.fromCharCode(0);
 
 /**
  * Checks a PUT body for /api/admin/notes/[id]. `updated_at` is the browser's
- * stamp for this edit, and decides which of two saves wins, so it is required.
+ * stamp for this edit and decides which of two saves wins, so it is required,
+ * and refused when it is further ahead of `now` than MAX_CLOCK_AHEAD_MS.
  * `created_at` comes back only with Undo; unreadable, it is refused rather
  * than quietly replaced with now.
  */
 export function parseNoteInput(
   value: unknown,
+  now = Date.now(),
 ): { ok: true; input: NoteInput } | { ok: false; error: string } {
   const data = (value ?? {}) as Record<string, unknown>;
   if (typeof data.body !== "string") return { ok: false, error: "body phải là chuỗi" };
-  // Postgres text cannot hold NUL; left in, every retry of the save would fail.
-  const body = data.body.split(NUL).join("");
+  // Postgres stores neither NUL nor half of a surrogate pair, and left in,
+  // either would fail every retry of the save. U+FFFD keeps the length.
+  const body = data.body.split(NUL).join("").toWellFormed();
   if (body.length > MAX_NOTE_LENGTH) {
     return { ok: false, error: `Note dài quá ${MAX_NOTE_LENGTH.toLocaleString("vi-VN")} ký tự` };
   }
@@ -91,6 +101,9 @@ export function parseNoteInput(
 
   const updatedAt = parseTimestamp(data.updated_at);
   if (!updatedAt) return { ok: false, error: "updated_at không đọc được" };
+  if (Date.parse(updatedAt) - now > MAX_CLOCK_AHEAD_MS) {
+    return { ok: false, error: "Giờ trên máy đang nhanh hơn server, chỉnh lại giờ máy rồi thử lại" };
+  }
 
   let createdAt: string | undefined;
   if (data.created_at != null) {
