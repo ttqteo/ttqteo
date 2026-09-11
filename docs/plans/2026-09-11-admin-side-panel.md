@@ -32,7 +32,7 @@
 2. CSS chừa chỗ khoá theo `:has(.admin-side-rail)`, để khoảng chừa không ở lại trên trang công khai sau khi rời `/admin`.
 3. Panel đang mở đọc bằng `useSyncExternalStore`, bắt đầu từ dấu trên `<html>` mà script `<head>` lấy từ localStorage. Không có effect nào gọi setState lúc nạp trang.
 
-**Về z-index:** toolbar là `z-[60]`, header dính của editor là `z-[55]`. Rail và panel dùng `z-[56]`: trên editor, dưới toolbar. Tooltip và popover mở từ bên trong chúng phải là `z-[70]`, vì mặc định của shadcn là `z-50` và sẽ nằm dưới panel.
+**Về z-index:** toolbar là `z-[60]`, header dính của editor là `z-[55]`. Panel dùng `z-[56]`: trên editor, dưới toolbar. Rail dùng `z-[57]`, cao hơn panel một bậc: tooltip của repo (`components/ui/tooltip.tsx`) không portal nên nằm trong stacking context của rail, và nếu rail ngang panel thì panel đang mở che mất tooltip. Popover thì có portal, nên popover mở từ panel phải là `z-[70]`, vì mặc định của shadcn là `z-50` và sẽ nằm dưới panel.
 
 ---
 
@@ -50,6 +50,7 @@ Xong giai đoạn này: rail và panel rỗng chạy được, đẩy hay đè �
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ShortcutKeys } from "@/lib/admin-panel-prefs";
 
 // The module keeps this tab's choice in module state, so every test loads a
 // fresh copy of it.
@@ -180,6 +181,47 @@ describe("ADMIN_PANEL_HEAD_SNIPPET", () => {
     expect(getItem).toHaveBeenCalled();
   });
 });
+
+describe("shortcutPanel / shortcutLabel", () => {
+  const alt = (code: string, extra: Partial<ShortcutKeys> = {}): ShortcutKeys => ({
+    altKey: true,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    repeat: false,
+    code,
+    ...extra,
+  });
+
+  it("maps Alt+1, Alt+2, Alt+3 to the panels in rail order", async () => {
+    const { shortcutPanel } = await load();
+    expect(["Digit1", "Digit2", "Digit3"].map((code) => shortcutPanel(alt(code)))).toEqual([
+      "calendar",
+      "tasks",
+      "notes",
+    ]);
+  });
+
+  it.each([
+    ["no Alt", alt("Digit1", { altKey: false })],
+    ["AltGr, which Windows reports as Ctrl+Alt", alt("Digit1", { ctrlKey: true })],
+    ["Shift", alt("Digit1", { shiftKey: true })],
+    ["Meta", alt("Digit1", { metaKey: true })],
+    ["a held key repeating", alt("Digit1", { repeat: true })],
+    ["the number pad", alt("Numpad1")],
+    ["a digit with no panel", alt("Digit4")],
+    ["Alt+0", alt("Digit0")],
+  ])("ignores %s", async (_label, keys) => {
+    const { shortcutPanel } = await load();
+    expect(shortcutPanel(keys)).toBeNull();
+  });
+
+  it("labels each panel with its shortcut", async () => {
+    const { shortcutLabel } = await load();
+    expect(shortcutLabel("calendar")).toBe("Alt+1");
+    expect(shortcutLabel("notes")).toBe("Alt+3");
+  });
+});
 ```
 
 **Step 2: Chạy để thấy fail**
@@ -251,6 +293,31 @@ export function subscribeAdminPanel(listener: () => void): () => void {
   };
 }
 
+/** The keys a panel shortcut looks at: a KeyboardEvent, or a plain object in tests. */
+export type ShortcutKeys = Pick<
+  KeyboardEvent,
+  "altKey" | "ctrlKey" | "metaKey" | "shiftKey" | "code" | "repeat"
+>;
+
+/**
+ * Alt+1, Alt+2, Alt+3 open the panels in ADMIN_PANEL_IDS order. Matched by key
+ * position (`code`), so every keyboard layout works; the number pad does not
+ * count. Ctrl is refused, which also refuses AltGr, since Windows reports it
+ * as Ctrl+Alt. A held key's repeats are ignored, or holding Alt+1 would flick
+ * the panel open and shut.
+ */
+export function shortcutPanel(keys: ShortcutKeys): AdminPanelId | null {
+  if (!keys.altKey || keys.ctrlKey || keys.metaKey || keys.shiftKey || keys.repeat) return null;
+  const digit = /^Digit(\d)$/.exec(keys.code);
+  if (!digit) return null;
+  return ADMIN_PANEL_IDS[Number(digit[1]) - 1] ?? null;
+}
+
+/** The hint the rail shows for a panel: "Alt+1" for the first, and so on. */
+export function shortcutLabel(id: AdminPanelId): string {
+  return `Alt+${ADMIN_PANEL_IDS.indexOf(id) + 1}`;
+}
+
 /**
  * Appended to the head script in app/layout.tsx, after its try block, in a
  * try of its own: a failure earlier in that script cannot stop it, and a
@@ -268,7 +335,7 @@ export const ADMIN_PANEL_HEAD_SNIPPET =
 **Step 4: Chạy lại**
 
 Run: `pnpm vitest run lib/admin-panel-prefs.test.ts`
-Expected: PASS, 12 tests.
+Expected: PASS, 22 tests.
 
 **Step 5: Commit**
 
@@ -324,7 +391,7 @@ git commit -m "feat: mark the open admin side panel before first paint"
 **Step 1: Danh sách panel**
 
 ```ts
-import type { AdminPanelId } from "@/lib/admin-panel-prefs";
+import { shortcutLabel, type AdminPanelId } from "@/lib/admin-panel-prefs";
 import {
   CalendarDaysIcon,
   SquareCheckBigIcon,
@@ -339,11 +406,11 @@ export type PanelMeta = {
   icon: LucideIcon;
 };
 
-/** Rail order, which is also the Alt+1/2/3 order. */
+/** Rail order. Keep it the order of ADMIN_PANEL_IDS, which the shortcuts follow. */
 export const PANELS: readonly PanelMeta[] = [
-  { id: "calendar", label: "Calendar", shortcut: "Alt+1", icon: CalendarDaysIcon },
-  { id: "tasks", label: "Task", shortcut: "Alt+2", icon: SquareCheckBigIcon },
-  { id: "notes", label: "Ghi nhanh", shortcut: "Alt+3", icon: StickyNoteIcon },
+  { id: "calendar", label: "Calendar", shortcut: shortcutLabel("calendar"), icon: CalendarDaysIcon },
+  { id: "tasks", label: "Task", shortcut: shortcutLabel("tasks"), icon: SquareCheckBigIcon },
+  { id: "notes", label: "Ghi nhanh", shortcut: shortcutLabel("notes"), icon: StickyNoteIcon },
 ];
 
 export function panelMeta(id: AdminPanelId): PanelMeta {
@@ -362,6 +429,7 @@ import { useIsAdmin } from "@/components/contexts/admin-context";
 import {
   OPEN_ADMIN_SHEET_EVENT,
   readAdminPanel,
+  shortcutPanel,
   subscribeAdminPanel,
   writeAdminPanel,
   type AdminPanelId,
@@ -372,11 +440,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type PropsWithChildren,
 } from "react";
-import { PANELS } from "./panels";
 
 type SidePanelContextValue = {
   /** The open panel, on screens with room for the rail; null when closed. */
@@ -400,8 +468,11 @@ export function useSidePanel(): SidePanelContextValue {
   return value;
 }
 
-const PHONE_QUERY = "(max-width: 767px)";
-const SHORTCUT_CODES = ["Digit1", "Digit2", "Digit3"];
+// Tailwind's max-md, the exact complement of md (min-width: 768px). A plain
+// (max-width: 767px) leaves a gap at fractional widths such as 767.2px, which
+// a 125% display scale produces, where neither the rail nor the sheet works.
+const PHONE_QUERY = "not all and (min-width: 768px)";
+const isPhone = () => window.matchMedia(PHONE_QUERY).matches;
 const closedOnServer = () => null;
 
 export function SidePanelProvider({ children }: PropsWithChildren) {
@@ -412,13 +483,33 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
   const [openedByUser, setOpenedByUser] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetTab, setSheetTab] = useState<AdminPanelId>("tasks");
+  // Where focus goes back to when the panel closes: whatever had it when the
+  // panel opened (the editor, mid-sentence, after Alt+3), else the rail.
+  const returnFocus = useRef<HTMLElement | null>(null);
 
   const apply = useCallback((next: AdminPanelId | null) => {
+    const previous = readAdminPanel();
+    const focused = document.activeElement;
+    const active = focused instanceof HTMLElement && focused !== document.body ? focused : null;
+    const focusInPanel = active?.closest(".admin-side-panel") != null;
+    if (next && !previous) returnFocus.current = focusInPanel ? null : active;
+
     setOpenedByUser(next !== null);
     writeAdminPanel(next);
     const root = document.documentElement;
     if (next) root.dataset.adminPanel = next;
     else delete root.dataset.adminPanel;
+
+    if (next) return;
+    // Closing hides the panel under the cursor; hand focus back rather than
+    // let it fall to <body>.
+    if (focusInPanel) {
+      const back = returnFocus.current?.isConnected
+        ? returnFocus.current
+        : document.querySelector<HTMLElement>(`.admin-side-rail [data-panel="${previous}"]`);
+      back?.focus();
+    }
+    returnFocus.current = null;
   }, []);
 
   const toggle = useCallback(
@@ -427,16 +518,15 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
   );
   const close = useCallback(() => apply(null), [apply]);
 
-  // Alt+1/2/3 in rail order. On a phone they open the sheet instead.
+  // Alt+1/2/3 (shortcutPanel). On a phone they open the sheet instead. In
+  // focus mode, which hides rail and panel, they do nothing.
   useEffect(() => {
     if (!admin) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-      const index = SHORTCUT_CODES.indexOf(event.code);
-      if (index === -1) return;
+      const id = shortcutPanel(event);
+      if (!id || document.body.classList.contains("focus-mode")) return;
       event.preventDefault();
-      const id = PANELS[index].id;
-      if (window.matchMedia(PHONE_QUERY).matches) {
+      if (isPhone()) {
         setSheetTab(id);
         setSheetOpen(true);
       } else {
@@ -448,9 +538,12 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
   }, [admin, toggle]);
 
   // The toolbar is in the root layout, outside this provider, so its phone
-  // button reaches the sheet through an event.
+  // button reaches the sheet through an event. Only where the sheet can show:
+  // opened at 768px or wider it would leave its overlay up over nothing.
   useEffect(() => {
-    const open = () => setSheetOpen(true);
+    const open = () => {
+      if (isPhone()) setSheetOpen(true);
+    };
     window.addEventListener(OPEN_ADMIN_SHEET_EVENT, open);
     return () => window.removeEventListener(OPEN_ADMIN_SHEET_EVENT, open);
   }, []);
@@ -513,10 +606,11 @@ export function SideRail() {
 
   return (
     // display comes from app/admin/layout.tsx, not a class here: the rail is
-    // hidden until html.is-admin and below 768px.
+    // hidden until html.is-admin and below 768px. z-57, one above the panel:
+    // see the tooltip below.
     <nav
       aria-label="Lịch, task và ghi nhanh"
-      className="admin-side-rail focus-mode-hidden fixed bottom-0 right-0 top-9 z-[56] w-12 flex-col items-center gap-1 border-l bg-background py-2"
+      className="admin-side-rail focus-mode-hidden fixed bottom-0 right-0 top-9 z-[57] w-12 flex-col items-center gap-1 border-l bg-background py-2"
     >
       {PANELS.map(({ id, label, shortcut, icon: Icon }) => (
         <Tooltip key={id}>
@@ -526,6 +620,8 @@ export function SideRail() {
               onClick={() => toggle(id)}
               aria-label={label}
               aria-pressed={panel === id}
+              aria-keyshortcuts={shortcut}
+              data-panel={id}
               className={cn(
                 "relative grid h-9 w-9 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
                 panel === id && "bg-muted text-foreground",
@@ -534,7 +630,9 @@ export function SideRail() {
               <Icon className="h-[18px] w-[18px]" />
             </button>
           </TooltipTrigger>
-          {/* Above the rail itself (z-56). */}
+          {/* components/ui/tooltip.tsx does not portal, so this paints inside
+              the rail's stacking context. That is why the rail sits one above
+              the panel (z-57 over z-56): otherwise an open panel covers it. */}
           <TooltipContent side="left" className="z-[70]">
             {label} <span className="ml-1 font-mono text-[10px] text-muted-foreground">{shortcut}</span>
           </TooltipContent>
@@ -547,7 +645,7 @@ export function SideRail() {
 
 **Step 2: Khung panel**
 
-Esc chỉ đóng panel khi phím được bấm bên trong panel. Popover mở từ panel được portal ra chỗ khác trong DOM nhưng sự kiện React vẫn nổi lên tới đây, và Esc của popover chỉ nên đóng popover.
+Esc chỉ đóng panel khi phím được bấm bên trong panel, chưa có lớp nào xử lý nó (Radix gọi `preventDefault` khi đóng popover hay tooltip), và bộ gõ không đang soạn chữ (Esc lúc gõ Telex là để huỷ chữ đang soạn). Popover mở từ panel được portal ra chỗ khác trong DOM, nhưng sự kiện React vẫn nổi lên tới đây.
 
 ```tsx
 "use client";
@@ -562,11 +660,15 @@ export function SidePanelFrame() {
   const { panel, openedByUser, close } = useSidePanel();
   const meta = panel ? panelMeta(panel) : null;
 
-  // Only for keys pressed inside the panel itself. A popover opened from it
-  // is portalled elsewhere in the DOM but still bubbles here through React,
-  // and its Escape should close the popover, not the panel.
+  // Escape closes the panel only when nothing else wanted it:
+  // - a layer that already handled it, such as a Radix popover or tooltip,
+  //   has called preventDefault;
+  // - an IME composition (Telex, say) uses Escape to cancel itself;
+  // - a popover opened from the panel is portalled elsewhere in the DOM but
+  //   still bubbles here through React, so the key must come from inside.
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === "Escape" && event.currentTarget.contains(event.target as Node)) close();
+    if (event.key !== "Escape" || event.defaultPrevented || event.nativeEvent.isComposing) return;
+    if (event.currentTarget.contains(event.target as Node)) close();
   };
 
   return (
@@ -624,14 +726,14 @@ export function SideSheet() {
         className="flex h-[85dvh] flex-col gap-0 p-0 md:hidden"
       >
         <SheetTitle className="sr-only">Lịch, task và ghi nhanh</SheetTitle>
-        {/* mr-12 leaves the sheet's own close button its corner. */}
-        <div role="tablist" className="mr-12 flex gap-1 border-b p-2">
+        {/* Toggle buttons like the rail's. mr-12 leaves the sheet's own close
+            button its corner. */}
+        <div className="mr-12 flex gap-1 border-b p-2">
           {PANELS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
-              role="tab"
-              aria-selected={sheetTab === id}
+              aria-pressed={sheetTab === id}
               onClick={() => setSheetTab(id)}
               className={cn(
                 "flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-sm text-muted-foreground transition-colors",
@@ -643,8 +745,10 @@ export function SideSheet() {
             </button>
           ))}
         </div>
+        {/* No autofocus: on a phone it would pull the keyboard up over the
+            sheet every time it opens, even just to look. */}
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <PanelBody id={sheetTab} autoFocus />
+          <PanelBody id={sheetTab} />
         </div>
       </SheetContent>
     </Sheet>
@@ -933,10 +1037,13 @@ git commit -m "fix: keep the editor's fixed pieces and toasts clear of the side 
 3. Khoảng 1024px: panel nổi đè lên bảng, có bóng; bảng giữ nguyên độ rộng.
 4. 390px (DevTools, chế độ thiết bị): không có rail. Toolbar có icon panel; bấm vào mở sheet từ dưới lên, có ba tab; đóng được. Mở rộng cửa sổ khi sheet đang mở: sheet tự đóng, không còn lớp phủ.
 5. Alt+1, Alt+2, Alt+3 mở đúng panel; bấm lại thì đóng. Bấm vào nút trong panel rồi Esc: panel đóng.
-6. `/admin/edit/<id>`, chế độ split: khung split và bảng vẽ dừng trước rail; cụm nút góc dưới phải không nằm dưới rail. Bật focus mode: rail và panel ẩn, không còn khoảng trống bên phải.
-7. Rời `/admin` bằng điều hướng client (ở `/admin`, gõ `g` rồi `h`): trang chủ không còn khoảng trống bên phải.
-8. Toast (ví dụ publish một bài) hiện bên trái rail, không đè lên rail.
-9. 390px ở `/admin/edit/<id>`: toolbar không tràn. Nếu tràn, đổi chữ `posts` trong `components/admin-toolbar.tsx` thành `<span className="hidden sm:inline">posts</span>` giống `notes`, rồi commit riêng `fix: fit the admin toolbar on a phone`.
+6. Đang gõ trong editor, bấm Alt+3 rồi Esc: con trỏ quay về đúng chỗ đang gõ. Mở panel bằng chuột, Tab tới nút đóng, Enter: con trỏ về nút tương ứng trên rail, không rơi xuống trang.
+7. Khi panel đang mở, rê chuột vào một icon trên rail: tooltip hiện đè lên panel.
+8. Windows scale 125% (hoặc DevTools với viewport 767px): lúc nào cũng có rail hoặc nút mở sheet trên toolbar, không bao giờ mất cả hai.
+9. `/admin/edit/<id>`, chế độ split: khung split và bảng vẽ dừng trước rail; cụm nút góc dưới phải không nằm dưới rail. Bật focus mode: rail và panel ẩn, không còn khoảng trống bên phải.
+10. Rời `/admin` bằng điều hướng client (ở `/admin`, gõ `g` rồi `h`): trang chủ không còn khoảng trống bên phải.
+11. Toast (ví dụ publish một bài) hiện bên trái rail, không đè lên rail.
+12. 390px ở `/admin/edit/<id>`: toolbar không tràn. Nếu tràn, đổi chữ `posts` trong `components/admin-toolbar.tsx` thành `<span className="hidden sm:inline">posts</span>` giống `notes`, rồi commit riêng `fix: fit the admin toolbar on a phone`.
 
 ---
 
@@ -1999,7 +2106,7 @@ export function useNotesStore(enabled: boolean): NotesStore {
 
 Trong `side-panel-provider.tsx`:
 
-Thêm import, sau `import { PANELS } from "./panels";`:
+Thêm import, ngay sau khối `import { … } from "react";`:
 
 ```tsx
 import { useNotesStore, type NotesStore } from "./use-notes-store";
@@ -3559,10 +3666,11 @@ export function SideRail() {
 
   return (
     // display comes from app/admin/layout.tsx, not a class here: the rail is
-    // hidden until html.is-admin and below 768px.
+    // hidden until html.is-admin and below 768px. z-57, one above the panel:
+    // see the tooltip below.
     <nav
       aria-label="Lịch, task và ghi nhanh"
-      className="admin-side-rail focus-mode-hidden fixed bottom-0 right-0 top-9 z-[56] w-12 flex-col items-center gap-1 border-l bg-background py-2"
+      className="admin-side-rail focus-mode-hidden fixed bottom-0 right-0 top-9 z-[57] w-12 flex-col items-center gap-1 border-l bg-background py-2"
     >
       {PANELS.map(({ id, label, shortcut, icon: Icon }) => (
         <Tooltip key={id}>
@@ -3572,6 +3680,8 @@ export function SideRail() {
               onClick={() => toggle(id)}
               aria-label={label}
               aria-pressed={panel === id}
+              aria-keyshortcuts={shortcut}
+              data-panel={id}
               className={cn(
                 "relative grid h-9 w-9 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
                 panel === id && "bg-muted text-foreground",
@@ -3585,7 +3695,9 @@ export function SideRail() {
               )}
             </button>
           </TooltipTrigger>
-          {/* Above the rail itself (z-56). */}
+          {/* components/ui/tooltip.tsx does not portal, so this paints inside
+              the rail's stacking context. That is why the rail sits one above
+              the panel (z-57 over z-56): otherwise an open panel covers it. */}
           <TooltipContent side="left" className="z-[70]">
             {label} <span className="ml-1 font-mono text-[10px] text-muted-foreground">{shortcut}</span>
           </TooltipContent>
@@ -4587,6 +4699,7 @@ import { useIsAdmin } from "@/components/contexts/admin-context";
 import {
   OPEN_ADMIN_SHEET_EVENT,
   readAdminPanel,
+  shortcutPanel,
   subscribeAdminPanel,
   writeAdminPanel,
   type AdminPanelId,
@@ -4597,11 +4710,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type PropsWithChildren,
 } from "react";
-import { PANELS } from "./panels";
 import { useCalendarStore, type CalendarStore } from "./use-calendar-store";
 import { useNotesStore, type NotesStore } from "./use-notes-store";
 import { useTasksStore, type TasksStore } from "./use-tasks-store";
@@ -4631,8 +4744,11 @@ export function useSidePanel(): SidePanelContextValue {
   return value;
 }
 
-const PHONE_QUERY = "(max-width: 767px)";
-const SHORTCUT_CODES = ["Digit1", "Digit2", "Digit3"];
+// Tailwind's max-md, the exact complement of md (min-width: 768px). A plain
+// (max-width: 767px) leaves a gap at fractional widths such as 767.2px, which
+// a 125% display scale produces, where neither the rail nor the sheet works.
+const PHONE_QUERY = "not all and (min-width: 768px)";
+const isPhone = () => window.matchMedia(PHONE_QUERY).matches;
 const closedOnServer = () => null;
 
 export function SidePanelProvider({ children }: PropsWithChildren) {
@@ -4643,13 +4759,33 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
   const [openedByUser, setOpenedByUser] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetTab, setSheetTab] = useState<AdminPanelId>("tasks");
+  // Where focus goes back to when the panel closes: whatever had it when the
+  // panel opened (the editor, mid-sentence, after Alt+3), else the rail.
+  const returnFocus = useRef<HTMLElement | null>(null);
 
   const apply = useCallback((next: AdminPanelId | null) => {
+    const previous = readAdminPanel();
+    const focused = document.activeElement;
+    const active = focused instanceof HTMLElement && focused !== document.body ? focused : null;
+    const focusInPanel = active?.closest(".admin-side-panel") != null;
+    if (next && !previous) returnFocus.current = focusInPanel ? null : active;
+
     setOpenedByUser(next !== null);
     writeAdminPanel(next);
     const root = document.documentElement;
     if (next) root.dataset.adminPanel = next;
     else delete root.dataset.adminPanel;
+
+    if (next) return;
+    // Closing hides the panel under the cursor; hand focus back rather than
+    // let it fall to <body>.
+    if (focusInPanel) {
+      const back = returnFocus.current?.isConnected
+        ? returnFocus.current
+        : document.querySelector<HTMLElement>(`.admin-side-rail [data-panel="${previous}"]`);
+      back?.focus();
+    }
+    returnFocus.current = null;
   }, []);
 
   const toggle = useCallback(
@@ -4658,16 +4794,15 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
   );
   const close = useCallback(() => apply(null), [apply]);
 
-  // Alt+1/2/3 in rail order. On a phone they open the sheet instead.
+  // Alt+1/2/3 (shortcutPanel). On a phone they open the sheet instead. In
+  // focus mode, which hides rail and panel, they do nothing.
   useEffect(() => {
     if (!admin) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-      const index = SHORTCUT_CODES.indexOf(event.code);
-      if (index === -1) return;
+      const id = shortcutPanel(event);
+      if (!id || document.body.classList.contains("focus-mode")) return;
       event.preventDefault();
-      const id = PANELS[index].id;
-      if (window.matchMedia(PHONE_QUERY).matches) {
+      if (isPhone()) {
         setSheetTab(id);
         setSheetOpen(true);
       } else {
@@ -4679,9 +4814,12 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
   }, [admin, toggle]);
 
   // The toolbar is in the root layout, outside this provider, so its phone
-  // button reaches the sheet through an event.
+  // button reaches the sheet through an event. Only where the sheet can show:
+  // opened at 768px or wider it would leave its overlay up over nothing.
   useEffect(() => {
-    const open = () => setSheetOpen(true);
+    const open = () => {
+      if (isPhone()) setSheetOpen(true);
+    };
     window.addEventListener(OPEN_ADMIN_SHEET_EVENT, open);
     return () => window.removeEventListener(OPEN_ADMIN_SHEET_EVENT, open);
   }, []);
@@ -5112,7 +5250,7 @@ Người dùng thêm `ADMIN_CALENDAR_FEEDS` vào Project Settings → Environmen
 **Step 1: Test**
 
 Run: `pnpm test`
-Expected: mọi file test đều PASS, gồm 95 test mới.
+Expected: mọi file test đều PASS, gồm 105 test mới.
 
 **Step 2: Kiểu và lint**
 

@@ -22,7 +22,7 @@ Mục đích là vừa viết bài hay quản lý bài vừa liếc được l�
 | Phạm vi | Chỉ trong `/admin` (danh sách bài, `/admin/notes`, editor) |
 | Rail | Luôn đẩy nội dung |
 | Panel | Đẩy nội dung từ 1280px trở lên, dưới đó nổi đè lên |
-| Điện thoại (< 768px) | Không có rail. Một icon trên toolbar mở sheet toàn màn với ba tab |
+| Điện thoại (< 768px) | Không có rail. Một icon trên toolbar mở sheet từ dưới lên, cao 85% màn hình, với ba tab |
 | Quick note | Danh sách note kiểu Keep, text thuần, không có màu |
 | Hạn của task | Theo ngày, không có giờ |
 | Cấu hình lịch | Biến môi trường `ADMIN_CALENDAR_FEEDS`, không có màn hình cấu hình |
@@ -48,7 +48,7 @@ Mục đích là vừa viết bài hay quản lý bài vừa liếc được l�
 - Rail ẩn hiện theo `html.is-admin`, giống toolbar.
 - Luật CSS chừa chỗ khoá theo `:has(.admin-side-rail)` chứ không dựa vào việc style của admin layout bị gỡ khi rời `/admin`. Rail rời DOM thì chỗ chừa cũng mất, kể cả khi style hoist vẫn còn trong `<head>`.
 - Toolbar nằm ở root layout, ngoài provider, nên nút mở sheet trên điện thoại gửi một window event (`OPEN_ADMIN_SHEET_EVENT`) để provider nghe.
-- Phím tắt: Alt+1, Alt+2, Alt+3 mở Calendar, Task, Ghi nhanh, bấm lại thì đóng. Esc đóng panel khi con trỏ đang ở trong panel. Không trùng với phím của editor (Ctrl+Alt+N, Ctrl+Alt+C, Ctrl+Shift+C) hay các phím `g` + chữ trong `lib/keyboard-nav.tsx`.
+- Phím tắt: Alt+1, Alt+2, Alt+3 mở Calendar, Task, Ghi nhanh, bấm lại thì đóng. Esc đóng panel khi con trỏ đang ở trong panel. Không trùng với phím của editor (Ctrl+Alt+N, Ctrl+Alt+C, Ctrl+Shift+C) hay các phím `g` + chữ trong `lib/keyboard-nav.tsx`. Giữ phím thì không lặp, và trong focus mode phím tắt không làm gì. Đóng panel khi con trỏ đang ở trong panel thì con trỏ quay về chỗ nó đứng trước khi mở (ví dụ editor), hoặc về nút trên rail.
 
 ### Các phần tử fixed phải chừa chỗ cho rail
 
