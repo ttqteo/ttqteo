@@ -1007,7 +1007,7 @@ export default function EditPostClient({
           // With the board open, past the board too: 45% of what the rail leaves.
           right:
             isSplit && panelOpen
-              ? "calc(var(--admin-side-w, 0px) + (100vw - var(--admin-side-w, 0px)) * 0.45 + 1rem)"
+              ? "calc(var(--admin-side-w, 0px) + (100% - var(--admin-side-w, 0px)) * 0.45 + 1rem)"
               : "calc(var(--admin-side-w, 0px) + 1rem)",
         }}
       >
