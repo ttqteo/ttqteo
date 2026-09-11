@@ -21,7 +21,7 @@
   - Một file test: `pnpm vitest run lib/<tên>.test.ts`
   - Toàn bộ test: `pnpm test`
   - Kiểu: `pnpm exec tsc --noEmit`
-  - Lint: `pnpm lint`. Trên master đã có đúng 3 warning `react-hooks/set-state-in-effect` trong `app/admin/edit/[id]/edit-post-client.tsx` (quanh dòng 323, 337, 614). Không thêm warning mới nào.
+  - Lint: `pnpm lint`. Trên master cả repo có 0 error và 36 warning, phần lớn là các luật React Compiler mà `eslint.config.mjs` đã hạ xuống warning (3 cái trong số đó ở `app/admin/edit/[id]/edit-post-client.tsx`). Sau mỗi task vẫn phải là 0 error và 36 warning.
 - Quy ước: comment trong code viết tiếng Anh, chữ trên giao diện tiếng Việt, không dùng em dash trong chữ trên giao diện. Import nội bộ dùng `@/lib/...`.
 - Chỉ test hàm thuần trong `lib/`. UI kiểm bằng tay ở cuối mỗi giai đoạn, như các plan trước.
 - Bản cuối của code trong plan này đã được chạy thử trên một bản sao của repo: `tsc` sạch, lint không thêm warning, 90 test mới và toàn bộ test cũ đều qua, và một test render tạm (không nằm trong plan) đã bấm qua cả ba panel. Các bản trung gian ở giai đoạn 1 đến 3 là tập con của bản cuối, chưa được chạy riêng: nếu `tsc` báo lỗi ở đó thì so với bản cuối.
@@ -756,7 +756,7 @@ Trong `<div className="flex shrink-0 items-center gap-3 sm:gap-4">`, chèn trư�
 **Step 3: Kiểm**
 
 Run: `pnpm exec tsc --noEmit` rồi `pnpm lint`
-Expected: không lỗi kiểu; lint vẫn đúng 3 warning cũ.
+Expected: không lỗi kiểu; lint vẫn 0 error, 36 warning như trên master.
 
 **Step 4: Commit**
 
@@ -841,7 +841,7 @@ Sonner dùng chuỗi offset nguyên văn cho `--offset-right`, và mặc định
 **Step 4: Kiểm**
 
 Run: `pnpm exec tsc --noEmit` rồi `pnpm lint`
-Expected: không lỗi kiểu; lint vẫn đúng 3 warning cũ.
+Expected: không lỗi kiểu; lint vẫn 0 error, 36 warning như trên master.
 
 **Step 5: Commit**
 
@@ -1949,7 +1949,7 @@ Thêm `notes` vào object trong `useMemo` và vào mảng deps của nó.
 **Step 3: Kiểm**
 
 Run: `pnpm exec tsc --noEmit` rồi `pnpm lint`
-Expected: không lỗi kiểu; lint vẫn đúng 3 warning cũ.
+Expected: không lỗi kiểu; lint vẫn 0 error, 36 warning như trên master.
 
 **Step 4: Commit**
 
@@ -2314,7 +2314,7 @@ export function PanelBody({ id, autoFocus = false }: { id: AdminPanelId; autoFoc
 **Step 3: Kiểm**
 
 Run: `pnpm exec tsc --noEmit` rồi `pnpm lint`
-Expected: không lỗi kiểu; lint vẫn đúng 3 warning cũ.
+Expected: không lỗi kiểu; lint vẫn 0 error, 36 warning như trên master.
 
 **Step 4: Commit**
 
@@ -3081,7 +3081,7 @@ Thêm `tasks` vào object trong `useMemo` và vào mảng deps.
 **Step 4: Kiểm**
 
 Run: `pnpm exec tsc --noEmit` rồi `pnpm lint`
-Expected: không lỗi kiểu; lint vẫn đúng 3 warning cũ.
+Expected: không lỗi kiểu; lint vẫn 0 error, 36 warning như trên master.
 
 **Step 5: Commit**
 
@@ -3451,7 +3451,7 @@ Trong `panel-body.tsx`, thêm import `import { TasksPanel } from "./tasks-panel"
 **Step 4: Kiểm**
 
 Run: `pnpm exec tsc --noEmit` rồi `pnpm lint`
-Expected: không lỗi kiểu; lint vẫn đúng 3 warning cũ.
+Expected: không lỗi kiểu; lint vẫn 0 error, 36 warning như trên master.
 
 **Step 5: Commit**
 
@@ -3525,7 +3525,7 @@ export function SideRail() {
 **Step 2: Kiểm**
 
 Run: `pnpm exec tsc --noEmit` rồi `pnpm lint`
-Expected: không lỗi kiểu; lint vẫn đúng 3 warning cũ.
+Expected: không lỗi kiểu; lint vẫn 0 error, 36 warning như trên master.
 
 **Step 3: Commit**
 
@@ -4995,7 +4995,7 @@ Trong chuỗi CSS của `app/admin/layout.tsx`, thêm ngay sau dòng `body.focus
 **Step 4: Kiểm**
 
 Run: `pnpm exec tsc --noEmit` rồi `pnpm lint`
-Expected: không lỗi kiểu; lint vẫn đúng 3 warning cũ.
+Expected: không lỗi kiểu; lint vẫn 0 error, 36 warning như trên master.
 
 **Step 5: Commit**
 
@@ -5043,7 +5043,7 @@ Expected: mọi file test đều PASS, gồm 90 test mới.
 **Step 2: Kiểu và lint**
 
 Run: `pnpm exec tsc --noEmit` rồi `pnpm lint`
-Expected: không lỗi kiểu; lint đúng 3 warning cũ trong `edit-post-client.tsx`.
+Expected: không lỗi kiểu; lint vẫn 0 error, 36 warning như trên master.
 
 **Step 3: Build**
 
