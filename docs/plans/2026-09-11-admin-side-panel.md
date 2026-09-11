@@ -23,7 +23,7 @@
   - Kiểu: `pnpm exec tsc --noEmit`
   - Lint: `pnpm lint`. Trên master cả repo có 0 error và 36 warning, phần lớn là các luật React Compiler mà `eslint.config.mjs` đã hạ xuống warning (3 cái trong số đó ở `app/admin/edit/[id]/edit-post-client.tsx`). Sau mỗi task vẫn phải là 0 error và 36 warning.
 - Quy ước: comment trong code viết tiếng Anh, chữ trên giao diện tiếng Việt, không dùng em dash trong chữ trên giao diện. Import nội bộ dùng `@/lib/...`.
-- Chỉ test hàm thuần trong `lib/`. UI kiểm bằng tay ở cuối mỗi giai đoạn, như các plan trước.
+- Chỉ test code trong `lib/`: hàm thuần, và cổng admin với `getUser` giả. UI kiểm bằng tay ở cuối mỗi giai đoạn, như các plan trước.
 - Trước khi bắt đầu, bản cuối của code trong plan này đã được chạy thử trên một bản sao của repo: `tsc` sạch, lint không thêm warning, test mới và toàn bộ test cũ đều qua, và một test render tạm (không nằm trong plan) đã bấm qua cả ba panel. Sau đó Task 1 được sửa qua ba vòng review (mỗi tab giữ panel riêng, bắt đầu từ dấu trên `<html>`) và đã chạy lại riêng trên nhánh. Các bản trung gian ở giai đoạn 1 đến 3 là tập con của bản cuối, chưa được chạy riêng: nếu `tsc` báo lỗi ở đó thì so với bản cuối.
 
 **Ba chỗ khác với bản design lúc trình bày** (file design đã cập nhật theo):
@@ -1261,8 +1261,8 @@ Expected: FAIL, `Failed to resolve import "@/lib/admin-db"`.
 ```ts
 /**
  * Pure helpers shared by the /api/admin routes behind the side panel. Kept
- * apart from lib/admin-api.ts, which pulls in next/headers and so cannot be
- * imported by a test.
+ * apart from lib/admin-api.ts, which reaches the session through
+ * next/headers, so testing these needs no mocks.
  */
 
 export type DbError = { code?: string; message?: string; details?: string; hint?: string };
@@ -1325,8 +1325,9 @@ git commit -m "feat: recognise a missing table and check ids for the admin route
 **Files:**
 - Create: `lib/admin-api.ts`
 - Modify: `lib/supabase-server.ts`
+- Test: `lib/admin-api.test.ts`
 
-File này import `next/headers` (qua `supabase-server`) nên không test bằng vitest.
+Test chỉ giả `getUser`, lời gọi mạng tới Supabase Auth; `isAdminUser`, `requireAdmin` và `dbError` chạy thật.
 
 **Step 1: Viết code**
 
@@ -1402,15 +1403,91 @@ Thay hai dòng comment trên `export const getUser` bằng:
 // independently. It does not dedupe in a route handler; see isAdminUser.
 ```
 
-**Step 3: Kiểm kiểu**
+**Step 3: Test cho cổng admin**
+
+`lib/admin-api.test.ts`:
+
+```ts
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// Only the network call to Supabase Auth is faked; isAdminUser, requireAdmin
+// and dbError run as they are.
+const { getUser } = vi.hoisted(() => ({ getUser: vi.fn() }));
+vi.mock("@/lib/supabase-server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/supabase-server")>()),
+  getUser,
+}));
+
+import { dbError, requireAdmin } from "@/lib/admin-api";
+import { isAdminUser } from "@/lib/supabase-server";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+  getUser.mockReset();
+});
+
+describe("isAdminUser", () => {
+  it("is nobody when ADMIN_EMAIL is unset or empty", () => {
+    vi.stubEnv("ADMIN_EMAIL", undefined);
+    expect(isAdminUser(null)).toBe(false);
+    expect(isAdminUser({})).toBe(false);
+    vi.stubEnv("ADMIN_EMAIL", "");
+    expect(isAdminUser({ email: "" })).toBe(false);
+  });
+
+  it("is only the user with the admin email", () => {
+    vi.stubEnv("ADMIN_EMAIL", "me@example.com");
+    expect(isAdminUser({ email: "me@example.com" })).toBe(true);
+    expect(isAdminUser({ email: "you@example.com" })).toBe(false);
+    expect(isAdminUser(null)).toBe(false);
+  });
+});
+
+describe("requireAdmin", () => {
+  it("answers 401 signed out and 403 for anyone else, asking for the user once each time", async () => {
+    vi.stubEnv("ADMIN_EMAIL", "me@example.com");
+    getUser.mockResolvedValueOnce(null);
+    expect((await requireAdmin())?.status).toBe(401);
+    getUser.mockResolvedValueOnce({ email: "you@example.com" });
+    expect((await requireAdmin())?.status).toBe(403);
+    getUser.mockResolvedValueOnce({ email: "me@example.com" });
+    expect(await requireAdmin()).toBeNull();
+    expect(getUser).toHaveBeenCalledTimes(3);
+  });
+
+  it("turns everyone away when ADMIN_EMAIL is unset", async () => {
+    vi.stubEnv("ADMIN_EMAIL", undefined);
+    getUser.mockResolvedValueOnce({});
+    expect((await requireAdmin())?.status).toBe(403);
+  });
+});
+
+describe("dbError", () => {
+  it("reports a missing table by code, and falls back on an empty message", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const missing = dbError({ code: "PGRST205" }, "test");
+    expect(missing.status).toBe(500);
+    expect(await missing.json()).toEqual({ error: "missing_table", code: "missing_table" });
+    const empty = dbError({ code: "XX000", message: "" }, "test");
+    expect(empty.status).toBe(500);
+    expect(await empty.json()).toEqual({ error: "Database error" });
+  });
+});
+```
+
+Run: `pnpm vitest run lib/admin-api.test.ts`
+Expected: PASS, 5 tests.
+
+**Step 4: Kiểm kiểu**
 
 Run: `pnpm exec tsc --noEmit`
 Expected: không lỗi.
 
-**Step 4: Commit**
+**Step 5: Commit**
 
 ```bash
-git add lib/admin-api.ts lib/supabase-server.ts
+git add lib/admin-api.ts lib/supabase-server.ts lib/admin-api.test.ts
 git commit -m "feat: shared admin gate and error responses for the side panel routes"
 ```
 
@@ -5496,7 +5573,7 @@ Người dùng thêm `ADMIN_CALENDAR_FEEDS` vào Project Settings → Environmen
 **Step 1: Test**
 
 Run: `pnpm test`
-Expected: mọi file test đều PASS, gồm 120 test mới.
+Expected: mọi file test đều PASS, gồm 125 test mới.
 
 **Step 2: Kiểu và lint**
 

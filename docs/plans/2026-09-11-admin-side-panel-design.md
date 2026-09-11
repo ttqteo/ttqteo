@@ -199,12 +199,13 @@ Route calendar:
 
 ## Testing
 
-Vitest cho hàm thuần trong `lib/`. Phần UI không test, như các thiết kế trước.
+Vitest cho hàm thuần trong `lib/`, và cho cổng admin trong `lib/admin-api.ts` với `getUser` giả. Phần UI không test, như các thiết kế trước.
 
 - `calendar-feed`: sự kiện lặp hằng tuần, EXDATE, buổi bị dời, sự kiện cả ngày, sự kiện qua nửa đêm (22:30 tới 00:15 hiện ở cả hai ngày), múi giờ Asia/Ho_Chi_Minh, cấu hình sai hoặc thiếu field.
 - `admin-tasks`: chia nhóm theo một "hôm nay" cố định, bỏ task xong quá 7 ngày, số trên badge bằng quá hạn cộng hôm nay.
 - `admin-notes`: tiêu đề và xem trước từ dòng không trống đầu tiên, note ghim lên đầu, tìm không phân biệt hoa thường và dấu.
 - `google-calendar-link`: link cho một ngày trọn vẹn, ngày kết thúc tính loại trừ.
+- `admin-api`: thiếu `ADMIN_EMAIL` thì không ai là admin; `requireAdmin` trả 401 khi chưa đăng nhập, 403 với người khác, và chỉ hỏi user một lần; lỗi thiếu bảng thành `missing_table`.
 
 ## Thứ tự làm
 
