@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MermaidDiagram } from "@/components/mermaid-diagram";
+import { gutterText } from "@/lib/code-gutter";
 import { highlightCodeIn } from "@/lib/code-highlight-dom";
 import { isMermaidPre, languageOf } from "@/lib/mermaid";
 
@@ -54,6 +55,17 @@ export function PostHtml({ html }: { html: string }) {
 
       const code = pre.querySelector("code");
       const language = languageOf(pre) ?? "";
+
+      // Số dòng, và chỉ khi có `<code>`: nút copy đọc `<code>`, nên cột số nằm
+      // ngoài nó thì không lọt vào chữ được copy. Dòng trống cuối không được vẽ
+      // trong `<pre>`, nên cũng không được đánh số.
+      if (code) {
+        const gutter = document.createElement("span");
+        gutter.className = "code-gutter";
+        gutter.setAttribute("aria-hidden", "true");
+        gutter.textContent = gutterText((code.textContent ?? "").replace(/\n$/, ""));
+        pre.prepend(gutter);
+      }
 
       const shell = document.createElement("div");
       shell.className = "code-shell";

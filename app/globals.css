@@ -497,14 +497,14 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   padding: 0.75rem 0 !important;
 }
 .code-block-shell > pre > code {
-  /* inline-block, not block: the <pre> scrolls horizontally, and a block child
-     drops its right padding as soon as the content overflows, so a long line
-     ends up flush against the edge. inline-block sizes to the content and keeps
-     both sides; min-width holds the background across the full width when the
-     line is short. */
-  display: inline-block;
-  min-width: 100%;
-  padding: 0 1.25rem !important;
+  /* The <pre> is a row, line numbers then code (see `.code-gutter`), and it
+     scrolls horizontally. The code grows from its content width rather than
+     being a plain block: a block drops its right padding as soon as the
+     content overflows, so a long line would end up flush against the edge.
+     Growing also fills the row when every line is short. */
+  display: block;
+  flex: 1 0 auto;
+  padding: 0 1.25rem 0 0.75rem !important;
 }
 
 /* Code blocks in a rendered post. The bar and button are built by PostHtml at
@@ -539,9 +539,9 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
 }
 .code-shell > pre > code {
   /* See the note on `.code-block-shell > pre > code`. */
-  display: inline-block;
-  min-width: 100%;
-  padding: 0 1.25rem !important;
+  display: block;
+  flex: 1 0 auto;
+  padding: 0 1.25rem 0 0.75rem !important;
 }
 
 /* Đoạn chữ mà prism không gắn class token nào phải lấy màu chữ thường.
@@ -553,6 +553,21 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
 .code-shell > pre,
 .code-block-shell > pre {
   color: inherit;
+}
+
+/* Số dòng của khối code, lúc soạn lẫn trên trang đọc: `<pre>` thành một hàng,
+   cột số rồi tới `<code>`. Cột số kế thừa cỡ chữ và line-height từ `<pre>` y
+   như `<code>`, nên số nào cũng đứng ngang dòng của nó mà không phải đo. Nó
+   dính mép trái khi code cuộn ngang, nên cần nền đặc cùng màu khối để che chữ
+   trôi bên dưới. */
+.code-shell > pre,
+.code-block-shell > pre {
+  display: flex;
+}
+.code-gutter {
+  @apply sticky left-0 z-[1] flex-none select-none bg-muted text-right text-muted-foreground/50;
+  padding: 0 0.75rem 0 1.25rem;
+  white-space: pre;
 }
 
 /* Sơ đồ mermaid trong bài viết. Dùng lại `.code-shell` và thanh của nó, chỉ

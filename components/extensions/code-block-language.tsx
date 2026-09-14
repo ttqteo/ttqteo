@@ -9,6 +9,7 @@ import {
   type NodeViewProps,
 } from "@tiptap/react";
 import { MermaidDiagram } from "@/components/mermaid-diagram";
+import { gutterText } from "@/lib/code-gutter";
 import { MERMAID_LANGUAGE } from "@/lib/mermaid";
 
 /**
@@ -103,6 +104,16 @@ function CodeBlockView({ node, updateAttributes, editor }: NodeViewProps) {
         </select>
       </div>
       <pre>
+        {/* Số dòng. Ngoài contentDOM nên không bao giờ vào nội dung bài. Đếm
+            cả dòng trống cuối: ProseMirror vẫn vẽ nó để con trỏ có chỗ đứng. */}
+        <span
+          className="code-gutter"
+          contentEditable={false}
+          suppressContentEditableWarning
+          aria-hidden="true"
+        >
+          {gutterText(node.textContent)}
+        </span>
         {/* The tag parameter is explicit because `as` is wrapped in NoInfer,
             so it cannot be deduced from the prop and would default to div. */}
         <NodeViewContent<"code"> as="code" />
