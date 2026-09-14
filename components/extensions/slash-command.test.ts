@@ -37,6 +37,38 @@ describe("filterSlashItems", () => {
   });
 });
 
+describe("/code + ngôn ngữ", () => {
+  it("/codej gợi ý các ngôn ngữ bắt đầu bằng j", () => {
+    expect(ids("codej")).toEqual(["code:java", "code:javascript", "code:json"]);
+  });
+
+  it("gõ thêm thì danh sách hẹp lại", () => {
+    expect(ids("codejava")).toEqual(["code:java", "code:javascript"]);
+    expect(ids("codepython")).toEqual(["code:python"]);
+  });
+
+  it("nhận tên tắt quen tay", () => {
+    expect(ids("codeyml")).toEqual(["code:yaml"]);
+    expect(ids("codepy")).toEqual(["code:python"]);
+    // "json" cũng bắt đầu bằng "js", nên nó đi kèm.
+    expect(ids("codejs")).toEqual(["code:javascript", "code:json"]);
+    expect(ids("codets")).toEqual(["code:tsx", "code:typescript"]);
+  });
+
+  it("không phân biệt hoa thường", () => {
+    expect(ids("CodeJava")).toEqual(["code:java", "code:javascript"]);
+  });
+
+  it("/code trần chỉ có mục Khối code, không liệt kê ngôn ngữ", () => {
+    expect(ids("code")).toEqual(["code"]);
+    expect(ids("codeblock")).toEqual(["code"]);
+  });
+
+  it("không ngôn ngữ nào khớp thì không có gì", () => {
+    expect(ids("codezzz")).toEqual([]);
+  });
+});
+
 let editor: Editor | null = null;
 
 afterEach(() => {
@@ -81,6 +113,14 @@ describe("applySlashItem", () => {
     expect(html).toMatch(expected);
     expect(html).toContain("<p>Trước</p>");
     // So trên chữ, không trên HTML: `</code>` tự nó đã chứa "/code".
+    expect(e.state.doc.textContent).toBe("Trước");
+  });
+
+  it("/codejava: xoá chữ vừa gõ rồi tạo khối code đã chọn sẵn java", () => {
+    const e = typed("codejava");
+    const item = filterSlashItems("codejava").find((i) => i.id === "code:java")!;
+    applySlashItem(e, slashRange(e, "codejava"), item);
+    expect(e.getHTML()).toContain('<pre><code class="language-java"></code></pre>');
     expect(e.state.doc.textContent).toBe("Trước");
   });
 
