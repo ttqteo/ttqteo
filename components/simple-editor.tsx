@@ -16,6 +16,11 @@ import { CodeHighlighting } from "./extensions/code-highlighting";
 import { ListNesting, indentList } from "./extensions/list-nesting";
 import { SmartArrows } from "./extensions/smart-arrows";
 import { EditorTable } from "./extensions/table";
+import {
+  ImageUpload,
+  imageFilesFrom,
+  startImageUpload,
+} from "./extensions/image-upload";
 import { TableBubble } from "./table-bubble";
 import { FormatBubble } from "./format-bubble";
 import { linkBubbleShouldShow } from "./editor-bubbles";
@@ -227,6 +232,7 @@ export function SimpleEditor({
           class: "rounded-lg border my-4",
         },
       }),
+      ImageUpload,
       LinkCard,
       Callout,
       PrivateNote,
@@ -259,6 +265,17 @@ export function SimpleEditor({
           "editor-prose prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[max(500px,60vh)] p-4 pb-[clamp(400px,50vh,600px)] text-base leading-normal prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-h1:font-bold prose-h2:font-semibold prose-h3:font-semibold",
       },
       handlePaste: (view, event) => {
+        // Xét ảnh trước link: có file ảnh thì đó là thứ đang được dán (xem
+        // imageFilesFrom). Vùng đang bôi đen bị thay, như dán chữ.
+        const images = imageFilesFrom(event.clipboardData);
+        if (images.length > 0) {
+          if (!view.state.selection.empty) {
+            view.dispatch(view.state.tr.deleteSelection());
+          }
+          void startImageUpload(view, images, view.state.selection.from, uploadImage);
+          return true;
+        }
+
         const url = bareUrl(event.clipboardData?.getData("text/plain"));
         if (!url) return false;
 
@@ -295,6 +312,18 @@ export function SimpleEditor({
           loading: true,
           data: localUnfurl(url),
         });
+        return true;
+      },
+      // Thả file ảnh từ máy vào. Không có handler này thì ProseMirror bỏ qua
+      // file, và trình duyệt mở luôn ảnh trong tab, rời khỏi trang soạn.
+      handleDrop: (view, event, _slice, moved) => {
+        // Kéo một khối ngay trong editor là việc của ProseMirror.
+        if (moved) return false;
+        const images = imageFilesFrom(event.dataTransfer);
+        if (images.length === 0) return false;
+        const at = view.posAtCoords({ left: event.clientX, top: event.clientY });
+        if (!at) return false;
+        void startImageUpload(view, images, at.pos, uploadImage);
         return true;
       },
     },

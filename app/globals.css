@@ -726,6 +726,15 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   content: "";
 }
 
+/* Ảnh dán hay thả vào editor, trong lúc đang tải lên (xem
+   extensions/image-upload.ts). Bản xem trước mờ đi cho tới khi có URL thật. */
+.editor-prose .image-upload-placeholder {
+  display: block;
+}
+.editor-prose .image-upload-placeholder img {
+  @apply my-4 max-h-80 animate-pulse rounded-lg border opacity-50;
+}
+
 
 /* Two lists in a row are one thought continued, not two sections. Tailwind
    Typography gives each list a full block margin, so a bullet list under a
