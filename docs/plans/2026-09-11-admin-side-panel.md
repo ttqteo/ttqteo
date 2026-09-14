@@ -1354,8 +1354,9 @@ export async function requireAdmin(): Promise<NextResponse | null> {
   return null;
 }
 
-export function badRequest(error: string): NextResponse {
-  return NextResponse.json({ error }, { status: 400 });
+/** A 400 with the reason, and a code when the caller acts on this refusal. */
+export function badRequest(error: string, code?: string): NextResponse {
+  return NextResponse.json(code ? { error, code } : { error }, { status: 400 });
 }
 
 /** A Supabase error as a response. A missing table gets a code the panel shows its own hint for. */
@@ -1418,7 +1419,7 @@ vi.mock("@/lib/supabase-server", async (importOriginal) => ({
   getUser,
 }));
 
-import { dbError, requireAdmin } from "@/lib/admin-api";
+import { badRequest, dbError, requireAdmin } from "@/lib/admin-api";
 import { isAdminUser } from "@/lib/supabase-server";
 
 afterEach(() => {
@@ -1474,10 +1475,19 @@ describe("dbError", () => {
     expect(await empty.json()).toEqual({ error: "Database error" });
   });
 });
+
+describe("badRequest", () => {
+  it("answers 400 with the reason, and the code when there is one", async () => {
+    expect(await badRequest("sai").json()).toEqual({ error: "sai" });
+    const coded = badRequest("sai giờ", "clock_ahead");
+    expect(coded.status).toBe(400);
+    expect(await coded.json()).toEqual({ error: "sai giờ", code: "clock_ahead" });
+  });
+});
 ```
 
 Run: `pnpm vitest run lib/admin-api.test.ts`
-Expected: PASS, 5 tests.
+Expected: PASS, 6 tests.
 
 **Step 4: Kiểm kiểu**
 
@@ -1502,6 +1512,7 @@ git commit -m "feat: shared admin gate and error responses for the side panel ro
 ```ts
 import { describe, expect, it } from "vitest";
 import {
+  CLOCK_AHEAD,
   filterNotes,
   foldText,
   isBlankNote,
@@ -1677,6 +1688,7 @@ describe("parseNoteInput", () => {
     expect(parseNoteInput({ body: "hi", pinned: false, updated_at: T }, now)).toMatchObject({ ok: true });
     expect(parseNoteInput({ body: "hi", pinned: false, updated_at: T }, now - 1)).toMatchObject({
       ok: false,
+      code: CLOCK_AHEAD,
     });
   });
 
@@ -1783,6 +1795,10 @@ export type NoteInput = { body: string; pinned: boolean; updated_at: string; cre
  */
 export const MAX_CLOCK_AHEAD_MS = 5 * 60_000;
 
+/** The codes on the two notes PUT refusals the notes store acts on. */
+export const CLOCK_AHEAD = "clock_ahead";
+export const NOTE_DELETED = "note_deleted";
+
 const NUL = String.fromCharCode(0);
 
 /**
@@ -1795,7 +1811,7 @@ const NUL = String.fromCharCode(0);
 export function parseNoteInput(
   value: unknown,
   now = Date.now(),
-): { ok: true; input: NoteInput } | { ok: false; error: string } {
+): { ok: true; input: NoteInput } | { ok: false; error: string; code?: string } {
   const data = (value ?? {}) as Record<string, unknown>;
   if (typeof data.body !== "string") return { ok: false, error: "body phải là chuỗi" };
   // Postgres stores neither NUL nor half of a surrogate pair, and left in,
@@ -1809,7 +1825,11 @@ export function parseNoteInput(
   const updatedAt = parseTimestamp(data.updated_at);
   if (!updatedAt) return { ok: false, error: "updated_at không đọc được" };
   if (Date.parse(updatedAt) - now > MAX_CLOCK_AHEAD_MS) {
-    return { ok: false, error: "Giờ trên máy đang nhanh hơn server, chỉnh lại giờ máy rồi thử lại" };
+    return {
+      ok: false,
+      error: "Giờ trên máy đang nhanh hơn server, chỉnh lại giờ máy rồi thử lại",
+      code: CLOCK_AHEAD,
+    };
   }
 
   let createdAt: string | undefined;
@@ -1881,7 +1901,7 @@ export async function GET() {
 ```ts
 import { isUuid } from "@/lib/admin-db";
 import { badRequest, dbError, requireAdmin } from "@/lib/admin-api";
-import { NOTE_COLUMNS, parseNoteInput } from "@/lib/admin-notes";
+import { NOTE_COLUMNS, NOTE_DELETED, parseNoteInput } from "@/lib/admin-notes";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -1904,7 +1924,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (!isUuid(id)) return badRequest("id không hợp lệ");
 
   const parsed = parseNoteInput(await request.json().catch(() => null));
-  if (!parsed.ok) return badRequest(parsed.error);
+  if (!parsed.ok) return badRequest(parsed.error, parsed.code);
 
   const supabase = await createSupabaseServerClient();
   const row = { id, ...parsed.input };
@@ -1935,7 +1955,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (stored.error) return dbError(stored.error, "admin notes PUT");
   // Deleted elsewhere in the moment between the write and this read.
   if (!stored.data) {
-    return NextResponse.json({ error: "Note vừa bị xoá ở nơi khác" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Note vừa bị xoá ở nơi khác", code: NOTE_DELETED },
+      { status: 404 },
+    );
   }
   return NextResponse.json({ note: stored.data });
 }
@@ -1988,13 +2011,15 @@ git commit -m "feat: API for the admin side panel's quick notes"
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdminFetchError, adminFetch } from "@/lib/admin-fetch";
 
-function respondWith(status: number, body: unknown) {
+function respondWith(status: number, body: BodyInit | null) {
   const fetchMock = vi.fn(
-    async (_url: string, _init?: RequestInit) => new Response(JSON.stringify(body), { status }),
+    async (_url: string, _init?: RequestInit) => new Response(body, { status }),
   );
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
+
+const respondJson = (status: number, value: unknown) => respondWith(status, JSON.stringify(value));
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -2002,48 +2027,96 @@ afterEach(() => {
 
 describe("adminFetch", () => {
   it("returns the JSON body", async () => {
-    respondWith(200, { notes: [] });
+    respondJson(200, { notes: [] });
     await expect(adminFetch("/api/admin/notes")).resolves.toEqual({ notes: [] });
   });
 
   it("sends JSON, uncached, when there is a body", async () => {
-    const fetchMock = respondWith(200, {});
+    const fetchMock = respondJson(200, {});
     await adminFetch("/api/admin/notes/1", { method: "PUT", body: "{}" });
-    expect(fetchMock.mock.calls[0][1]).toMatchObject({
-      method: "PUT",
-      cache: "no-store",
-      headers: { "Content-Type": "application/json" },
-    });
+    const init = fetchMock.mock.calls[0][1];
+    expect(init).toMatchObject({ method: "PUT", cache: "no-store" });
+    expect(new Headers(init?.headers).get("content-type")).toBe("application/json");
   });
 
-  it.each([401, 403])("reports %i as a lapsed session", async (status) => {
-    respondWith(status, { error: "Unauthorized" });
-    await expect(adminFetch("/api/admin/notes")).rejects.toMatchObject({ kind: "auth" });
+  it("reads uncached, with no content type, when there is no body", async () => {
+    const fetchMock = respondJson(200, {});
+    await adminFetch("/api/admin/notes");
+    const init = fetchMock.mock.calls[0][1];
+    expect(init).toMatchObject({ cache: "no-store" });
+    expect(new Headers(init?.headers).has("content-type")).toBe(false);
+  });
+
+  it("keeps the caller's headers, whatever shape they come in", async () => {
+    const fetchMock = respondJson(200, {});
+    await adminFetch("/api/admin/notes/1", {
+      method: "PUT",
+      body: "{}",
+      headers: new Headers({ "X-Trace": "1" }),
+    });
+    const headers = new Headers(fetchMock.mock.calls[0][1]?.headers);
+    expect(headers.get("x-trace")).toBe("1");
+    expect(headers.get("content-type")).toBe("application/json");
+  });
+
+  it.each([401, 403])("reports %i as a sign-in to renew", async (status) => {
+    respondJson(status, { error: "Unauthorized" });
+    const error = await adminFetch("/api/admin/notes").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AdminFetchError);
+    expect(error).toMatchObject({ kind: "auth" });
   });
 
   it("reports a table that was never created", async () => {
-    respondWith(500, { error: "missing_table", code: "missing_table" });
+    respondJson(500, { error: "missing_table", code: "missing_table" });
     await expect(adminFetch("/api/admin/notes")).rejects.toMatchObject({ kind: "missing_table" });
   });
 
   it("passes the server's message through", async () => {
-    respondWith(500, { error: "boom" });
+    respondJson(500, { error: "boom" });
     await expect(adminFetch("/api/admin/notes")).rejects.toMatchObject({
       kind: "server",
       message: "boom",
     });
   });
 
+  it("passes the server's code through, for refusals a store acts on", async () => {
+    respondJson(400, { error: "Giờ trên máy đang nhanh hơn server", code: "clock_ahead" });
+    await expect(
+      adminFetch("/api/admin/notes/1", { method: "PUT", body: "{}" }),
+    ).rejects.toMatchObject({ kind: "server", code: "clock_ahead" });
+  });
+
+  it("reports an error page that is not JSON by its status", async () => {
+    respondWith(504, "<html>Gateway Timeout</html>");
+    await expect(adminFetch("/api/admin/notes")).rejects.toMatchObject({
+      kind: "server",
+      message: "Lỗi 504",
+    });
+  });
+
+  it("refuses a success whose body cannot be read", async () => {
+    respondWith(200, "<html>not json</html>");
+    const error = await adminFetch("/api/admin/notes").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AdminFetchError);
+    expect(error).toMatchObject({ kind: "server" });
+  });
+
+  it("returns nothing for 204", async () => {
+    respondWith(204, null);
+    await expect(adminFetch("/api/admin/notes/1", { method: "DELETE" })).resolves.toBeUndefined();
+  });
+
   it("reports a request that never reached the server", async () => {
+    const cause = new TypeError("Failed to fetch");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
-        throw new TypeError("Failed to fetch");
+        throw cause;
       }),
     );
     const error = await adminFetch("/api/admin/notes").catch((e: unknown) => e);
     expect(error).toBeInstanceOf(AdminFetchError);
-    expect(error).toMatchObject({ kind: "network" });
+    expect(error).toMatchObject({ kind: "network", cause });
   });
 });
 ```
@@ -2060,43 +2133,67 @@ export type AdminFetchErrorKind = "auth" | "missing_table" | "network" | "server
 
 export class AdminFetchError extends Error {
   readonly kind: AdminFetchErrorKind;
+  /** The route's own code for the failure, when it sent one, such as "clock_ahead". */
+  readonly code: string | undefined;
 
-  constructor(kind: AdminFetchErrorKind, message: string) {
-    super(message);
+  constructor(
+    kind: AdminFetchErrorKind,
+    message: string,
+    options?: ErrorOptions & { code?: string },
+  ) {
+    super(message, options);
     this.name = "AdminFetchError";
     this.kind = kind;
+    this.code = options?.code;
   }
 }
 
+// What a body that is not JSON reads as, told apart from a JSON null.
+const UNREADABLE = Symbol("unreadable");
+
 /**
- * JSON fetch for the /api/admin routes behind the side panel. Every failure
- * comes out as an AdminFetchError whose `kind` the UI can act on: a lapsed
- * session and a table that was never created each get their own message
- * instead of one generic "something went wrong".
+ * JSON fetch for the /api/admin routes behind the side panel, never cached.
+ * Every failure comes out as an AdminFetchError whose `kind` the UI can act
+ * on: a lapsed session and a table that was never created each get their own
+ * message instead of one generic "something went wrong", and a refusal the
+ * route gave a code keeps it. A success whose body cannot be read is a
+ * failure too, not a null; a 204 resolves to undefined.
  */
-export async function adminFetch<T>(url: string, init: RequestInit = {}): Promise<T> {
+export async function adminFetch<T>(
+  url: string,
+  init: Omit<RequestInit, "cache"> = {},
+): Promise<T> {
+  const headers = new Headers(init.headers);
+  if (init.body != null && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
   let response: Response;
   try {
-    response = await fetch(url, {
-      ...init,
-      cache: "no-store",
-      headers: init.body ? { "Content-Type": "application/json", ...init.headers } : init.headers,
-    });
-  } catch {
-    throw new AdminFetchError("network", "Không kết nối được server");
+    response = await fetch(url, { ...init, cache: "no-store", headers });
+  } catch (error) {
+    throw new AdminFetchError("network", "Không kết nối được server", { cause: error });
   }
 
   if (response.status === 401 || response.status === 403) {
-    throw new AdminFetchError("auth", "Hết phiên đăng nhập");
+    throw new AdminFetchError("auth", "Cần đăng nhập lại");
   }
+  if (response.status === 204) return undefined as T;
 
-  const data = await response.json().catch(() => null);
+  // A platform error page (an HTML 504, say) is not JSON. A failure still has
+  // its status to go on; a success has nothing, so it fails too.
+  const data: unknown = await response.json().catch(() => UNREADABLE);
   if (!response.ok) {
-    if (data?.code === "missing_table") {
+    const body = typeof data === "object" && data !== null ? (data as Record<string, unknown>) : {};
+    if (body.code === "missing_table") {
       throw new AdminFetchError("missing_table", "Chưa chạy supabase/add_admin_side_panel.sql");
     }
-    const message = typeof data?.error === "string" ? data.error : `Lỗi ${response.status}`;
-    throw new AdminFetchError("server", message);
+    const message = typeof body.error === "string" ? body.error : `Lỗi ${response.status}`;
+    const code = typeof body.code === "string" ? body.code : undefined;
+    throw new AdminFetchError("server", message, { code });
+  }
+  if (data === UNREADABLE) {
+    throw new AdminFetchError("server", `Lỗi ${response.status}: không đọc được phản hồi`);
   }
   return data as T;
 }
@@ -2105,7 +2202,7 @@ export async function adminFetch<T>(url: string, init: RequestInit = {}): Promis
 **Step 4: Chạy lại**
 
 Run: `pnpm vitest run lib/admin-fetch.test.ts`
-Expected: PASS, 7 tests.
+Expected: PASS, 13 tests.
 
 **Step 5: Ba file nhỏ cho panel**
 
@@ -2116,7 +2213,7 @@ Expected: PASS, 7 tests.
 export type LoadStatus = "idle" | "loading" | "ready" | "missing_table" | "error";
 ```
 
-`components/admin/side-panel/report-admin-error.ts`. Hết phiên thì tải lại trang chứ không điều hướng client: server mới là nơi quyết định có hiện màn đăng nhập hay không, và nó chỉ hỏi ở một request mới.
+`components/admin/side-panel/report-admin-error.ts`. Hết phiên (hay tài khoản không phải admin) thì một toast duy nhất, không tự tắt. Đăng nhập lại ở tab khác rồi lưu lại thì giữ được chữ chưa lưu; tải lại trang thì mất phần đó. Tải lại là tải cả trang chứ không điều hướng client, vì server mới là nơi quyết định có hiện màn đăng nhập hay không, và nó chỉ hỏi ở một request mới.
 
 ```ts
 "use client";
@@ -2127,16 +2224,25 @@ import { toast } from "sonner";
 /** One toast for a failed side-panel request, with a way back in when the session lapsed. */
 export function reportAdminError(error: unknown, action: string): void {
   if (error instanceof AdminFetchError && error.kind === "auth") {
-    // A full reload, not a client navigation: the server decides whether the
-    // login screen is due, and it only asks on a fresh request.
-    toast.error("Hết phiên đăng nhập", {
-      description: "Tải lại trang để đăng nhập lại.",
+    // One toast however many stores hit this, kept until dismissed: it is the
+    // only word on why saves stop. Signing in again in another tab keeps the
+    // unsaved text, since the cookies are shared. A reload here loses it, and
+    // is a full reload rather than a client navigation because the server
+    // decides whether the login screen is due, and only on a fresh request.
+    toast.error("Cần đăng nhập lại", {
+      id: "admin-session",
+      duration: Infinity,
+      description:
+        "Đăng nhập lại bằng tài khoản admin ở tab khác rồi lưu lại để giữ chữ chưa lưu, hoặc tải lại trang.",
       action: { label: "Tải lại", onClick: () => window.location.reload() },
     });
     return;
   }
+  // Only our own messages are fit to show. Anything else is a bug: log it for
+  // whoever fixes it, and say something plain.
+  if (!(error instanceof AdminFetchError)) console.error(error);
   toast.error(`${action} không thành công`, {
-    description: error instanceof Error ? error.message : undefined,
+    description: error instanceof AdminFetchError ? error.message : "Có lỗi không mong đợi.",
   });
 }
 ```
@@ -2145,17 +2251,19 @@ export function reportAdminError(error: unknown, action: string): void {
 
 ```tsx
 import { Button } from "@/components/ui/button";
+import type { LoadStatus } from "./load-status";
 
 /** What a panel shows instead of its list when loading failed. */
 export function PanelNotice({
   kind,
   onRetry,
 }: {
-  kind: "missing_table" | "error";
+  kind: Extract<LoadStatus, "missing_table" | "error">;
   onRetry: () => void;
 }) {
   return (
-    <div className="space-y-3 p-4 text-sm text-muted-foreground">
+    // A status region: no toast fires for a missing table, so this is the only word on it.
+    <div role="status" className="space-y-3 p-4 text-sm text-muted-foreground">
       {kind === "missing_table" ? (
         <p>
           Chưa có bảng dữ liệu. Chạy{" "}
@@ -5626,7 +5734,7 @@ Người dùng thêm `ADMIN_CALENDAR_FEEDS` vào Project Settings → Environmen
 **Step 1: Test**
 
 Run: `pnpm test`
-Expected: mọi file test đều PASS, gồm 130 test mới.
+Expected: mọi file test đều PASS, gồm 137 test mới.
 
 **Step 2: Kiểu và lint**
 
