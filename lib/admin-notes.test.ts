@@ -238,6 +238,13 @@ describe("keepaliveSaves", () => {
     expect(keepaliveSaves([long], characters)).toEqual([]);
     expect(keepaliveSaves([long], characters + 200)).toHaveLength(1);
   });
+
+  it("stops at the budget across notes, not per note", () => {
+    const a = edited("aaa", "2026-09-11T02:00:00.000Z");
+    const b = edited("bbb", "2026-09-11T01:00:00.000Z");
+    const one = new TextEncoder().encode(noteSaveBody(a)).length;
+    expect(keepaliveSaves([a, b], one + 10).map((save) => save.id)).toEqual(["aaa"]);
+  });
 });
 
 describe("nextStamp", () => {
@@ -253,5 +260,9 @@ describe("nextStamp", () => {
 
   it("comes after a Postgres stamp with microseconds", () => {
     expect(nextStamp("2026-09-11T03:00:00.000500+00:00", NOW)).toBe("2026-09-11T03:00:00.001Z");
+  });
+
+  it("is now when the previous stamp cannot be read", () => {
+    expect(nextStamp("", NOW)).toBe("2026-09-11T03:00:00.000Z");
   });
 });

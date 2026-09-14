@@ -156,13 +156,20 @@ export function useNotesStore(enabled: boolean): NotesStore {
           // Deleted here meanwhile: nothing left to show.
           if (!bodies.current.has(id)) return;
           accepted.current.set(id, stored.updated_at);
-          // An edit made while this was in flight reports its own state, and
-          // its own save decides which version stays.
-          if (pending.current.has(id)) return;
+          const newest = latest.current.get(id) === sent;
+          // Answered: nothing of it is left for the keepalive to resend.
+          if (newest) latest.current.delete(id);
+          // A newer version, waiting or already sent, reports its own state and
+          // decides which version stays.
+          if (pending.current.has(id) || !newest) return;
           setState(id, "saved");
-          // The server kept a newer version, saved in another tab or on another
+          const ours =
+            Date.parse(stored.updated_at) === Date.parse(sent.updated_at) &&
+            stored.body === sent.body &&
+            stored.pinned === sent.pinned;
+          if (ours) return;
+          // The server kept another version, saved in another tab or on another
           // device: show that one.
-          if (Date.parse(stored.updated_at) <= Date.parse(sent.updated_at)) return;
           bodies.current.set(id, stored.body);
           changeNotes((list) => list.map((n) => (n.id === id ? stored : n)));
           toast("Note này vừa được sửa ở nơi khác", { description: "Đang hiện bản mới hơn." });
@@ -181,8 +188,9 @@ export function useNotesStore(enabled: boolean): NotesStore {
           // Keep the text in line: the next keystroke, or a click on the dot,
           // retries. Only the newest version sent goes back, never an older
           // one whose failure came in after a newer one was sent.
-          if (!pending.current.has(id) && latest.current.get(id) === sent) {
-            pending.current.set(id, sent);
+          if (latest.current.get(id) === sent) {
+            latest.current.delete(id);
+            if (!pending.current.has(id)) pending.current.set(id, sent);
           }
           setState(id, "error");
           if (!failing.current.has(id)) {
@@ -272,7 +280,11 @@ export function useNotesStore(enabled: boolean): NotesStore {
   // refused as ahead of the server's clock goes out stamped again.
   useEffect(() => {
     const onPageHide = () => {
-      const unsaved = [...pending.current.values()].map((note) =>
+      // Sent but not answered yet (it may never go out once the page is gone),
+      // and anything still waiting, which is newer where a note has both.
+      const waiting = new Map(latest.current);
+      for (const [id, note] of pending.current) waiting.set(id, note);
+      const unsaved = [...waiting.values()].map((note) =>
         clockRefused.current.has(note.id)
           ? { ...note, updated_at: nextStamp(accepted.current.get(note.id) ?? "") }
           : note,
@@ -338,6 +350,9 @@ export function useNotesStore(enabled: boolean): NotesStore {
   const remove = useCallback(
     (note: AdminNote) => {
       const acceptedStamp = accepted.current.get(note.id);
+      // Whether this version still had to reach the server, so a failed
+      // delete can put it back in line to save.
+      const unsaved = pending.current.has(note.id) || latest.current.has(note.id);
       forget(note.id);
       enqueue(note.id, () => adminFetch(noteUrl(note.id), { method: "DELETE" })).then(
         () => {
@@ -347,15 +362,20 @@ export function useNotesStore(enabled: boolean): NotesStore {
           });
         },
         (error) => {
-          // Still on the server: back in the list, as the server knows it.
+          // Still on the server: back in the list as it was here, and back in
+          // line to save if it had not been saved yet.
           bodies.current.set(note.id, note.body);
           if (acceptedStamp) accepted.current.set(note.id, acceptedStamp);
           changeNotes((list) => [note, ...list]);
+          if (unsaved) {
+            pending.current.set(note.id, note);
+            setState(note.id, "error");
+          }
           reportAdminError(error, "Xoá note");
         },
       );
     },
-    [forget, enqueue, restore, changeNotes],
+    [forget, enqueue, restore, changeNotes, setState],
   );
 
   const discardIfBlank = useCallback(
