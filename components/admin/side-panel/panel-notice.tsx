@@ -1,15 +1,17 @@
 import { Button } from "@/components/ui/button";
+import type { LoadStatus } from "./load-status";
 
 /** What a panel shows instead of its list when loading failed. */
 export function PanelNotice({
   kind,
   onRetry,
 }: {
-  kind: "missing_table" | "error";
+  kind: Extract<LoadStatus, "missing_table" | "error">;
   onRetry: () => void;
 }) {
   return (
-    <div className="space-y-3 p-4 text-sm text-muted-foreground">
+    // A status region: no toast fires for a missing table, so this is the only word on it.
+    <div role="status" className="space-y-3 p-4 text-sm text-muted-foreground">
       {kind === "missing_table" ? (
         <p>
           Chưa có bảng dữ liệu. Chạy{" "}
