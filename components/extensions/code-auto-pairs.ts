@@ -15,7 +15,8 @@ const PAIRS: Record<string, string> = {
 const CLOSERS = new Set(Object.values(PAIRS));
 /** Braces that earn a block when Enter is pressed inside them. */
 const BLOCK_OPENERS = new Set(["(", "[", "{"]);
-const INDENT = "  ";
+/** One level of indentation in a code block, for Enter between braces and for Tab. */
+export const INDENT = "  ";
 
 const WORD = /[\w$]/;
 
@@ -143,6 +144,23 @@ export const CodeAutoPairs = Extension.create({
                 ),
               );
               return true;
+            }
+
+            // Enter anywhere else keeps the current line's indentation, which
+            // is what makes Tab worth pressing. An unindented line is left to
+            // the base keymap, so three Enters at the end still leave the block.
+            if (
+              event.key === "Enter" &&
+              !event.shiftKey &&
+              !event.ctrlKey &&
+              !event.metaKey &&
+              !event.altKey
+            ) {
+              const indent = currentIndent(text, offset);
+              if (indent) {
+                view.dispatch(view.state.tr.insertText(`\n${indent}`, pos, pos));
+                return true;
+              }
             }
 
             return false;

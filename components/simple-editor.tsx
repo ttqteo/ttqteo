@@ -12,6 +12,7 @@ import { Callout } from "./extensions/callout";
 import { PrivateNote } from "./extensions/private-note";
 import { SlashCommand } from "./extensions/slash-command";
 import { CodeAutoPairs } from "./extensions/code-auto-pairs";
+import { CodeIndent } from "./extensions/code-indent";
 import { CodeHighlighting } from "./extensions/code-highlighting";
 import { ListNesting, indentList } from "./extensions/list-nesting";
 import { SmartArrows } from "./extensions/smart-arrows";
@@ -239,6 +240,7 @@ export function SimpleEditor({
       EditorTable,
       SlashCommand,
       CodeAutoPairs,
+      CodeIndent,
       CodeHighlighting,
       ListNesting,
       SmartArrows,

@@ -165,6 +165,32 @@ describe("enter inside braces", () => {
   });
 });
 
+describe("enter keeps indentation", () => {
+  it("carries the current line's indent onto the new line", () => {
+    const e = open("<pre><code>  foo</code></pre>");
+    const at = caret(e, 5);
+    press(e, "Enter");
+    expect(code(e)).toBe("  foo\n  ");
+    expect(e.state.selection.from).toBe(at + 3);
+  });
+
+  it("uses only the indent before the caret", () => {
+    const e = open("<pre><code>    x</code></pre>");
+    caret(e, 2);
+    press(e, "Enter");
+    expect(code(e)).toBe("  \n    x");
+  });
+
+  it("leaves an unindented line to the base keymap", () => {
+    // Asserted on the text for the same reason as "does nothing between
+    // quotes" above.
+    const e = open("<pre><code>foo</code></pre>");
+    caret(e, 3);
+    press(e, "Enter");
+    expect(code(e)).toBe("foo\n");
+  });
+});
+
 describe("outside code", () => {
   it("does not pair in a paragraph", () => {
     // Auto-closing a quote mid-sentence would be an active nuisance.
