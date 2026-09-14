@@ -20,6 +20,7 @@ import {
   useSyncExternalStore,
   type PropsWithChildren,
 } from "react";
+import { useNotesStore, type NotesStore } from "./use-notes-store";
 
 type SidePanelContextValue = {
   /** The open panel, on screens with room for the rail; null when closed. */
@@ -33,6 +34,7 @@ type SidePanelContextValue = {
   setSheetOpen: (open: boolean) => void;
   sheetTab: AdminPanelId;
   setSheetTab: (id: AdminPanelId) => void;
+  notes: NotesStore;
 };
 
 const SidePanelContext = createContext<SidePanelContextValue | null>(null);
@@ -149,9 +151,12 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
     return () => query.removeEventListener("change", onChange);
   }, []);
 
+  const notesShowing = panel === "notes" || (sheetOpen && sheetTab === "notes");
+  const notes = useNotesStore(admin && notesShowing);
+
   const value = useMemo(
-    () => ({ panel, openedByUser, toggle, close, sheetOpen, setSheetOpen, sheetTab, setSheetTab }),
-    [panel, openedByUser, toggle, close, sheetOpen, sheetTab],
+    () => ({ panel, openedByUser, toggle, close, sheetOpen, setSheetOpen, sheetTab, setSheetTab, notes }),
+    [panel, openedByUser, toggle, close, sheetOpen, sheetTab, notes],
   );
 
   return <SidePanelContext.Provider value={value}>{children}</SidePanelContext.Provider>;

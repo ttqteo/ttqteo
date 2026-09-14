@@ -4,9 +4,12 @@ import {
   filterNotes,
   foldText,
   isBlankNote,
+  keepaliveSaves,
   MAX_CLOCK_AHEAD_MS,
   MAX_NOTE_LENGTH,
+  nextStamp,
   notePreview,
+  noteSaveBody,
   noteTitle,
   parseNoteInput,
   sortNotes,
@@ -191,5 +194,64 @@ describe("parseNoteInput", () => {
     ["nothing at all", null],
   ])("rejects %s", (_label, value) => {
     expect(parseNoteInput(value)).toMatchObject({ ok: false });
+  });
+});
+
+describe("noteSaveBody", () => {
+  it("is a body the PUT accepts, with the edit's time", () => {
+    const saved = note({ body: "Mua đồ Tết", pinned: true, updated_at: "2026-09-11T03:00:00.000Z" });
+    expect(parseNoteInput(JSON.parse(noteSaveBody(saved)))).toEqual({
+      ok: true,
+      input: {
+        body: "Mua đồ Tết",
+        pinned: true,
+        updated_at: "2026-09-11T03:00:00.000Z",
+        created_at: "2026-09-01T00:00:00.000Z",
+      },
+    });
+  });
+});
+
+describe("keepaliveSaves", () => {
+  const edited = (body: string, updated_at: string) => note({ body, updated_at });
+
+  it("sends the newest edit first", () => {
+    const saves = keepaliveSaves(
+      [edited("old", "2026-09-11T01:00:00.000Z"), edited("new", "2026-09-11T02:00:00.000Z")],
+      60_000,
+    );
+    expect(saves.map((save) => save.id)).toEqual(["new", "old"]);
+  });
+
+  it("skips a note too big for what is left, and still sends a smaller one", () => {
+    const saves = keepaliveSaves(
+      [edited("x".repeat(500), "2026-09-11T02:00:00.000Z"), edited("nhỏ", "2026-09-11T01:00:00.000Z")],
+      300,
+    );
+    expect(saves.map((save) => save.id)).toEqual(["nhỏ"]);
+  });
+
+  it("counts bytes, not characters", () => {
+    // "ệ" is one character and three bytes in UTF-8.
+    const long = edited("ệ".repeat(100), "2026-09-11T01:00:00.000Z");
+    const characters = noteSaveBody(long).length;
+    expect(keepaliveSaves([long], characters)).toEqual([]);
+    expect(keepaliveSaves([long], characters + 200)).toHaveLength(1);
+  });
+});
+
+describe("nextStamp", () => {
+  const NOW = Date.parse("2026-09-11T03:00:00.000Z");
+
+  it("is now, for a version stamped earlier", () => {
+    expect(nextStamp("2026-09-11T02:59:00.000Z", NOW)).toBe("2026-09-11T03:00:00.000Z");
+  });
+
+  it("comes just after a version stamped by a clock running fast", () => {
+    expect(nextStamp("2026-09-11T03:04:00.000Z", NOW)).toBe("2026-09-11T03:04:00.001Z");
+  });
+
+  it("comes after a Postgres stamp with microseconds", () => {
+    expect(nextStamp("2026-09-11T03:00:00.000500+00:00", NOW)).toBe("2026-09-11T03:00:00.001Z");
   });
 });

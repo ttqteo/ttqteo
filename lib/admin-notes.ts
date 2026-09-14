@@ -130,3 +130,50 @@ export function parseNoteInput(
     },
   };
 }
+
+/** The PUT body for a note: what parseNoteInput reads, this edit's time included. */
+export function noteSaveBody(note: AdminNote): string {
+  return JSON.stringify({
+    body: note.body,
+    pinned: note.pinned,
+    updated_at: note.updated_at,
+    created_at: note.created_at,
+  });
+}
+
+/**
+ * The stamp for an edit made on top of a version stamped `previous`: now, or
+ * a millisecond after `previous` when this device's clock is behind it. The
+ * newest edit wins, so an edit on a version from a clock running fast must
+ * still count as newer, and two edits in one millisecond must not tie.
+ */
+export function nextStamp(previous: string, now = Date.now()): string {
+  const after = Date.parse(previous) + 1;
+  return new Date(Number.isNaN(after) ? now : Math.max(now, after)).toISOString();
+}
+
+/**
+ * What to send with keepalive as the page goes away. Browsers refuse keepalive
+ * requests past 64 KiB in flight altogether, so this takes the newest edits
+ * first, within `budget` bytes, and skips a note too big for what is left so
+ * that smaller ones behind it still go.
+ */
+export function keepaliveSaves(
+  notes: AdminNote[],
+  budget: number,
+): { id: string; body: string }[] {
+  const encoder = new TextEncoder();
+  const saves: { id: string; body: string }[] = [];
+  let left = budget;
+  const newestFirst = [...notes].sort(
+    (a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at),
+  );
+  for (const note of newestFirst) {
+    const body = noteSaveBody(note);
+    const size = encoder.encode(body).length;
+    if (size > left) continue;
+    left -= size;
+    saves.push({ id: note.id, body });
+  }
+  return saves;
+}
