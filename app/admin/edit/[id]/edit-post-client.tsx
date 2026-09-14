@@ -1,6 +1,9 @@
 "use client";
 
 import { FadedScroll } from "@/components/faded-scroll";
+// Chỉ lấy kiểu: import giá trị sẽ kéo TipTap về chunk của trang, thứ `dynamic`
+// bên dưới tách ra có chủ đích.
+import type { SimpleEditorHandle } from "@/components/simple-editor";
 import { GUIDE_SERIES, hasTag } from "@/lib/guides";
 import {
   clearEditorDraft,
@@ -18,6 +21,7 @@ import {
   type EditorPrefs,
   type EditorWidth,
 } from "@/lib/editor-prefs";
+import { isComposingKey, isSaveShortcut } from "@/lib/editor-keys";
 import { navigationTarget } from "@/lib/nav-guard";
 import { clearWriterResume, setWriterResume } from "@/lib/resume-storage";
 import { cn } from "@/lib/utils";
@@ -155,6 +159,14 @@ const ALIGN_CLASS: Record<EditorAlign, string> = {
 };
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
+
+type SaveOptions = {
+  // Where to go once the save lands, for the "save and leave" path. Replaces
+  // the usual stay-in-the-editor routing rather than running after it.
+  leaveTo?: string;
+  // Stay in the editor after a draft save instead of landing in preview.
+  stayInWrite?: boolean;
+};
 
 function removeVietnameseTones(str: string): string {
   return str
@@ -423,6 +435,10 @@ export default function EditPostClient({
     loadingActionRef.current = loadingAction;
   }, [loadingAction]);
 
+  // Editor nằm sau `dynamic`, nên có thể chưa dựng xong khi đã gõ tiêu đề. Lúc
+  // đó ref rỗng, và Enter ở tiêu đề hay Tab ở mô tả không đưa đi đâu cả.
+  const editorHandleRef = useRef<SimpleEditorHandle | null>(null);
+
   const buildPayload = useCallback(
     (publish: boolean) => ({
       ...post,
@@ -651,20 +667,21 @@ export default function EditPostClient({
     }
   };
 
+  // Id của bài vừa tạo từ chính trang này. `isNew` còn là true tới khi
+  // router.replace bên dưới xong, và một lần lưu lọt vào khoảng đó (Ctrl+S bấm
+  // hai lần là chuyện thường) sẽ tạo bài thêm lần nữa.
+  const createdIdRef = useRef<string | null>(null);
+
   const handleSave = async (
     publish: boolean,
     action: string,
-    // Where to go once the save lands, for the "save and leave" path. Replaces
-    // the usual stay-in-the-editor routing rather than running after it.
-    leaveTo?: string,
+    { leaveTo, stayInWrite = false }: SaveOptions = {},
   ) => {
     setLoadingAction(action);
     try {
-      const url = isNew ? "/api/posts" : `/api/posts/${initialData?.id}`;
-      const method = isNew ? "POST" : "PUT";
-
-      const res = await fetch(url, {
-        method,
+      const id = initialData?.id ?? createdIdRef.current;
+      const res = await fetch(id ? `/api/posts/${id}` : "/api/posts", {
+        method: id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildPayload(publish)),
       });
@@ -683,8 +700,9 @@ export default function EditPostClient({
         setDirtyVsServer(false);
         // Saving a draft is usually the moment you want to see how it reads,
         // so it lands in preview. Only for the explicit button: autosave fires
-        // every few seconds and would yank the editor away mid-sentence.
-        if (action === "save-draft") setMode("preview");
+        // every few seconds and Ctrl+S gets pressed mid-sentence out of habit,
+        // and either would yank the editor away.
+        if (action === "save-draft" && !stayInWrite) setMode("preview");
         if (publish) clearWriterResume();
         toast.success(publish ? "Post published" : "Draft saved");
         if (leaveTo) {
@@ -693,16 +711,19 @@ export default function EditPostClient({
           router.push(leaveTo);
           return;
         }
-        if (isNew) {
+        if (!id) {
           // After creating a new post we want the URL to match the new id so
           // subsequent saves use PUT, but keep the user in the editor.
           const saved = await res.json().catch(() => null);
           const newId = saved?.id as string | undefined;
           if (newId) {
+            createdIdRef.current = newId;
             router.replace(`/admin/edit/${newId}`);
           }
-        } else {
+        } else if (!isNew) {
           // Refresh server data (drafts list, lastSaved etc.) without leaving.
+          // Not while the replace above is still landing: that brings fresh
+          // data of its own.
           router.refresh();
         }
         setLastSaved(new Date());
@@ -718,6 +739,41 @@ export default function EditPostClient({
       setLoadingAction(null);
     }
   };
+
+  // The header's plain save, whichever of the two it is right now. A published
+  // post saves as published: routing it through the draft path would quietly
+  // unpublish it.
+  const saveInPlace = (options?: SaveOptions) =>
+    handleSave(
+      post.is_published,
+      post.is_published ? "save" : "save-draft",
+      options,
+    );
+
+  // Ctrl/Cmd+S. Listener chỉ gắn một lần, còn `saveInPlace` mới ở mỗi lần
+  // render và mang theo bài đang soạn, nên đi qua ref.
+  const saveShortcutRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    saveShortcutRef.current = () => {
+      // Nút lưu đang tắt thì phím này cũng vậy.
+      if (loadingActionRef.current) return;
+      void saveInPlace({ stayInWrite: true });
+    };
+  });
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isSaveShortcut(event)) return;
+      // Chặn cả lúc đang lưu dở: hộp "Lưu trang" của trình duyệt không bao giờ
+      // là ý của phím này ở đây.
+      event.preventDefault();
+      if (event.repeat) return;
+      saveShortcutRef.current();
+    };
+    // Pha capture, để phím tới đây trước khi thứ đang giữ tiêu điểm (editor,
+    // bảng vẽ) kịp nhận hay chặn nó.
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, []);
 
   // Bản đang soạn, kể cả phần chưa lưu: editor đẩy HTML lên `post.content` ở
   // mỗi lần gõ. Ghi chú riêng bị bỏ, như ở màn Xem trước.
@@ -1050,13 +1106,7 @@ export default function EditPostClient({
                 event.preventDefault();
                 const href = pendingHref;
                 if (!href) return;
-                // A published post saves as published — routing this through
-                // the draft path would quietly unpublish it.
-                void handleSave(
-                  post.is_published,
-                  post.is_published ? "save" : "save-draft",
-                  href,
-                );
+                void saveInPlace({ leaveTo: href });
               }}
             >
               {loadingAction ? (
@@ -1321,6 +1371,14 @@ export default function EditPostClient({
               ref={writeTitleRef}
               value={post.title}
               onChange={(e) => setPost({ ...post, title: e.target.value })}
+              onKeyDown={(e) => {
+                // Enter xong tiêu đề là vào viết luôn. Tiêu đề không có dòng
+                // thứ hai: nó hiện trong `<h1>`, nơi xuống dòng chỉ còn là một
+                // dấu cách. Tab thì để trình duyệt lo, ô kế tiếp là mô tả.
+                if (e.key !== "Enter" || isComposingKey(e.nativeEvent)) return;
+                e.preventDefault();
+                editorHandleRef.current?.focusStart();
+              }}
               placeholder="Title"
               maxLength={TITLE_MAX}
               rows={1}
@@ -1346,6 +1404,24 @@ export default function EditPostClient({
               onChange={(e) =>
                 setPost({ ...post, description: e.target.value })
               }
+              onKeyDown={(e) => {
+                // Tab từ mô tả vào thẳng nội dung, bỏ qua đường dẫn, loại bài
+                // và tag: mấy thứ đó chỉnh một lần, còn đây là đường của mọi
+                // lần viết. Editor chưa tải xong thì Tab đi như thường.
+                if (
+                  e.key !== "Tab" ||
+                  e.shiftKey ||
+                  e.altKey ||
+                  e.ctrlKey ||
+                  e.metaKey ||
+                  isComposingKey(e.nativeEvent) ||
+                  !editorHandleRef.current
+                ) {
+                  return;
+                }
+                e.preventDefault();
+                editorHandleRef.current.focusStart();
+              }}
               placeholder="Add a subtitle..."
               maxLength={DESCRIPTION_MAX}
               rows={1}
@@ -1493,6 +1569,7 @@ export default function EditPostClient({
             content={post.content}
             onChange={(content) => setPost({ ...post, content })}
             stickyTop={isSplit ? "0px" : "100px"}
+            handleRef={editorHandleRef}
           />
           </div>
         </div>

@@ -19,6 +19,7 @@ import { EditorTable } from "./extensions/table";
 import { TableBubble } from "./table-bubble";
 import { FormatBubble } from "./format-bubble";
 import { linkBubbleShouldShow } from "./editor-bubbles";
+import { focusContentStart } from "./editor-focus";
 import { bareUrl, type UnfurlResult } from "@/lib/unfurl";
 import { parseYoutubeUrl, youtubeEmbedSrc } from "@/lib/youtube";
 import {
@@ -61,10 +62,21 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useImageUpload } from "./use-image-upload";
 
+/** Việc trang soạn nhờ editor làm khi tiêu điểm đến từ bên ngoài. */
+export type SimpleEditorHandle = {
+  /** Con trỏ lên đầu nội dung, sẵn để gõ. */
+  focusStart: () => void;
+};
+
 interface SimpleEditorProps {
   content: string;
   onChange: (content: string) => void;
   stickyTop?: string | null;
+  /**
+   * Được gán khi editor dựng xong. Là prop thường chứ không phải `ref`, vì
+   * editor nằm sau `next/dynamic` và prop thường thì chắc chắn đi qua được.
+   */
+  handleRef?: React.MutableRefObject<SimpleEditorHandle | null>;
 }
 
 /**
@@ -174,7 +186,12 @@ function ToolbarButton({
   );
 }
 
-export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEditorProps) {
+export function SimpleEditor({
+  content,
+  onChange,
+  stickyTop = null,
+  handleRef,
+}: SimpleEditorProps) {
   const { uploadImage, isUploading } = useImageUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pastePrompt, setPastePrompt] = useState<PastePrompt | null>(null);
@@ -289,6 +306,14 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
       editor.commands.setContent(content || "");
     }
   }, [content, editor]);
+
+  useEffect(() => {
+    if (!editor || !handleRef) return;
+    handleRef.current = { focusStart: () => focusContentStart(editor) };
+    return () => {
+      handleRef.current = null;
+    };
+  }, [editor, handleRef]);
 
   // Keep the offer anchored to its link while the author keeps writing. Without
   // remapping, typing above the link would leave the menu pointing at whatever
