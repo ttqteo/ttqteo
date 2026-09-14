@@ -85,6 +85,7 @@ Mục đích là vừa viết bài hay quản lý bài vừa liếc được l�
 - Nút kính lúp trên header để tìm, không phân biệt hoa thường và không phân biệt dấu ("tet" tìm ra "Tết").
 - Bấm vào thẻ thì mở chế độ sửa trong panel: textarea tự giãn theo nội dung, nút quay lại, ghim, xoá. Tự lưu sau khi ngừng gõ 500ms. Chấm trạng thái giống editor: vàng là chưa lưu, xanh là đã lưu, đỏ là lỗi.
 - Note trống tự bị xoá khi rời khỏi nó. Xoá note thì có toast Undo.
+- Note dài tối đa 20.000 ký tự, bằng giới hạn của server: ô gõ không nhận thêm khi đã đủ.
 - Chân panel có link "Ghi chú riêng trong bài →" sang `/admin/notes`.
 
 ## Dữ liệu
@@ -128,7 +129,7 @@ Theo kiểu của `app/api/posts/[id]/route.ts`: chặn bằng `requireAdmin()`,
 | `DELETE /api/admin/tasks/[id]` | Xoá thật |
 | `GET /api/admin/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD[&fresh=1]` | Sự kiện đã trải ra trong khoảng ngày |
 
-`id` do trình duyệt tạo (`crypto.randomUUID()`), nên tạo mới, tự lưu, tick xong và Undo sau khi xoá đều là cùng một lệnh `PUT`. Client luôn gửi cả bản ghi, không gửi body một phần. Với task, server tự đặt `updated_at`. Với note, trình duyệt đóng dấu `updated_at` cho mỗi lần sửa và server chỉ ghi đè bản cũ hơn, nên một lần lưu tới muộn (request chậm, hay lần gửi `keepalive` lúc đóng tab) không đè được bản mới hơn; khi thua, server trả về bản đang lưu để panel hiện nó. Cách này tin vào đồng hồ của máy. Mỗi lần sửa được đóng dấu sau bản mà nó sửa lên, nên sửa tiếp trên bản đến từ một máy chạy nhanh giờ vẫn được tính là mới hơn; server từ chối dấu thời gian nhanh hơn giờ server quá 5 phút, và trả 404 nếu note bị xoá đúng lúc đang lưu. Hai lần từ chối đó mang `code` (`clock_ahead`, `note_deleted`) để panel xử lý riêng. Trong một tab, mỗi note chỉ có một request đang chạy, nên cũng không tạo lại được note vừa xoá. Giữa hai tab, bản sửa sau cùng thắng, và tab nào quay lại màn hình thì tải lại danh sách nếu không còn gì chờ lưu. Một tab cũ vẫn có thể tạo lại note vừa bị xoá ở tab khác; chặn được việc đó phải chuyển sang xoá mềm, nên chưa làm.
+`id` do trình duyệt tạo (`crypto.randomUUID()`), nên tạo mới, tự lưu, tick xong và Undo sau khi xoá đều là cùng một lệnh `PUT`. Client luôn gửi cả bản ghi, không gửi body một phần. Với task, server tự đặt `updated_at`. Với note, trình duyệt đóng dấu `updated_at` cho mỗi lần sửa và server chỉ ghi đè bản cũ hơn, nên một lần lưu tới muộn (request chậm, hay lần gửi `keepalive` lúc đóng tab) không đè được bản mới hơn; khi thua, server trả về bản đang lưu để panel hiện nó. Cách này tin vào đồng hồ của máy. Mỗi lần sửa được đóng dấu sau bản mà nó sửa lên, nên sửa tiếp trên bản đến từ một máy chạy nhanh giờ vẫn được tính là mới hơn; server từ chối dấu thời gian nhanh hơn giờ server quá 5 phút, và trả 404 nếu note bị xoá đúng lúc đang lưu. Hai lần từ chối đó mang `code` (`clock_ahead`, `note_deleted`) để panel xử lý riêng. Trong một tab, mỗi note chỉ có một request đang chạy, nên cũng không tạo lại được note vừa xoá. Giữa hai tab, bản sửa sau cùng thắng, và tab nào quay lại màn hình, hay mở lại panel Ghi nhanh, thì tải lại danh sách nếu không còn gì chờ lưu. Một tab cũ vẫn có thể tạo lại note vừa bị xoá ở tab khác; chặn được việc đó phải chuyển sang xoá mềm, nên chưa làm.
 
 ## Nguồn lịch Google
 
@@ -165,8 +166,11 @@ Route calendar:
 
 - Sửa note và task: giao diện đổi ngay trước khi server trả lời. Server lỗi thì trả về như cũ và báo bằng toast.
 - Tự lưu note lỗi: chấm đỏ, chữ vẫn nằm nguyên, lần gõ sau lưu lại. Thẻ note giữ chấm đỏ cho tới khi lưu được.
-- Giờ trên máy nhanh hơn server quá 5 phút: lần lưu note bị từ chối, toast nhắc chỉnh lại giờ máy.
-- 401 hoặc 403: một toast "Cần đăng nhập lại" không tự tắt, kèm nút tải lại trang. Đăng nhập lại ở tab khác rồi lưu lại thì giữ được chữ chưa lưu.
+- Giờ trên máy nhanh hơn server quá 5 phút: lần lưu note bị từ chối, toast nhắc chỉnh lại giờ máy. Chỉnh giờ xong, lần lưu sau đóng dấu lại từ bản server đang giữ.
+- Lần lưu note thua bản mới hơn từ tab hay máy khác: panel hiện bản mới hơn, kèm toast "Note này vừa được sửa ở nơi khác".
+- Note bị xoá ở nơi khác đúng lúc đang lưu: panel bỏ note khỏi danh sách, kèm toast.
+- Đóng tab khi còn chữ chưa lưu: gửi nốt bằng `keepalive`, note sửa gần nhất trước, trong 64 KiB trình duyệt cho phép. Note quá lớn so với phần còn lại thì bỏ qua.
+- 401 hoặc 403: một toast "Cần đăng nhập lại" không tự tắt, kèm nút tải lại trang. Đăng nhập lại ở tab khác rồi lưu lại thì giữ được chữ chưa lưu. Toast tự gỡ khi có request đi qua được trở lại.
 - Server trả về thứ không đọc được (như trang lỗi HTML của nền tảng): báo lỗi theo mã trạng thái, không coi là thành công.
 - Supabase báo bảng không tồn tại: panel ghi rõ cần chạy `supabase/add_admin_side_panel.sql`.
 - Calendar: lịch tải hỏng hiện dòng "Không tải được: MIT". Thiếu hoặc sai `ADMIN_CALENDAR_FEEDS`: panel vẫn hiện task theo ngày, kèm hướng dẫn cấu hình.
@@ -181,7 +185,7 @@ Route calendar:
 | `lib/admin-db.ts` | Mới: nhận ra lỗi thiếu bảng, kiểm uuid, đọc timestamp |
 | `lib/admin-api.ts` | Mới: `requireAdmin`, `badRequest`, `dbError` cho các route |
 | `lib/admin-fetch.ts` | Mới: fetch JSON cho panel, phân loại lỗi (hết phiên, thiếu bảng, mạng, server) |
-| `lib/admin-notes.ts` | Mới: tiêu đề, xem trước, sắp xếp, tìm, kiểm body của `PUT` |
+| `lib/admin-notes.ts` | Mới: tiêu đề, xem trước, sắp xếp, tìm, kiểm và dựng body của `PUT`, đóng dấu lần sửa, chọn phần gửi bằng `keepalive` |
 | `lib/admin-tasks.ts` | Mới: chia nhóm, số trên badge, hạn nhanh, nhãn hạn, kiểm body của `PUT` |
 | `lib/calendar-events.ts` | Mới: kiểu sự kiện, lọc theo ngày, khoảng ngày của một tháng, nhãn |
 | `lib/calendar-feed.ts` | Mới, chỉ server: đọc cấu hình, trải ICS bằng `ical.js` |
@@ -205,7 +209,7 @@ Vitest cho hàm thuần trong `lib/`, và cho cổng admin trong `lib/admin-api.
 
 - `calendar-feed`: sự kiện lặp hằng tuần, EXDATE, buổi bị dời, sự kiện cả ngày, sự kiện qua nửa đêm (22:30 tới 00:15 hiện ở cả hai ngày), múi giờ Asia/Ho_Chi_Minh, cấu hình sai hoặc thiếu field.
 - `admin-tasks`: chia nhóm theo một "hôm nay" cố định, bỏ task xong quá 7 ngày, số trên badge bằng quá hạn cộng hôm nay.
-- `admin-notes`: tiêu đề và xem trước từ dòng không trống đầu tiên, note ghim lên đầu, tìm không phân biệt hoa thường và dấu.
+- `admin-notes`: tiêu đề và xem trước từ dòng không trống đầu tiên, note ghim lên đầu, tìm không phân biệt hoa thường và dấu, body `PUT` client gửi đi được `parseNoteInput` nhận, dấu thời gian luôn sau bản trước kể cả khi đồng hồ máy chậm hơn, và phần gửi bằng `keepalive` lấy note sửa gần nhất trước, tính theo byte.
 - `google-calendar-link`: link cho một ngày trọn vẹn, ngày kết thúc tính loại trừ.
 - `admin-api`: thiếu `ADMIN_EMAIL` thì không ai là admin; `requireAdmin` trả 401 khi chưa đăng nhập, 403 với người khác, và chỉ hỏi user một lần; lỗi thiếu bảng thành `missing_table`.
 

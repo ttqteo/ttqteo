@@ -1327,7 +1327,7 @@ git commit -m "feat: recognise a missing table and check ids for the admin route
 - Modify: `lib/supabase-server.ts`
 - Test: `lib/admin-api.test.ts`
 
-Test chỉ giả `getUser`, lời gọi mạng tới Supabase Auth; `isAdminUser`, `requireAdmin` và `dbError` chạy thật.
+Test chỉ giả `getUser`, lời gọi mạng tới Supabase Auth; mọi thứ khác chạy thật.
 
 **Step 1: Viết code**
 
@@ -1411,8 +1411,7 @@ Thay hai dòng comment trên `export const getUser` bằng:
 ```ts
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// Only the network call to Supabase Auth is faked; isAdminUser, requireAdmin
-// and dbError run as they are.
+// Only the network call to Supabase Auth is faked; everything else runs as it is.
 const { getUser } = vi.hoisted(() => ({ getUser: vi.fn() }));
 vi.mock("@/lib/supabase-server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/supabase-server")>()),
@@ -2059,6 +2058,16 @@ describe("adminFetch", () => {
     expect(headers.get("content-type")).toBe("application/json");
   });
 
+  it("keeps a content type the caller set", async () => {
+    const fetchMock = respondJson(200, {});
+    await adminFetch("/api/admin/notes/1", {
+      method: "PUT",
+      body: "{}",
+      headers: [["content-type", "text/plain"]],
+    });
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get("content-type")).toBe("text/plain");
+  });
+
   it.each([401, 403])("reports %i as a sign-in to renew", async (status) => {
     respondJson(status, { error: "Unauthorized" });
     const error = await adminFetch("/api/admin/notes").catch((e: unknown) => e);
@@ -2106,6 +2115,11 @@ describe("adminFetch", () => {
     await expect(adminFetch("/api/admin/notes/1", { method: "DELETE" })).resolves.toBeUndefined();
   });
 
+  it("resolves a JSON null as null", async () => {
+    respondWith(200, "null");
+    await expect(adminFetch("/api/admin/notes")).resolves.toBeNull();
+  });
+
   it("reports a request that never reached the server", async () => {
     const cause = new TypeError("Failed to fetch");
     vi.stubGlobal(
@@ -2116,7 +2130,8 @@ describe("adminFetch", () => {
     );
     const error = await adminFetch("/api/admin/notes").catch((e: unknown) => e);
     expect(error).toBeInstanceOf(AdminFetchError);
-    expect(error).toMatchObject({ kind: "network", cause });
+    expect(error).toMatchObject({ kind: "network" });
+    expect((error as Error).cause).toBe(cause);
   });
 });
 ```
@@ -2202,7 +2217,7 @@ export async function adminFetch<T>(
 **Step 4: Chạy lại**
 
 Run: `pnpm vitest run lib/admin-fetch.test.ts`
-Expected: PASS, 13 tests.
+Expected: PASS, 15 tests.
 
 **Step 5: Ba file nhỏ cho panel**
 
@@ -2213,7 +2228,7 @@ Expected: PASS, 13 tests.
 export type LoadStatus = "idle" | "loading" | "ready" | "missing_table" | "error";
 ```
 
-`components/admin/side-panel/report-admin-error.ts`. Hết phiên (hay tài khoản không phải admin) thì một toast duy nhất, không tự tắt. Đăng nhập lại ở tab khác rồi lưu lại thì giữ được chữ chưa lưu; tải lại trang thì mất phần đó. Tải lại là tải cả trang chứ không điều hướng client, vì server mới là nơi quyết định có hiện màn đăng nhập hay không, và nó chỉ hỏi ở một request mới.
+`components/admin/side-panel/report-admin-error.ts`. Hết phiên (hay tài khoản không phải admin) thì một toast duy nhất, không tự tắt, và tự gỡ khi có request đi qua được (`clearAdminSession`). Đăng nhập lại ở tab khác rồi lưu lại thì giữ được chữ chưa lưu; tải lại trang thì mất phần đó. Tải lại là tải cả trang chứ không điều hướng client, vì server mới là nơi quyết định có hiện màn đăng nhập hay không, và nó chỉ hỏi ở một request mới.
 
 ```ts
 "use client";
@@ -2221,20 +2236,29 @@ export type LoadStatus = "idle" | "loading" | "ready" | "missing_table" | "error
 import { AdminFetchError } from "@/lib/admin-fetch";
 import { toast } from "sonner";
 
+const SESSION_TOAST = "admin-session";
+// Whether the sign-in toast is up, so a request that gets through can take it down.
+let sessionToastUp = false;
+
 /** One toast for a failed side-panel request, with a way back in when the session lapsed. */
 export function reportAdminError(error: unknown, action: string): void {
   if (error instanceof AdminFetchError && error.kind === "auth") {
-    // One toast however many stores hit this, kept until dismissed: it is the
-    // only word on why saves stop. Signing in again in another tab keeps the
-    // unsaved text, since the cookies are shared. A reload here loses it, and
-    // is a full reload rather than a client navigation because the server
-    // decides whether the login screen is due, and only on a fresh request.
+    // One toast however many stores hit this, kept until dismissed or until a
+    // request gets through again (clearAdminSession): it is the only word on
+    // why saves stop. Signing in again in another tab keeps the unsaved text,
+    // since the cookies are shared. A reload here loses it, and is a full
+    // reload rather than a client navigation because the server decides
+    // whether the login screen is due, and only on a fresh request.
+    sessionToastUp = true;
     toast.error("Cần đăng nhập lại", {
-      id: "admin-session",
+      id: SESSION_TOAST,
       duration: Infinity,
       description:
-        "Đăng nhập lại bằng tài khoản admin ở tab khác rồi lưu lại để giữ chữ chưa lưu, hoặc tải lại trang.",
+        "Đăng nhập lại bằng tài khoản admin ở tab khác rồi lưu lại để giữ chữ chưa lưu. Tải lại trang thì mất phần chưa lưu.",
       action: { label: "Tải lại", onClick: () => window.location.reload() },
+      onDismiss: () => {
+        sessionToastUp = false;
+      },
     });
     return;
   }
@@ -2244,6 +2268,13 @@ export function reportAdminError(error: unknown, action: string): void {
   toast.error(`${action} không thành công`, {
     description: error instanceof AdminFetchError ? error.message : "Có lỗi không mong đợi.",
   });
+}
+
+/** Takes the sign-in toast down once a request gets through again. */
+export function clearAdminSession(): void {
+  if (!sessionToastUp) return;
+  sessionToastUp = false;
+  toast.dismiss(SESSION_TOAST);
 }
 ```
 
@@ -2298,23 +2329,184 @@ git commit -m "feat: typed fetch errors and notices for the side panel"
 **Files:**
 - Create: `components/admin/side-panel/use-notes-store.ts`
 - Modify: `components/admin/side-panel/side-panel-provider.tsx`
+- Modify: `lib/admin-notes.ts`
+- Test: `lib/admin-notes.test.ts`
 
 Những điểm dễ sai trong file này:
 - Mỗi note chỉ có một request đang chạy (`enqueue`). Thiếu nó thì lần lưu chậm có thể tới sau lần lưu mới hơn, hoặc tạo lại note vừa xoá.
+- Mỗi lần lưu gửi kèm `updated_at` của lần sửa đó (`noteSaveBody`), đóng dấu sau bản mà nó sửa lên (`nextStamp`), và server chỉ giữ bản mới nhất. Server trả về bản mới hơn thì kho hiện bản đó, trừ khi đã có lần sửa mới hơn đang chờ lưu.
+- Server từ chối dấu vì giờ máy nhanh (`clock_ahead`) thì lần lưu sau đóng dấu lại từ bản server đang giữ, không từ dấu bị từ chối; nếu không, chỉnh giờ xong vẫn bị từ chối cho tới khi giờ thật đuổi kịp. Note bị xoá ở nơi khác (`note_deleted`) thì bỏ khỏi danh sách, và lần lưu còn xếp hàng của nó không được gửi.
+- Hai lần lưu của một note cùng hỏng thì chỉ bản mới nhất đã gửi được giữ lại để thử lại (`latest`); nếu không, lần thử lại đưa chữ cũ hơn trở lại màn hình.
+- Danh sách chỉ tải lại (khi quay lại tab, hay mở lại panel) lúc không còn gì chờ lưu hay đang gửi, và bỏ kết quả nếu trong lúc tải có gì đổi ở đây. Nếu không, danh sách đọc trước khi một lần lưu tới nơi sẽ đưa chữ cũ trở lại màn hình, và lần gõ sau lưu đè lên bản mới hơn.
 - Lần nạp đầu không gọi setState trước khi request đi (`status` giữ `"idle"` tới khi có kết quả). Gọi `setStatus("loading")` trong effect sẽ thêm warning `react-hooks/set-state-in-effect`.
-- `pagehide` gửi lại các note chưa lưu bằng `keepalive`, để đóng tab trong nửa giây sau khi gõ không mất chữ.
+- `pagehide` gửi lại các note chưa lưu bằng `keepalive`, để đóng tab trong nửa giây sau khi gõ không mất chữ. Trình duyệt chỉ cho tổng cộng 64 KiB, nên `keepaliveSaves` lấy note sửa gần nhất trước và tính theo byte.
 
-**Step 1: Viết kho**
+**Step 1: Test cho ba hàm thuần**
+
+Trong `lib/admin-notes.test.ts`, khối import thêm `keepaliveSaves`, `nextStamp` và `noteSaveBody`, và ba khối `describe` sau được thêm vào cuối file:
+
+```ts
+import {
+  CLOCK_AHEAD,
+  filterNotes,
+  foldText,
+  isBlankNote,
+  keepaliveSaves,
+  MAX_CLOCK_AHEAD_MS,
+  MAX_NOTE_LENGTH,
+  nextStamp,
+  notePreview,
+  noteSaveBody,
+  noteTitle,
+  parseNoteInput,
+  sortNotes,
+  type AdminNote,
+} from "@/lib/admin-notes";
+```
+
+```ts
+describe("noteSaveBody", () => {
+  it("is a body the PUT accepts, with the edit's time", () => {
+    const saved = note({ body: "Mua đồ Tết", pinned: true, updated_at: "2026-09-11T03:00:00.000Z" });
+    expect(parseNoteInput(JSON.parse(noteSaveBody(saved)))).toEqual({
+      ok: true,
+      input: {
+        body: "Mua đồ Tết",
+        pinned: true,
+        updated_at: "2026-09-11T03:00:00.000Z",
+        created_at: "2026-09-01T00:00:00.000Z",
+      },
+    });
+  });
+});
+
+describe("keepaliveSaves", () => {
+  const edited = (body: string, updated_at: string) => note({ body, updated_at });
+
+  it("sends the newest edit first", () => {
+    const saves = keepaliveSaves(
+      [edited("old", "2026-09-11T01:00:00.000Z"), edited("new", "2026-09-11T02:00:00.000Z")],
+      60_000,
+    );
+    expect(saves.map((save) => save.id)).toEqual(["new", "old"]);
+  });
+
+  it("skips a note too big for what is left, and still sends a smaller one", () => {
+    const saves = keepaliveSaves(
+      [edited("x".repeat(500), "2026-09-11T02:00:00.000Z"), edited("nhỏ", "2026-09-11T01:00:00.000Z")],
+      300,
+    );
+    expect(saves.map((save) => save.id)).toEqual(["nhỏ"]);
+  });
+
+  it("counts bytes, not characters", () => {
+    // "ệ" is one character and three bytes in UTF-8.
+    const long = edited("ệ".repeat(100), "2026-09-11T01:00:00.000Z");
+    const characters = noteSaveBody(long).length;
+    expect(keepaliveSaves([long], characters)).toEqual([]);
+    expect(keepaliveSaves([long], characters + 200)).toHaveLength(1);
+  });
+});
+
+describe("nextStamp", () => {
+  const NOW = Date.parse("2026-09-11T03:00:00.000Z");
+
+  it("is now, for a version stamped earlier", () => {
+    expect(nextStamp("2026-09-11T02:59:00.000Z", NOW)).toBe("2026-09-11T03:00:00.000Z");
+  });
+
+  it("comes just after a version stamped by a clock running fast", () => {
+    expect(nextStamp("2026-09-11T03:04:00.000Z", NOW)).toBe("2026-09-11T03:04:00.001Z");
+  });
+
+  it("comes after a Postgres stamp with microseconds", () => {
+    expect(nextStamp("2026-09-11T03:00:00.000500+00:00", NOW)).toBe("2026-09-11T03:00:00.001Z");
+  });
+});
+```
+
+**Step 2: Chạy để thấy fail**
+
+Run: `pnpm vitest run lib/admin-notes.test.ts`
+Expected: FAIL ở 7 test mới, vì `noteSaveBody`, `nextStamp` và `keepaliveSaves` chưa có.
+
+**Step 3: Ba hàm trong `lib/admin-notes.ts`**
+
+Thêm vào cuối file:
+
+```ts
+/** The PUT body for a note: what parseNoteInput reads, this edit's time included. */
+export function noteSaveBody(note: AdminNote): string {
+  return JSON.stringify({
+    body: note.body,
+    pinned: note.pinned,
+    updated_at: note.updated_at,
+    created_at: note.created_at,
+  });
+}
+
+/**
+ * The stamp for an edit made on top of a version stamped `previous`: now, or
+ * a millisecond after `previous` when this device's clock is behind it. The
+ * newest edit wins, so an edit on a version from a clock running fast must
+ * still count as newer, and two edits in one millisecond must not tie.
+ */
+export function nextStamp(previous: string, now = Date.now()): string {
+  const after = Date.parse(previous) + 1;
+  return new Date(Number.isNaN(after) ? now : Math.max(now, after)).toISOString();
+}
+
+/**
+ * What to send with keepalive as the page goes away. Browsers refuse keepalive
+ * requests past 64 KiB in flight altogether, so this takes the newest edits
+ * first, within `budget` bytes, and skips a note too big for what is left so
+ * that smaller ones behind it still go.
+ */
+export function keepaliveSaves(
+  notes: AdminNote[],
+  budget: number,
+): { id: string; body: string }[] {
+  const encoder = new TextEncoder();
+  const saves: { id: string; body: string }[] = [];
+  let left = budget;
+  const newestFirst = [...notes].sort(
+    (a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at),
+  );
+  for (const note of newestFirst) {
+    const body = noteSaveBody(note);
+    const size = encoder.encode(body).length;
+    if (size > left) continue;
+    left -= size;
+    saves.push({ id: note.id, body });
+  }
+  return saves;
+}
+```
+
+**Step 4: Chạy lại**
+
+Run: `pnpm vitest run lib/admin-notes.test.ts`
+Expected: PASS, 37 tests.
+
+**Step 5: Viết kho**
 
 ```ts
 "use client";
 
 import { AdminFetchError, adminFetch } from "@/lib/admin-fetch";
-import { isBlankNote, type AdminNote } from "@/lib/admin-notes";
+import {
+  CLOCK_AHEAD,
+  isBlankNote,
+  keepaliveSaves,
+  nextStamp,
+  NOTE_DELETED,
+  noteSaveBody,
+  type AdminNote,
+} from "@/lib/admin-notes";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { LoadStatus } from "./load-status";
-import { reportAdminError } from "./report-admin-error";
+import { clearAdminSession, reportAdminError } from "./report-admin-error";
 
 export type SaveState = "dirty" | "saving" | "saved" | "error";
 
@@ -2334,16 +2526,20 @@ export type NotesStore = {
 };
 
 const AUTOSAVE_MS = 500;
+// Under the 64 KiB browsers allow for keepalive requests in flight at once.
+const KEEPALIVE_BUDGET = 60_000;
 
 const noteUrl = (id: string) => `/api/admin/notes/${id}`;
-const noteJson = (note: AdminNote) =>
-  JSON.stringify({ body: note.body, pinned: note.pinned, created_at: note.created_at });
-const stamp = () => new Date().toISOString();
 
 /**
  * The notes behind Ghi nhanh. Typing autosaves half a second after the last
- * key; each note sends one request at a time, so a slow save can never land
- * after a newer one or after the note's delete.
+ * key, and each note sends one request at a time. Every edit is stamped just
+ * after the version it was made on, and the server keeps the newest, so a
+ * save that arrives late (the keepalive as a tab closes, another tab) cannot
+ * overwrite a newer one; when it loses, the newer version shows here too, and
+ * a note deleted elsewhere leaves here. The list is fetched again when the tab
+ * comes back or the panel opens again, but only while nothing here is waiting
+ * to save.
  */
 export function useNotesStore(enabled: boolean): NotesStore {
   const [status, setStatus] = useState<LoadStatus>("idle");
@@ -2352,10 +2548,22 @@ export function useNotesStore(enabled: boolean): NotesStore {
 
   // Read by timers and queued requests, never by render, so refs rather than state.
   const pending = useRef(new Map<string, AdminNote>()); // latest unsaved version of each note
+  const latest = useRef(new Map<string, AdminNote>()); // newest version handed to a request
   const timers = useRef(new Map<string, number>());
   const queues = useRef(new Map<string, Promise<unknown>>()); // the request each note has in flight
-  const bodies = useRef(new Map<string, string>()); // latest text of each note, for discardIfBlank
+  const inFlight = useRef(0); // requests queued or sent and not yet settled, all notes together
+  const bodies = useRef(new Map<string, string>()); // latest text of each note still in the list
   const failing = useRef(new Set<string>()); // notes whose failure has been toasted already
+  const accepted = useRef(new Map<string, string>()); // stamp of the version the server holds
+  const clockRefused = useRef(new Set<string>()); // notes whose last stamp was refused as ahead
+  const loaded = useRef(false); // the first list is in
+  const changes = useRef(0); // counts changes made to the list here
+
+  /** setNotes for a change made here, so a list fetched meanwhile knows it is stale. */
+  const changeNotes = useCallback((update: (list: AdminNote[]) => AdminNote[]) => {
+    changes.current += 1;
+    setNotes(update);
+  }, []);
 
   const setState = useCallback((id: string, state: SaveState | null) => {
     setSaveState((states) => {
@@ -2367,33 +2575,108 @@ export function useNotesStore(enabled: boolean): NotesStore {
   }, []);
 
   /** Runs `request` once whatever this note already has in flight has settled. */
-  const enqueue = useCallback((id: string, request: () => Promise<unknown>) => {
+  const enqueue = useCallback(<T>(id: string, request: () => Promise<T>): Promise<T> => {
+    inFlight.current += 1;
     const run = (queues.current.get(id) ?? Promise.resolve()).then(request);
     queues.current.set(
       id,
-      run.catch(() => undefined),
+      run
+        .catch(() => undefined)
+        .finally(() => {
+          inFlight.current -= 1;
+        }),
     );
     return run;
   }, []);
+
+  /**
+   * The stamp for an edit of `note`: just after its version, unless the server
+   * refused that stamp as ahead of its clock. Then just after the version the
+   * server holds, so a clock put right is not held back by what it stamped
+   * while it was wrong.
+   */
+  const stampFor = useCallback((note: AdminNote) => {
+    if (!clockRefused.current.has(note.id)) return nextStamp(note.updated_at);
+    clockRefused.current.delete(note.id);
+    return nextStamp(accepted.current.get(note.id) ?? "");
+  }, []);
+
+  /** Drops the note from the list and from everything waiting to save it. */
+  const forget = useCallback(
+    (id: string) => {
+      window.clearTimeout(timers.current.get(id));
+      timers.current.delete(id);
+      pending.current.delete(id);
+      latest.current.delete(id);
+      bodies.current.delete(id);
+      failing.current.delete(id);
+      accepted.current.delete(id);
+      clockRefused.current.delete(id);
+      setState(id, null);
+      changeNotes((list) => list.filter((n) => n.id !== id));
+    },
+    [changeNotes, setState],
+  );
 
   const flush = useCallback(
     (id: string) => {
       window.clearTimeout(timers.current.get(id));
       timers.current.delete(id);
-      const note = pending.current.get(id);
+      let note = pending.current.get(id);
       if (!note) return;
       pending.current.delete(id);
+      if (clockRefused.current.has(id)) {
+        // A retry after its stamp was refused as ahead of the server's clock:
+        // stamp it again, now that the clock may have been put right.
+        const restamped = { ...note, updated_at: stampFor(note) };
+        changeNotes((list) => list.map((n) => (n.id === id ? restamped : n)));
+        note = restamped;
+      }
+      const sent = note;
+      latest.current.set(id, sent);
       setState(id, "saving");
 
-      enqueue(id, () => adminFetch(noteUrl(id), { method: "PUT", body: noteJson(note) })).then(
-        () => {
+      enqueue(id, () =>
+        // Forgotten while this waited its turn (deleted here, or elsewhere):
+        // sending it would put the row back.
+        bodies.current.has(id)
+          ? adminFetch<{ note: AdminNote }>(noteUrl(id), { method: "PUT", body: noteSaveBody(sent) })
+          : Promise.reject(new Error("forgotten")),
+      ).then(
+        ({ note: stored }) => {
+          clearAdminSession();
           failing.current.delete(id);
-          // An edit made while this was in flight reports its own state.
-          if (!pending.current.has(id)) setState(id, "saved");
+          // Deleted here meanwhile: nothing left to show.
+          if (!bodies.current.has(id)) return;
+          accepted.current.set(id, stored.updated_at);
+          // An edit made while this was in flight reports its own state, and
+          // its own save decides which version stays.
+          if (pending.current.has(id)) return;
+          setState(id, "saved");
+          // The server kept a newer version, saved in another tab or on another
+          // device: show that one.
+          if (Date.parse(stored.updated_at) <= Date.parse(sent.updated_at)) return;
+          bodies.current.set(id, stored.body);
+          changeNotes((list) => list.map((n) => (n.id === id ? stored : n)));
+          toast("Note này vừa được sửa ở nơi khác", { description: "Đang hiện bản mới hơn." });
         },
         (error) => {
-          // Keep the text in line: the next keystroke, or a click on the dot, retries.
-          if (!pending.current.has(id)) pending.current.set(id, note);
+          // Deleted here meanwhile: nothing left to save.
+          if (!bodies.current.has(id)) return;
+          const code = error instanceof AdminFetchError ? error.code : undefined;
+          if (code === NOTE_DELETED) {
+            // Deleted in another tab or on another device, the newest change of all.
+            forget(id);
+            toast("Note này vừa bị xoá ở nơi khác");
+            return;
+          }
+          if (code === CLOCK_AHEAD) clockRefused.current.add(id);
+          // Keep the text in line: the next keystroke, or a click on the dot,
+          // retries. Only the newest version sent goes back, never an older
+          // one whose failure came in after a newer one was sent.
+          if (!pending.current.has(id) && latest.current.get(id) === sent) {
+            pending.current.set(id, sent);
+          }
           setState(id, "error");
           if (!failing.current.has(id)) {
             failing.current.add(id);
@@ -2402,7 +2685,7 @@ export function useNotesStore(enabled: boolean): NotesStore {
         },
       );
     },
-    [enqueue, setState],
+    [enqueue, setState, changeNotes, stampFor, forget],
   );
 
   const schedule = useCallback(
@@ -2419,36 +2702,78 @@ export function useNotesStore(enabled: boolean): NotesStore {
     [flush, setState],
   );
 
-  const fetchNotes = useCallback(async () => {
+  /**
+   * `background`: a refresh under a list already showing. It keeps that list
+   * if it fails, and gives way to any change made here while it was loading.
+   */
+  const fetchNotes = useCallback(async (background = false) => {
+    const changesBefore = changes.current;
     try {
       const data = await adminFetch<{ notes: AdminNote[] }>("/api/admin/notes");
+      clearAdminSession();
+      if (background && changes.current !== changesBefore) return;
       bodies.current = new Map(data.notes.map((note) => [note.id, note.body]));
+      accepted.current = new Map(data.notes.map((note) => [note.id, note.updated_at]));
       setNotes(data.notes);
+      loaded.current = true;
       setStatus("ready");
     } catch (error) {
-      const missing = error instanceof AdminFetchError && error.kind === "missing_table";
-      setStatus(missing ? "missing_table" : "error");
-      if (!missing) reportAdminError(error, "Tải ghi nhanh");
+      const kind = error instanceof AdminFetchError ? error.kind : null;
+      if (background) {
+        // The list already showing stays; only a lapsed session is worth a word.
+        if (kind === "auth") reportAdminError(error, "Tải ghi nhanh");
+        return;
+      }
+      setStatus(kind === "missing_table" ? "missing_table" : "error");
+      if (kind !== "missing_table") reportAdminError(error, "Tải ghi nhanh");
     }
   }, []);
 
-  // The first load, once the panel is showing. Status stays "idle" until the
-  // answer is in, so nothing sets state before the request goes out.
+  /** The list again, once it has loaded, and only while nothing here is waiting to save. */
+  const refresh = useCallback(() => {
+    if (!loaded.current || pending.current.size > 0 || inFlight.current > 0) return;
+    void fetchNotes(true);
+  }, [fetchNotes]);
+
+  // The first load once the panel is showing, then a refresh each time it
+  // shows again. Status stays "idle" until the first answer is in, so nothing
+  // sets state before the request goes out.
   const started = useRef(false);
   useEffect(() => {
-    if (!enabled || started.current) return;
+    if (!enabled) return;
+    if (started.current) {
+      refresh();
+      return;
+    }
     started.current = true;
     void fetchNotes();
-  }, [enabled, fetchNotes]);
+  }, [enabled, fetchNotes, refresh]);
+
+  // Back to this tab: another tab may have changed the notes meanwhile.
+  useEffect(() => {
+    if (!enabled) return;
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [enabled, refresh]);
 
   // A tab closed inside the autosave delay would lose the last half second of
-  // typing. keepalive lets those requests outlive the page.
+  // typing. keepalive lets those saves outlive the page; keepaliveSaves keeps
+  // them under the browser's limit, newest edit first. A note whose stamp was
+  // refused as ahead of the server's clock goes out stamped again.
   useEffect(() => {
     const onPageHide = () => {
-      for (const [id, note] of pending.current) {
-        void fetch(noteUrl(id), {
+      const unsaved = [...pending.current.values()].map((note) =>
+        clockRefused.current.has(note.id)
+          ? { ...note, updated_at: nextStamp(accepted.current.get(note.id) ?? "") }
+          : note,
+      );
+      for (const save of keepaliveSaves(unsaved, KEEPALIVE_BUDGET)) {
+        void fetch(noteUrl(save.id), {
           method: "PUT",
-          body: noteJson(note),
+          body: save.body,
           headers: { "Content-Type": "application/json" },
           keepalive: true,
         }).catch(() => undefined);
@@ -2460,7 +2785,7 @@ export function useNotesStore(enabled: boolean): NotesStore {
 
   const create = useCallback(
     (body: string) => {
-      const now = stamp();
+      const now = new Date().toISOString();
       const note: AdminNote = {
         id: crypto.randomUUID(),
         body,
@@ -2468,71 +2793,62 @@ export function useNotesStore(enabled: boolean): NotesStore {
         created_at: now,
         updated_at: now,
       };
-      setNotes((list) => [note, ...list]);
+      changeNotes((list) => [note, ...list]);
       schedule(note);
       return note;
     },
-    [schedule],
+    [changeNotes, schedule],
   );
 
   const edit = useCallback(
     (note: AdminNote, body: string) => {
-      const next = { ...note, body, updated_at: stamp() };
-      setNotes((list) => list.map((n) => (n.id === note.id ? next : n)));
+      const next = { ...note, body, updated_at: stampFor(note) };
+      changeNotes((list) => list.map((n) => (n.id === note.id ? next : n)));
       schedule(next);
     },
-    [schedule],
+    [changeNotes, schedule, stampFor],
   );
 
   const togglePin = useCallback(
     (note: AdminNote) => {
-      const next = { ...note, pinned: !note.pinned, updated_at: stamp() };
-      setNotes((list) => list.map((n) => (n.id === note.id ? next : n)));
+      const next = { ...note, pinned: !note.pinned, updated_at: stampFor(note) };
+      changeNotes((list) => list.map((n) => (n.id === note.id ? next : n)));
       schedule(next);
       flush(next.id);
     },
-    [schedule, flush],
-  );
-
-  /** Drops the note from the list and from everything waiting to save it. */
-  const forget = useCallback(
-    (id: string) => {
-      window.clearTimeout(timers.current.get(id));
-      timers.current.delete(id);
-      pending.current.delete(id);
-      bodies.current.delete(id);
-      failing.current.delete(id);
-      setState(id, null);
-      setNotes((list) => list.filter((n) => n.id !== id));
-    },
-    [setState],
+    [changeNotes, schedule, flush, stampFor],
   );
 
   const restore = useCallback(
     (note: AdminNote) => {
-      setNotes((list) => [note, ...list.filter((n) => n.id !== note.id)]);
+      changeNotes((list) => [note, ...list.filter((n) => n.id !== note.id)]);
       schedule(note);
       flush(note.id);
     },
-    [schedule, flush],
+    [changeNotes, schedule, flush],
   );
 
   const remove = useCallback(
     (note: AdminNote) => {
+      const acceptedStamp = accepted.current.get(note.id);
       forget(note.id);
       enqueue(note.id, () => adminFetch(noteUrl(note.id), { method: "DELETE" })).then(
-        () =>
+        () => {
+          clearAdminSession();
           toast.success("Đã xoá note", {
             action: { label: "Undo", onClick: () => restore(note) },
-          }),
+          });
+        },
         (error) => {
+          // Still on the server: back in the list, as the server knows it.
           bodies.current.set(note.id, note.body);
-          setNotes((list) => [note, ...list]);
+          if (acceptedStamp) accepted.current.set(note.id, acceptedStamp);
+          changeNotes((list) => [note, ...list]);
           reportAdminError(error, "Xoá note");
         },
       );
     },
-    [forget, enqueue, restore],
+    [forget, enqueue, restore, changeNotes],
   );
 
   const discardIfBlank = useCallback(
@@ -2569,7 +2885,7 @@ export function useNotesStore(enabled: boolean): NotesStore {
 }
 ```
 
-**Step 2: Nối vào provider**
+**Step 6: Nối vào provider**
 
 Trong `side-panel-provider.tsx`:
 
@@ -2594,15 +2910,15 @@ Thêm ngay trước `const value = useMemo(`:
 
 Thêm `notes` vào object trong `useMemo` và vào mảng deps của nó.
 
-**Step 3: Kiểm**
+**Step 7: Kiểm**
 
 Run: `pnpm exec tsc --noEmit` rồi `pnpm lint`
 Expected: không lỗi kiểu; lint vẫn 0 error, 36 warning như trên master.
 
-**Step 4: Commit**
+**Step 8: Commit**
 
 ```bash
-git add components/admin/side-panel/use-notes-store.ts components/admin/side-panel/side-panel-provider.tsx
+git add lib/admin-notes.ts lib/admin-notes.test.ts components/admin/side-panel/use-notes-store.ts components/admin/side-panel/side-panel-provider.tsx
 git commit -m "feat: quick note store with autosave, one request per note at a time"
 ```
 
@@ -2614,7 +2930,7 @@ git commit -m "feat: quick note store with autosave, one request per note at a t
 
 **Step 1: Panel**
 
-Ô "Ghi gì đó…" để bộ gõ IME gõ xong cả chữ rồi mới chuyển sang textarea (`onCompositionEnd`). Nếu chuyển giữa chừng, chữ đang gõ có dấu sẽ bị cắt đôi. Rời một note, bằng nút quay lại hay bằng cách đóng panel, sẽ lưu phần còn chờ và xoá note nếu nó trống (effect cleanup theo `editingId`).
+Ô "Ghi gì đó…" để bộ gõ IME gõ xong cả chữ rồi mới chuyển sang textarea (`onCompositionEnd`). Nếu chuyển giữa chừng, chữ đang gõ có dấu sẽ bị cắt đôi. Rời một note, bằng nút quay lại hay bằng cách đóng panel, sẽ lưu phần còn chờ và xoá note nếu nó trống (effect cleanup theo `editingId`). Ô ghi và textarea có `maxLength` bằng `MAX_NOTE_LENGTH`, để trình duyệt dừng ở giới hạn của server thay vì để mọi lần lưu đều bị từ chối.
 
 ```tsx
 "use client";
@@ -2623,6 +2939,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   filterNotes,
+  MAX_NOTE_LENGTH,
   notePreview,
   noteTitle,
   sortNotes,
@@ -2778,6 +3095,7 @@ function CaptureBox({
       ref={input}
       value={draft}
       disabled={disabled}
+      maxLength={MAX_NOTE_LENGTH}
       placeholder="Ghi gì đó…"
       className="h-9"
       onCompositionStart={() => {
@@ -2932,6 +3250,7 @@ function NoteEditor({
         ref={textarea}
         value={note.body}
         onChange={(event) => notes.edit(note, event.target.value)}
+        maxLength={MAX_NOTE_LENGTH}
         placeholder="Ghi gì đó…"
         rows={6}
         className="w-full flex-1 resize-none bg-transparent px-4 py-3 text-sm leading-relaxed outline-none"
@@ -2982,6 +3301,9 @@ git commit -m "feat: Ghi nhanh panel in the admin sidebar"
 7. DevTools → Network → Offline, gõ vào một note: chấm đỏ và đúng một toast. Online lại, gõ tiếp: chấm xanh.
 8. Đang gõ giữa một bài dài trong editor, bấm Alt+3, gõ một note rồi Esc: con trỏ quay về đúng chỗ đang gõ, trang không bị cuộn.
 9. Đang ở ô gõ của Ghi nhanh, bấm Alt+1 để sang Calendar rồi Esc: panel đóng.
+10. Hai tab `/admin`, cả hai mở Ghi nhanh. Sửa một note ở tab A, đợi chấm xanh, rồi chuyển sang tab B: note ở B đã có chữ mới.
+11. Ở tab B bật Offline (DevTools → Network) rồi gõ vào note đó: chấm đỏ. Sang tab A sửa note đó, đợi chấm xanh. Về tab B, tắt Offline, bấm chấm đỏ: B hiện chữ của A, kèm toast "Note này vừa được sửa ở nơi khác".
+12. (Tuỳ chọn) Chỉnh giờ máy nhanh 10 phút rồi gõ vào một note: chấm đỏ, toast nhắc chỉnh giờ. Chỉnh lại giờ, gõ tiếp: chấm xanh.
 
 ---
 
@@ -5734,7 +6056,7 @@ Người dùng thêm `ADMIN_CALENDAR_FEEDS` vào Project Settings → Environmen
 **Step 1: Test**
 
 Run: `pnpm test`
-Expected: mọi file test đều PASS, gồm 137 test mới.
+Expected: mọi file test đều PASS, gồm 146 test mới.
 
 **Step 2: Kiểu và lint**
 
