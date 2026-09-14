@@ -35,8 +35,16 @@ export async function GET(request: NextRequest) {
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`);
     }
+    console.error("[auth-callback] exchange failed:", error.message);
+  } else {
+    // Google hay Supabase báo lỗi thì quay về đây với `?error=` thay vì `?code=`.
+    console.error(
+      "[auth-callback] no code:",
+      searchParams.get("error_description") ?? searchParams.get("error") ?? "(none)",
+    );
   }
 
-  // Return to login page on error
-  return NextResponse.redirect(`${origin}/login`);
+  // Về /admin, nơi có nút đăng nhập, kèm cờ để trang báo lỗi. Trang /login cũ
+  // đã bỏ, nên trước đây lỗi nào cũng rơi vào một trang 404 không nói gì.
+  return NextResponse.redirect(`${origin}/admin?login=failed`);
 }

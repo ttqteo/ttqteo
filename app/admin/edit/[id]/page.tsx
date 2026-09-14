@@ -18,7 +18,8 @@ export default async function EditPostPage({ params, searchParams }: PageProps) 
   const { type } = await searchParams;
 
   const user = await getUser();
-  if (!user) redirect("/login");
+  // /admin là nơi có nút đăng nhập. /login cũ đã bỏ nên từng dẫn tới 404.
+  if (!user) redirect("/admin");
 
   const admin = await isAdmin();
   if (!admin) redirect("/");
