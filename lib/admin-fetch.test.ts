@@ -49,6 +49,16 @@ describe("adminFetch", () => {
     expect(headers.get("content-type")).toBe("application/json");
   });
 
+  it("keeps a content type the caller set", async () => {
+    const fetchMock = respondJson(200, {});
+    await adminFetch("/api/admin/notes/1", {
+      method: "PUT",
+      body: "{}",
+      headers: [["content-type", "text/plain"]],
+    });
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get("content-type")).toBe("text/plain");
+  });
+
   it.each([401, 403])("reports %i as a sign-in to renew", async (status) => {
     respondJson(status, { error: "Unauthorized" });
     const error = await adminFetch("/api/admin/notes").catch((e: unknown) => e);
@@ -96,6 +106,11 @@ describe("adminFetch", () => {
     await expect(adminFetch("/api/admin/notes/1", { method: "DELETE" })).resolves.toBeUndefined();
   });
 
+  it("resolves a JSON null as null", async () => {
+    respondWith(200, "null");
+    await expect(adminFetch("/api/admin/notes")).resolves.toBeNull();
+  });
+
   it("reports a request that never reached the server", async () => {
     const cause = new TypeError("Failed to fetch");
     vi.stubGlobal(
@@ -106,6 +121,7 @@ describe("adminFetch", () => {
     );
     const error = await adminFetch("/api/admin/notes").catch((e: unknown) => e);
     expect(error).toBeInstanceOf(AdminFetchError);
-    expect(error).toMatchObject({ kind: "network", cause });
+    expect(error).toMatchObject({ kind: "network" });
+    expect((error as Error).cause).toBe(cause);
   });
 });

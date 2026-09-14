@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// Only the network call to Supabase Auth is faked; isAdminUser, requireAdmin
-// and dbError run as they are.
+// Only the network call to Supabase Auth is faked; everything else runs as it is.
 const { getUser } = vi.hoisted(() => ({ getUser: vi.fn() }));
 vi.mock("@/lib/supabase-server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/supabase-server")>()),
