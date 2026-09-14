@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CLOCK_AHEAD,
   filterNotes,
   foldText,
   isBlankNote,
@@ -175,6 +176,7 @@ describe("parseNoteInput", () => {
     expect(parseNoteInput({ body: "hi", pinned: false, updated_at: T }, now)).toMatchObject({ ok: true });
     expect(parseNoteInput({ body: "hi", pinned: false, updated_at: T }, now - 1)).toMatchObject({
       ok: false,
+      code: CLOCK_AHEAD,
     });
   });
 

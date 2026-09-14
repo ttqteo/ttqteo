@@ -1,6 +1,6 @@
 import { isUuid } from "@/lib/admin-db";
 import { badRequest, dbError, requireAdmin } from "@/lib/admin-api";
-import { NOTE_COLUMNS, parseNoteInput } from "@/lib/admin-notes";
+import { NOTE_COLUMNS, NOTE_DELETED, parseNoteInput } from "@/lib/admin-notes";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -23,7 +23,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (!isUuid(id)) return badRequest("id không hợp lệ");
 
   const parsed = parseNoteInput(await request.json().catch(() => null));
-  if (!parsed.ok) return badRequest(parsed.error);
+  if (!parsed.ok) return badRequest(parsed.error, parsed.code);
 
   const supabase = await createSupabaseServerClient();
   const row = { id, ...parsed.input };
@@ -54,7 +54,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (stored.error) return dbError(stored.error, "admin notes PUT");
   // Deleted elsewhere in the moment between the write and this read.
   if (!stored.data) {
-    return NextResponse.json({ error: "Note vừa bị xoá ở nơi khác" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Note vừa bị xoá ở nơi khác", code: NOTE_DELETED },
+      { status: 404 },
+    );
   }
   return NextResponse.json({ note: stored.data });
 }

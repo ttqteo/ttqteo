@@ -8,7 +8,7 @@ vi.mock("@/lib/supabase-server", async (importOriginal) => ({
   getUser,
 }));
 
-import { dbError, requireAdmin } from "@/lib/admin-api";
+import { badRequest, dbError, requireAdmin } from "@/lib/admin-api";
 import { isAdminUser } from "@/lib/supabase-server";
 
 afterEach(() => {
@@ -62,5 +62,14 @@ describe("dbError", () => {
     const empty = dbError({ code: "XX000", message: "" }, "test");
     expect(empty.status).toBe(500);
     expect(await empty.json()).toEqual({ error: "Database error" });
+  });
+});
+
+describe("badRequest", () => {
+  it("answers 400 with the reason, and the code when there is one", async () => {
+    expect(await badRequest("sai").json()).toEqual({ error: "sai" });
+    const coded = badRequest("sai giờ", "clock_ahead");
+    expect(coded.status).toBe(400);
+    expect(await coded.json()).toEqual({ error: "sai giờ", code: "clock_ahead" });
   });
 });

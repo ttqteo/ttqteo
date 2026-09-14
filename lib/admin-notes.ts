@@ -76,6 +76,10 @@ export type NoteInput = { body: string; pinned: boolean; updated_at: string; cre
  */
 export const MAX_CLOCK_AHEAD_MS = 5 * 60_000;
 
+/** The codes on the two notes PUT refusals the notes store acts on. */
+export const CLOCK_AHEAD = "clock_ahead";
+export const NOTE_DELETED = "note_deleted";
+
 const NUL = String.fromCharCode(0);
 
 /**
@@ -88,7 +92,7 @@ const NUL = String.fromCharCode(0);
 export function parseNoteInput(
   value: unknown,
   now = Date.now(),
-): { ok: true; input: NoteInput } | { ok: false; error: string } {
+): { ok: true; input: NoteInput } | { ok: false; error: string; code?: string } {
   const data = (value ?? {}) as Record<string, unknown>;
   if (typeof data.body !== "string") return { ok: false, error: "body phải là chuỗi" };
   // Postgres stores neither NUL nor half of a surrogate pair, and left in,
@@ -102,7 +106,11 @@ export function parseNoteInput(
   const updatedAt = parseTimestamp(data.updated_at);
   if (!updatedAt) return { ok: false, error: "updated_at không đọc được" };
   if (Date.parse(updatedAt) - now > MAX_CLOCK_AHEAD_MS) {
-    return { ok: false, error: "Giờ trên máy đang nhanh hơn server, chỉnh lại giờ máy rồi thử lại" };
+    return {
+      ok: false,
+      error: "Giờ trên máy đang nhanh hơn server, chỉnh lại giờ máy rồi thử lại",
+      code: CLOCK_AHEAD,
+    };
   }
 
   let createdAt: string | undefined;

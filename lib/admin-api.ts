@@ -20,8 +20,9 @@ export async function requireAdmin(): Promise<NextResponse | null> {
   return null;
 }
 
-export function badRequest(error: string): NextResponse {
-  return NextResponse.json({ error }, { status: 400 });
+/** A 400 with the reason, and a code when the caller acts on this refusal. */
+export function badRequest(error: string, code?: string): NextResponse {
+  return NextResponse.json(code ? { error, code } : { error }, { status: 400 });
 }
 
 /** A Supabase error as a response. A missing table gets a code the panel shows its own hint for. */
