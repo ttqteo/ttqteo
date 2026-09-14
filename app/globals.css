@@ -703,6 +703,19 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
 .editor-html :is(th, td) > * + * {
   margin-top: 0.5em;
 }
+/* Trong editor cột chia đều theo bề rộng bảng chứ không theo chữ. Với
+   `table-layout: auto` (mặc định, Typography cũng đặt vậy) trình duyệt chia lại
+   cột ở mỗi phím gõ, nên cả bảng xô qua xô lại trong lúc điền một ô. Trang đọc
+   và Xem trước giữ `auto`: ở đó không ai gõ, cột vừa khít chữ dễ đọc hơn, và
+   bảng rộng vẫn cuộn ngang được trên điện thoại. */
+.editor-prose table {
+  table-layout: fixed;
+}
+.editor-prose :is(th, td) {
+  /* Cột đã cố định thì một URL dài phải tự xuống dòng, không thì tràn sang ô
+     bên cạnh. */
+  overflow-wrap: break-word;
+}
 /* Kéo chuột qua nhiều ô thì prosemirror-tables gắn `.selectedCell` cho từng ô.
    Không có quy tắc này thì vùng chọn không hiện gì. Chỉ có trong editor. */
 .editor-prose :is(th, td) {
