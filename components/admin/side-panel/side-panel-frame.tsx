@@ -7,7 +7,7 @@ import { panelMeta } from "./panels";
 import { useSidePanel } from "./side-panel-provider";
 
 export function SidePanelFrame() {
-  const { panel, openedByUser, close } = useSidePanel();
+  const { panel, openedByUser, close, notePanelFocus } = useSidePanel();
   const meta = panel ? panelMeta(panel) : null;
 
   // Escape closes the panel only when nothing else wanted it:
@@ -27,6 +27,7 @@ export function SidePanelFrame() {
     <aside
       aria-label={meta?.label}
       onKeyDown={onKeyDown}
+      onFocus={(e) => notePanelFocus(e.target as HTMLElement)}
       className="admin-side-panel focus-mode-hidden fixed bottom-0 right-12 top-9 z-[56] w-[360px] flex-col border-l bg-background shadow-xl xl:shadow-none"
     >
       {meta && (

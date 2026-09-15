@@ -85,7 +85,7 @@ export function AdminToolbar({ editPostId }: AdminToolbarProps) {
           </AdminNavLink>
           <AdminNavLink href="/admin/notes">
             <StickyNoteIcon className="w-3.5 h-3.5 shrink-0" />
-            {/* Icon only on a phone, same as Edit Post, so the bar still fits. */}
+            {/* Icon only on a phone, so the bar still fits. */}
             <span className="sr-only sm:not-sr-only">notes</span>
           </AdminNavLink>
           {editPostId && (
@@ -93,7 +93,7 @@ export function AdminToolbar({ editPostId }: AdminToolbarProps) {
               <PencilIcon className="w-3.5 h-3.5 shrink-0" />
               {/* The icon carries it on a phone; the bar has to fit the logo,
                   posts, new and logout on 390px too. */}
-              <span className="hidden sm:inline">Edit Post</span>
+              <span className="sr-only sm:not-sr-only">Edit Post</span>
             </AdminNavLink>
           )}
         </div>

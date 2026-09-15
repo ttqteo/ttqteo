@@ -35,6 +35,8 @@ type SidePanelContextValue = {
   sheetTab: AdminPanelId;
   setSheetTab: (id: AdminPanelId) => void;
   notes: NotesStore;
+  /** Marks an element, portalled popovers included, as focus inside the panel. */
+  notePanelFocus: (el: HTMLElement) => void;
 };
 
 const SidePanelContext = createContext<SidePanelContextValue | null>(null);
@@ -63,17 +65,30 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
   // Where focus goes back to when the panel closes: whatever had it when the
   // panel opened (the editor, mid-sentence, after Alt+3), else the rail.
   const returnFocus = useRef<HTMLElement | null>(null);
+  // The last element inside the panel to report focus, portalled popovers
+  // included: React focus events bubble through a portal even though the DOM
+  // node itself renders outside .admin-side-panel.
+  const lastPanelFocus = useRef<HTMLElement | null>(null);
+
+  const notePanelFocus = useCallback((el: HTMLElement) => {
+    lastPanelFocus.current = el;
+  }, []);
 
   const apply = useCallback((next: AdminPanelId | null) => {
     const previous = readAdminPanel();
     const focused = document.activeElement;
     const active = focused instanceof HTMLElement && focused !== document.body ? focused : null;
-    const focusInPanel = active?.closest(".admin-side-panel") != null;
-    // Remember what had focus before the panel took it, the first time there
-    // is something to remember: on opening, or on the first switch after a
-    // panel was restored on load. A switch made from inside the panel keeps
-    // what was remembered.
-    if (next && !focusInPanel && !returnFocus.current) returnFocus.current = active;
+    const inSidebar =
+      active?.closest(".admin-side-panel, .admin-side-rail") != null ||
+      (active !== null && active === lastPanelFocus.current);
+    const focusInPanel =
+      active?.closest(".admin-side-panel") != null ||
+      (active !== null && active === lastPanelFocus.current);
+    // Record where focus was every time a panel opens or switches, as long as
+    // it was outside the sidebar: that is where the user actually was when
+    // they pressed the shortcut, so Esc after a switch never lands on the
+    // rail icon of a panel that is no longer open.
+    if (next && active && !inSidebar) returnFocus.current = active;
 
     setOpenedByUser(next !== null);
     writeAdminPanel(next);
@@ -97,7 +112,7 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
     if (focusInPanel) {
       const rail = document.querySelector<HTMLElement>(`.admin-side-rail [data-panel="${previous}"]`);
       const back = returnFocus.current?.isConnected ? returnFocus.current : rail;
-      back?.focus({ preventScroll: true });
+      back?.focus({ preventScroll: back.isContentEditable });
       // An opener hidden or disabled since then cannot take focus: use the rail.
       if (document.activeElement !== back) rail?.focus({ preventScroll: true });
     }
@@ -155,8 +170,19 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
   const notes = useNotesStore(admin && notesShowing);
 
   const value = useMemo(
-    () => ({ panel, openedByUser, toggle, close, sheetOpen, setSheetOpen, sheetTab, setSheetTab, notes }),
-    [panel, openedByUser, toggle, close, sheetOpen, sheetTab, notes],
+    () => ({
+      panel,
+      openedByUser,
+      toggle,
+      close,
+      sheetOpen,
+      setSheetOpen,
+      sheetTab,
+      setSheetTab,
+      notes,
+      notePanelFocus,
+    }),
+    [panel, openedByUser, toggle, close, sheetOpen, sheetTab, notes, notePanelFocus],
   );
 
   return <SidePanelContext.Provider value={value}>{children}</SidePanelContext.Provider>;
