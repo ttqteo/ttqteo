@@ -24,15 +24,18 @@ import { usePostsQuery } from "./posts-query";
 import { AdminPostActions } from "./post-actions";
 
 interface PostsTableProps {
+  /** Rows for the current page only — selection and bulk actions work on these. */
   posts: UnifiedPost[];
   query: AdminPostsQuery;
   isTrash: boolean;
   total: number;
+  /** How many posts match the view and search, across every page. */
+  matching: number;
 }
 
 type BulkAction = "publish" | "unpublish" | "trash" | "restore" | "purge";
 
-export function PostsTable({ posts, query, isTrash, total }: PostsTableProps) {
+export function PostsTable({ posts, query, isTrash, total, matching }: PostsTableProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Phones start with no checkbox column at all: every row carrying one costs
@@ -126,7 +129,7 @@ export function PostsTable({ posts, query, isTrash, total }: PostsTableProps) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span className="tabular-nums">
-          {posts.length} / {total}
+          {matching} / {total}
         </span>
         <span className="flex items-center gap-2.5">
           <LegendDot className="bg-emerald-500" label="published" />

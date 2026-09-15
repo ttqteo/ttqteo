@@ -61,7 +61,15 @@ export function PostsQueryProvider({
   latest.current = query;
 
   const setQuery = useCallback<PostsQueryContext["setQuery"]>((patch, opts) => {
-    const next = { ...latest.current, ...patch };
+    // A patch that isn't itself moving the page (a new view, sort, direction
+    // or search term) starts over at page 1 — the old page number rarely
+    // still makes sense against a differently filtered list. A patch that
+    // does set `page` (the pager) is left alone.
+    const next = {
+      ...latest.current,
+      ...(patch.page === undefined ? { page: DEFAULT_QUERY.page } : null),
+      ...patch,
+    };
     const url = `/admin${buildQueryString(next)}`;
     // `replace` for search, so one back-step does not unwind it a character at
     // a time; `push` for everything else, so back walks the filters.

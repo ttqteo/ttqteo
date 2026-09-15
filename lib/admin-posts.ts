@@ -26,6 +26,7 @@ export type AdminPostsQuery = {
   sort: SortKey;
   dir: SortDir;
   q: string;
+  page: number;
 };
 
 export const VIEWS: ViewKey[] = [
@@ -46,7 +47,10 @@ export const DEFAULT_QUERY: AdminPostsQuery = {
   sort: "edited",
   dir: "desc",
   q: "",
+  page: 1,
 };
+
+export const PAGE_SIZE = 50;
 
 function pick<T extends string>(allowed: T[], value: unknown, fallback: T): T {
   return allowed.includes(value as T) ? (value as T) : fallback;
@@ -72,7 +76,21 @@ export function parseQuery(
     sort: pick(SORTS, one("sort"), DEFAULT_QUERY.sort),
     dir: one("dir") === "asc" ? "asc" : "desc",
     q: (one("q") ?? "").trim(),
+    page: parsePage(one("page")),
   };
+}
+
+/**
+ * Digits only and at least 1; anything else (missing, "0", "-1", "abc",
+ * "2.5") lands on page 1. The page count isn't known here, so clamping the
+ * upper end happens in `paginate` instead.
+ */
+function parsePage(raw: string | undefined): number {
+  if (raw && /^\d+$/.test(raw)) {
+    const n = Number(raw);
+    if (n >= 1) return n;
+  }
+  return 1;
 }
 
 /** Serializes back to a query string, omitting anything still at its default. */
@@ -81,6 +99,9 @@ export function buildQueryString(query: Partial<AdminPostsQuery>): string {
   for (const key of ["view", "sort", "dir", "q"] as const) {
     const value = query[key];
     if (value && value !== DEFAULT_QUERY[key]) params.set(key, value);
+  }
+  if (query.page && query.page > DEFAULT_QUERY.page) {
+    params.set("page", String(query.page));
   }
   const s = params.toString();
   return s ? `?${s}` : "";
@@ -166,4 +187,45 @@ export function selectableIds(posts: UnifiedPost[]): string[] {
 
 export function isSelectable(post: UnifiedPost): boolean {
   return post.source === "supabase";
+}
+
+/** Slices an already filtered and sorted list into one page. */
+export function paginate<T>(
+  items: T[],
+  page: number,
+  size = PAGE_SIZE,
+): { items: T[]; page: number; pageCount: number; from: number; to: number } {
+  const pageCount = Math.max(1, Math.ceil(items.length / size));
+  const clamped = Math.min(pageCount, Math.max(1, page));
+  const start = (clamped - 1) * size;
+  const end = Math.min(items.length, start + size);
+  return {
+    items: items.slice(start, end),
+    page: clamped,
+    pageCount,
+    from: items.length === 0 ? 0 : start + 1,
+    to: items.length === 0 ? 0 : end,
+  };
+}
+
+/**
+ * The compact set of page numbers a pager shows: first, last, and a window
+ * around the current page, with a single missing neighbour filled in and
+ * wider gaps collapsed to "…".
+ */
+export function pageList(page: number, pageCount: number): (number | "…")[] {
+  const clamp = (n: number) => Math.min(pageCount, Math.max(1, n));
+  const candidates = [1, pageCount, page - 1, page, page + 1].map(clamp);
+  const nums = Array.from(new Set(candidates)).sort((a, b) => a - b);
+
+  const result: (number | "…")[] = [];
+  nums.forEach((n, i) => {
+    if (i > 0) {
+      const gap = n - nums[i - 1];
+      if (gap === 2) result.push(n - 1);
+      else if (gap > 2) result.push("…");
+    }
+    result.push(n);
+  });
+  return result;
 }

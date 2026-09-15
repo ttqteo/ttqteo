@@ -5,6 +5,7 @@ import {
   countPosts,
   datasetFor,
   filterAndSortPosts,
+  paginate,
   type AdminPostsQuery,
 } from "@/lib/admin-posts";
 import type { UnifiedPost } from "@/lib/posts";
@@ -13,6 +14,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { AdminSidebar } from "./admin-sidebar";
 import { FilterSheet } from "./filter-sheet";
+import { PostsPager } from "./posts-pager";
 import { PostsQueryProvider, usePostsQuery } from "./posts-query";
 import { PostsTable } from "./posts-table";
 import { SearchInput } from "./search-input";
@@ -59,6 +61,9 @@ function Browser({
     () => filterAndSortPosts(dataset, query),
     [dataset, query],
   );
+  // Pagination only slices the already filtered, sorted list — the browser
+  // still holds and filters every post itself.
+  const paged = useMemo(() => paginate(posts, query.page), [posts, query.page]);
 
   return (
     <>
@@ -84,11 +89,21 @@ function Browser({
         <div className="min-w-0 flex-1 space-y-4">
           <SearchInput />
           <PostsTable
-            posts={posts}
+            posts={paged.items}
             query={query}
             isTrash={query.view === "trash"}
             total={dataset.length}
+            matching={posts.length}
           />
+          {paged.pageCount > 1 && (
+            <PostsPager
+              page={paged.page}
+              pageCount={paged.pageCount}
+              from={paged.from}
+              to={paged.to}
+              matching={posts.length}
+            />
+          )}
         </div>
       </div>
     </>

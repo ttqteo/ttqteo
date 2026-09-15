@@ -4,6 +4,8 @@ import {
   countPosts,
   datasetFor,
   filterAndSortPosts,
+  pageList,
+  paginate,
   parseQuery,
   selectableIds,
   DEFAULT_QUERY,
@@ -42,7 +44,17 @@ describe("parseQuery", () => {
       sort: "title",
       dir: "asc",
       q: "hi",
+      page: 1,
     });
+  });
+
+  it("reads the page number, falling back to 1 for anything invalid", () => {
+    expect(parseQuery({}).page).toBe(1);
+    expect(parseQuery({ page: "3" }).page).toBe(3);
+    expect(parseQuery({ page: "0" }).page).toBe(1);
+    expect(parseQuery({ page: "-1" }).page).toBe(1);
+    expect(parseQuery({ page: "abc" }).page).toBe(1);
+    expect(parseQuery({ page: "2.5" }).page).toBe(1);
   });
 
   it("takes the first value when a param repeats", () => {
@@ -73,6 +85,76 @@ describe("buildQueryString", () => {
     expect(buildQueryString(query({ view: "draft", sort: "title" }))).toBe(
       "?view=draft&sort=title",
     );
+  });
+
+  it("leaves out page 1", () => {
+    expect(buildQueryString(query({ page: 1 }))).toBe("");
+  });
+
+  it("writes page after the other params, when above 1", () => {
+    expect(buildQueryString(query({ view: "draft", page: 2 }))).toBe(
+      "?view=draft&page=2",
+    );
+  });
+});
+
+describe("paginate", () => {
+  const items = Array.from({ length: 120 }, (_, i) => i + 1);
+
+  it("slices the first page", () => {
+    const result = paginate(items, 1);
+    expect(result.items).toHaveLength(50);
+    expect(result.items[0]).toBe(1);
+    expect(result.items[49]).toBe(50);
+    expect(result.from).toBe(1);
+    expect(result.to).toBe(50);
+    expect(result.pageCount).toBe(3);
+    expect(result.page).toBe(1);
+  });
+
+  it("slices the last, partial page", () => {
+    const result = paginate(items, 3);
+    expect(result.items).toHaveLength(20);
+    expect(result.from).toBe(101);
+    expect(result.to).toBe(120);
+  });
+
+  it("clamps a page number past the end", () => {
+    const result = paginate(items, 9);
+    expect(result.page).toBe(3);
+    expect(result.from).toBe(101);
+    expect(result.to).toBe(120);
+  });
+
+  it("handles an empty list", () => {
+    const result = paginate([], 1);
+    expect(result.items).toEqual([]);
+    expect(result.page).toBe(1);
+    expect(result.pageCount).toBe(1);
+    expect(result.from).toBe(0);
+    expect(result.to).toBe(0);
+  });
+
+  it("reports one page when the count matches the page size exactly", () => {
+    const result = paginate(Array.from({ length: 50 }, (_, i) => i), 1);
+    expect(result.pageCount).toBe(1);
+  });
+});
+
+describe("pageList", () => {
+  it("returns just the page for a single-page list", () => {
+    expect(pageList(1, 1)).toEqual([1]);
+  });
+
+  it("returns every page when there are few enough", () => {
+    expect(pageList(2, 4)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("gaps in the middle become an ellipsis", () => {
+    expect(pageList(1, 10)).toEqual([1, 2, "…", 10]);
+    expect(pageList(4, 10)).toEqual([1, 2, 3, 4, 5, "…", 10]);
+    expect(pageList(5, 10)).toEqual([1, "…", 4, 5, 6, "…", 10]);
+    expect(pageList(10, 10)).toEqual([1, "…", 9, 10]);
   });
 });
 
