@@ -149,6 +149,10 @@ function TaskRow({ task, today }: { task: AdminTask; today: DateKey }) {
   const [draft, setDraft] = useState(task.title);
   const done = task.done_at !== null;
   const overdue = !done && task.due_on !== null && task.due_on < today;
+  // Enter and Esc unmount the input while it still has focus, which makes
+  // Chrome fire a blur right after; this tells onBlur that key already ended
+  // the edit, so it must not commit (or, for Enter, commit a second time).
+  const skipBlur = useRef(false);
 
   const commit = () => {
     setEditing(false);
@@ -172,12 +176,24 @@ function TaskRow({ task, today }: { task: AdminTask; today: DateKey }) {
             value={draft}
             maxLength={MAX_TASK_TITLE}
             onChange={(event) => setDraft(event.target.value)}
-            onBlur={commit}
+            onBlur={() => {
+              if (skipBlur.current) {
+                skipBlur.current = false;
+                return;
+              }
+              commit();
+            }}
             onKeyDown={(event) => {
-              if (event.key === "Enter") commit();
+              // A Telex composition's Enter or Esc ends the composition, not the edit.
+              if (event.nativeEvent.isComposing) return;
+              if (event.key === "Enter") {
+                skipBlur.current = true;
+                commit();
+              }
               if (event.key === "Escape") {
                 // Cancels the edit only; the panel stays open.
                 event.stopPropagation();
+                skipBlur.current = true;
                 setDraft(task.title);
                 setEditing(false);
               }

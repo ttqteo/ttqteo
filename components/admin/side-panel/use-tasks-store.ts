@@ -51,6 +51,18 @@ export function useTasksStore(enabled: boolean): TasksStore {
   // The newest version handed to a request for each task, so a failure that
   // arrives after a newer change was sent knows not to roll anything back.
   const latest = useRef(new Map<string, AdminTask>());
+  // The version the server holds for each task: filled from the load and from
+  // every successful save, and cleared once a delete succeeds. A failed save
+  // that is still the latest for its task restores this, never an unsaved
+  // `before` that may itself never have reached the server.
+  const confirmed = useRef(new Map<string, AdminTask>());
+  // The list as of the latest render, so the tick toast's Undo can look up
+  // what a task has become since it was ticked, rather than replaying a copy
+  // from when the toast was raised.
+  const tasksRef = useRef(tasks);
+  useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
 
   /** Runs `request` once whatever this task already has in flight has settled. */
   const enqueue = useCallback(<T>(id: string, request: () => Promise<T>): Promise<T> => {
@@ -62,6 +74,7 @@ export function useTasksStore(enabled: boolean): TasksStore {
   const fetchTasks = useCallback(async () => {
     try {
       const data = await adminFetch<{ tasks: AdminTask[] }>("/api/admin/tasks");
+      confirmed.current = new Map(data.tasks.map((task) => [task.id, task]));
       setTasks(data.tasks);
       setStatus("ready");
     } catch (error) {
@@ -80,26 +93,43 @@ export function useTasksStore(enabled: boolean): TasksStore {
     void fetchTasks();
   }, [enabled, fetchTasks]);
 
-  /** Show `after` now and save it; if the save fails, show `before` again. */
+  /**
+   * Puts back what the server holds for `id`, replacing the task shown or
+   * adding it back if it is gone; drops it instead when nothing has ever
+   * been confirmed there. Used once a failed request is found to still be
+   * the latest for that id.
+   */
+  const rollback = useCallback((id: string) => {
+    const back = confirmed.current.get(id);
+    setTasks((list) => {
+      if (!back) return list.filter((task) => task.id !== id);
+      return list.some((task) => task.id === id)
+        ? list.map((task) => (task.id === id ? back : task))
+        : [...list, back];
+    });
+  }, []);
+
+  /** Show `after` now and save it; if the save fails, roll back to what the server holds. */
   const replace = useCallback(
-    (before: AdminTask, after: AdminTask) => {
+    (after: AdminTask) => {
       setTasks((list) => list.map((task) => (task.id === after.id ? after : task)));
       latest.current.set(after.id, after);
       enqueue(after.id, () => putTask(after)).then(
-        () => {
+        ({ task: stored }) => {
           clearAdminSession();
+          confirmed.current.set(after.id, stored);
           if (latest.current.get(after.id) === after) latest.current.delete(after.id);
         },
         (error) => {
           if (latest.current.get(after.id) === after) {
             latest.current.delete(after.id);
-            setTasks((list) => list.map((task) => (task.id === before.id ? before : task)));
+            rollback(after.id);
           }
           reportAdminError(error, "Lưu task");
         },
       );
     },
-    [enqueue],
+    [enqueue, rollback],
   );
 
   const insert = useCallback(
@@ -107,20 +137,21 @@ export function useTasksStore(enabled: boolean): TasksStore {
       setTasks((list) => [...list.filter((t) => t.id !== task.id), task]);
       latest.current.set(task.id, task);
       enqueue(task.id, () => putTask(task)).then(
-        () => {
+        ({ task: stored }) => {
           clearAdminSession();
+          confirmed.current.set(task.id, stored);
           if (latest.current.get(task.id) === task) latest.current.delete(task.id);
         },
         (error) => {
           if (latest.current.get(task.id) === task) {
             latest.current.delete(task.id);
-            setTasks((list) => list.filter((t) => t.id !== task.id));
+            rollback(task.id);
           }
           reportAdminError(error, "Lưu task");
         },
       );
     },
-    [enqueue],
+    [enqueue, rollback],
   );
 
   const add = useCallback(
@@ -139,17 +170,28 @@ export function useTasksStore(enabled: boolean): TasksStore {
   );
 
   const update = useCallback(
-    (task: AdminTask, patch: TaskPatch) => replace(task, { ...task, ...patch, updated_at: stamp() }),
+    (task: AdminTask, patch: TaskPatch) => replace({ ...task, ...patch, updated_at: stamp() }),
     [replace],
   );
 
   const toggleDone = useCallback(
     (task: AdminTask) => {
       const after: AdminTask = { ...task, done_at: task.done_at ? null : stamp(), updated_at: stamp() };
-      replace(task, after);
+      replace(after);
       if (after.done_at) {
         toast.success("Xong một việc", {
-          action: { label: "Undo", onClick: () => replace(after, task) },
+          action: {
+            label: "Undo",
+            onClick: () => {
+              // What the task has become since the toast was raised, not the
+              // stale copy from before the tick: a title or date edited in
+              // the meantime must stick, and a task deleted since must stay
+              // deleted rather than be recreated by this PUT.
+              const current = tasksRef.current.find((t) => t.id === after.id);
+              if (!current || !current.done_at) return;
+              replace({ ...current, done_at: null, updated_at: stamp() });
+            },
+          },
         });
       }
     },
@@ -163,10 +205,11 @@ export function useTasksStore(enabled: boolean): TasksStore {
       enqueue(task.id, () => adminFetch(`/api/admin/tasks/${task.id}`, { method: "DELETE" })).then(
         () => {
           clearAdminSession();
+          confirmed.current.delete(task.id);
           toast.success("Đã xoá task", { action: { label: "Undo", onClick: () => insert(task) } });
         },
         (error) => {
-          setTasks((list) => [...list, task]);
+          setTasks((list) => [...list, confirmed.current.get(task.id) ?? task]);
           reportAdminError(error, "Xoá task");
         },
       );
