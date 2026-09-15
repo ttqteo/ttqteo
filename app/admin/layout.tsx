@@ -53,6 +53,20 @@ export default function AdminLayout({
           /* Focus mode hides rail and panel (focus-mode-hidden); hand their room back too. */
           body.focus-mode { --admin-side-w: 0px; }
 
+          /* The calendar panel's month grid: a dot under each day with something on it. */
+          .admin-cal-has-items button::after {
+            content: "";
+            position: absolute;
+            bottom: 4px;
+            left: 50%;
+            width: 4px;
+            height: 4px;
+            margin-left: -2px;
+            border-radius: 9999px;
+            background: currentColor;
+            opacity: 0.6;
+          }
+
           /* A dialog, alert dialog or sheet (all z-50) must not open under the
              rail (z-57) or the panel (z-56). Radix marks <body> with
              data-scroll-locked while one of them is open. */
