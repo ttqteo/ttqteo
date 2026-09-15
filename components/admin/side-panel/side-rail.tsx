@@ -1,12 +1,17 @@
 "use client";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { badgeCount } from "@/lib/admin-tasks";
+import { toDateKey } from "@/lib/date-key";
 import { cn } from "@/lib/utils";
 import { PANELS } from "./panels";
 import { useSidePanel } from "./side-panel-provider";
+import { useNow } from "./use-now";
 
 export function SideRail() {
-  const { panel, toggle } = useSidePanel();
+  const { panel, toggle, tasks } = useSidePanel();
+  const today = toDateKey(useNow());
+  const due = tasks.status === "ready" ? badgeCount(tasks.tasks, today) : 0;
 
   return (
     // display comes from app/admin/layout.tsx, not a class here: the rail is
@@ -32,6 +37,11 @@ export function SideRail() {
               )}
             >
               <Icon className="h-[18px] w-[18px]" />
+              {id === "tasks" && due > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-destructive px-1 text-center text-[10px] font-medium leading-4 text-destructive-foreground tabular-nums">
+                  {due > 9 ? "9+" : due}
+                </span>
+              )}
             </button>
           </TooltipTrigger>
           {/* components/ui/tooltip.tsx does not portal, so this paints inside
