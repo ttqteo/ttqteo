@@ -3,7 +3,7 @@ import { TextSelection } from "@tiptap/pm/state";
 import { Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { afterEach, describe, expect, it } from "vitest";
-import { focusContentStart } from "./editor-focus";
+import { focusContentStart, resumeWriting } from "./editor-focus";
 
 let editor: Editor | null = null;
 
@@ -58,5 +58,22 @@ describe("focusContentStart", () => {
     // Ảnh vẫn còn, ngay dưới đoạn mới.
     expect(doc.child(1).type.name).toBe("image");
     expect(doc.child(2).textContent).toBe("Sau ảnh");
+  });
+});
+
+describe("resumeWriting", () => {
+  it("chưa gõ gì từ lúc mở trang: xuống cuối bài", () => {
+    const e = open("<p>Mở bài</p><p>Đang viết dở</p>");
+    resumeWriting(e, false);
+    const { $from } = e.state.selection;
+    expect($from.parent.textContent).toBe("Đang viết dở");
+    expect($from.parentOffset).toBe("Đang viết dở".length);
+  });
+
+  it("đang gõ dở ở giữa bài: về đúng chỗ đó", () => {
+    const e = open("<p>Mở bài</p><p>Đang viết dở</p>");
+    e.commands.setTextSelection(3);
+    resumeWriting(e, true);
+    expect(e.state.selection.from).toBe(3);
   });
 });

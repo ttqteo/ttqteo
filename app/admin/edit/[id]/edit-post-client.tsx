@@ -441,6 +441,17 @@ export default function EditPostClient({
   // đó ref rỗng, và Enter ở tiêu đề hay Tab ở mô tả không đưa đi đâu cả.
   const editorHandleRef = useRef<SimpleEditorHandle | null>(null);
 
+  // Từ Xem trước quay về Viết thì đưa con trỏ về lại chỗ đang viết (xem
+  // resumeWriting). Chỉ ở lần chuyển đó: mở trang không được giành focus khỏi
+  // ô tiêu đề.
+  const previousModeRef = useRef(mode);
+  useEffect(() => {
+    if (previousModeRef.current === "preview" && mode === "write") {
+      editorHandleRef.current?.resume();
+    }
+    previousModeRef.current = mode;
+  }, [mode]);
+
   const buildPayload = useCallback(
     (publish: boolean) => ({
       ...post,

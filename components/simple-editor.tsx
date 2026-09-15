@@ -25,7 +25,7 @@ import {
 import { TableBubble } from "./table-bubble";
 import { FormatBubble } from "./format-bubble";
 import { linkBubbleShouldShow } from "./editor-bubbles";
-import { focusContentStart } from "./editor-focus";
+import { focusContentStart, resumeWriting } from "./editor-focus";
 import { bareUrl, type UnfurlResult } from "@/lib/unfurl";
 import { parseYoutubeUrl, youtubeEmbedSrc } from "@/lib/youtube";
 import {
@@ -72,6 +72,8 @@ import { useImageUpload } from "./use-image-upload";
 export type SimpleEditorHandle = {
   /** Con trỏ lên đầu nội dung, sẵn để gõ. */
   focusStart: () => void;
+  /** Quay lại chỗ đang viết, hoặc xuống cuối bài nếu chưa viết gì. */
+  resume: () => void;
 };
 
 interface SimpleEditorProps {
@@ -338,9 +340,26 @@ export function SimpleEditor({
     }
   }, [content, editor]);
 
+  // Editor đã được focus lần nào từ lúc mở trang chưa: `resume` dựa vào đó để
+  // chọn giữa về chỗ cũ và xuống cuối bài.
+  const focusedOnceRef = useRef(false);
+  useEffect(() => {
+    if (!editor) return;
+    const onFocus = () => {
+      focusedOnceRef.current = true;
+    };
+    editor.on("focus", onFocus);
+    return () => {
+      editor.off("focus", onFocus);
+    };
+  }, [editor]);
+
   useEffect(() => {
     if (!editor || !handleRef) return;
-    handleRef.current = { focusStart: () => focusContentStart(editor) };
+    handleRef.current = {
+      focusStart: () => focusContentStart(editor),
+      resume: () => resumeWriting(editor, focusedOnceRef.current),
+    };
     return () => {
       handleRef.current = null;
     };

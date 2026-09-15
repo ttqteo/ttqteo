@@ -16,3 +16,14 @@ export function focusContentStart(editor: Editor): void {
   }
   editor.chain().insertContentAt(0, { type: "paragraph" }).focus("start").run();
 }
+
+/**
+ * Quay lại viết sau khi rời editor, như lúc từ Xem trước về Viết: con trỏ về
+ * đúng chỗ đang gõ, vì ProseMirror vẫn giữ vùng chọn khi editor bị ẩn. Chưa gõ
+ * gì từ lúc mở trang thì vùng chọn đó chỉ là đầu bài mặc định, nên xuống cuối
+ * bài, chỗ bài đang viết dở.
+ */
+export function resumeWriting(editor: Editor, wasFocused: boolean): void {
+  if (wasFocused) editor.commands.focus();
+  else editor.commands.focus("end");
+}
