@@ -567,7 +567,12 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
 .code-gutter {
   @apply sticky left-0 z-[1] flex-none select-none bg-muted text-right text-muted-foreground/50;
   padding: 0 0.75rem 0 1.25rem;
-  white-space: pre;
+}
+/* Mỗi số một khối, không dựa vào `white-space: pre`: CSS mà tiptap tự chèn đặt
+   `white-space: normal` cho node không soạn được trong editor, và từng dồn cả
+   cột số lên một hàng. */
+.code-gutter > span {
+  display: block;
 }
 
 /* Sơ đồ mermaid trong bài viết. Dùng lại `.code-shell` và thanh của nó, chỉ

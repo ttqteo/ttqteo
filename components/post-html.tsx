@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MermaidDiagram } from "@/components/mermaid-diagram";
-import { gutterText } from "@/lib/code-gutter";
+import { lineCount } from "@/lib/code-gutter";
 import { highlightCodeIn } from "@/lib/code-highlight-dom";
 import { isMermaidPre, languageOf } from "@/lib/mermaid";
 
@@ -63,7 +63,12 @@ export function PostHtml({ html }: { html: string }) {
         const gutter = document.createElement("span");
         gutter.className = "code-gutter";
         gutter.setAttribute("aria-hidden", "true");
-        gutter.textContent = gutterText((code.textContent ?? "").replace(/\n$/, ""));
+        const lines = lineCount((code.textContent ?? "").replace(/\n$/, ""));
+        for (let n = 1; n <= lines; n += 1) {
+          const line = document.createElement("span");
+          line.textContent = String(n);
+          gutter.append(line);
+        }
         pre.prepend(gutter);
       }
 

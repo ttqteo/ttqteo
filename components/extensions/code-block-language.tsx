@@ -9,7 +9,7 @@ import {
   type NodeViewProps,
 } from "@tiptap/react";
 import { MermaidDiagram } from "@/components/mermaid-diagram";
-import { gutterText } from "@/lib/code-gutter";
+import { lineCount } from "@/lib/code-gutter";
 import { MERMAID_LANGUAGE } from "@/lib/mermaid";
 
 /**
@@ -112,7 +112,9 @@ function CodeBlockView({ node, updateAttributes, editor }: NodeViewProps) {
           suppressContentEditableWarning
           aria-hidden="true"
         >
-          {gutterText(node.textContent)}
+          {Array.from({ length: lineCount(node.textContent) }, (_, i) => (
+            <span key={i}>{i + 1}</span>
+          ))}
         </span>
         {/* The tag parameter is explicit because `as` is wrapped in NoInfer,
             so it cannot be deduced from the prop and would default to div. */}

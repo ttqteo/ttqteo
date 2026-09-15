@@ -22,10 +22,16 @@ describe("số dòng của khối code trong editor", () => {
     await waitFor(() =>
       expect(container.querySelector(".code-gutter")).not.toBeNull(),
     );
-    expect(container.querySelector(".code-gutter")?.textContent).toBe("1\n2\n3");
-    expect(container.querySelector(".code-gutter")?.getAttribute("contenteditable")).toBe(
-      "false",
-    );
+    const gutter = container.querySelector(".code-gutter")!;
+    // Mỗi số một phần tử, không phải một chuỗi "1\n2\n3": trong editor, CSS mà
+    // tiptap tự chèn đặt `white-space: normal` cho mọi node không soạn được, nên
+    // các dấu xuống dòng trong chuỗi bị gộp thành dấu cách, số dồn lên một hàng.
+    expect(Array.from(gutter.children, (line) => line.textContent)).toEqual([
+      "1",
+      "2",
+      "3",
+    ]);
+    expect(gutter.getAttribute("contenteditable")).toBe("false");
     // Phần soạn được chỉ có code, không lẫn số.
     expect(container.querySelector("pre > code")?.textContent).toBe(
       "int a;\nint b;\nint c;",

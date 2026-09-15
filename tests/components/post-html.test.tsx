@@ -44,7 +44,11 @@ describe("PostHtml", () => {
     // vì `<pre>` không vẽ nó.
     const gutters = container.querySelectorAll("pre > .code-gutter");
     expect(gutters).toHaveLength(1);
-    expect(gutters[0].textContent).toBe("1\n2\n3");
+    expect(Array.from(gutters[0].children, (line) => line.textContent)).toEqual([
+      "1",
+      "2",
+      "3",
+    ]);
     expect(gutters[0].getAttribute("aria-hidden")).toBe("true");
     expect(container.querySelector("pre > code")?.textContent).toBe("a\nb\nc\n");
   });
