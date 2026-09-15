@@ -34,6 +34,25 @@ describe("PostHtml", () => {
     expect(screen.getByRole("button", { name: "copy" })).toBeInTheDocument();
   });
 
+  it("đánh số dòng cạnh code, ngoài `<code>` nên không lọt vào chữ được copy", () => {
+    const { container } = render(
+      <StrictMode>
+        <PostHtml html={'<pre><code class="language-java">a\nb\nc\n</code></pre>'} />
+      </StrictMode>,
+    );
+    // Một cột số dù effect chạy hai lần; dòng trống cuối không được đánh số
+    // vì `<pre>` không vẽ nó.
+    const gutters = container.querySelectorAll("pre > .code-gutter");
+    expect(gutters).toHaveLength(1);
+    expect(Array.from(gutters[0].children, (line) => line.textContent)).toEqual([
+      "1",
+      "2",
+      "3",
+    ]);
+    expect(gutters[0].getAttribute("aria-hidden")).toBe("true");
+    expect(container.querySelector("pre > code")?.textContent).toBe("a\nb\nc\n");
+  });
+
   it("xử lý được bài có cả hai loại khối", async () => {
     const { container } = render(
       <PostHtml html={MERMAID + '<pre><code class="language-sql">select 1</code></pre>'} />,

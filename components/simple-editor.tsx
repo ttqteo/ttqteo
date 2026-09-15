@@ -12,16 +12,23 @@ import { Callout } from "./extensions/callout";
 import { PrivateNote } from "./extensions/private-note";
 import { SlashCommand } from "./extensions/slash-command";
 import { CodeAutoPairs } from "./extensions/code-auto-pairs";
+import { CodeIndent } from "./extensions/code-indent";
 import { CodeHighlighting } from "./extensions/code-highlighting";
 import { ListNesting, indentList } from "./extensions/list-nesting";
 import { SmartArrows } from "./extensions/smart-arrows";
+import { EditorTable } from "./extensions/table";
+import {
+  ImageUpload,
+  imageFilesFrom,
+  startImageUpload,
+} from "./extensions/image-upload";
+import { TableBubble } from "./table-bubble";
+import { FormatBubble } from "./format-bubble";
+import { linkBubbleShouldShow } from "./editor-bubbles";
+import { focusContentStart, resumeWriting } from "./editor-focus";
 import { bareUrl, type UnfurlResult } from "@/lib/unfurl";
 import { parseYoutubeUrl, youtubeEmbedSrc } from "@/lib/youtube";
 import {
-  Bold,
-  Italic,
-  Strikethrough,
-  Code,
   List,
   ListOrdered,
   Heading1,
@@ -34,10 +41,7 @@ import {
   Plus,
   ChevronDown,
   Pilcrow,
-  Undo,
-  Redo,
   Link2,
-  UnderlineIcon,
   Code2,
   ImageIcon,
   Loader2,
@@ -47,6 +51,7 @@ import {
   MonitorPlay,
   Lightbulb,
   StickyNote,
+  Table2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,10 +68,23 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useImageUpload } from "./use-image-upload";
 
+/** Việc trang soạn nhờ editor làm khi tiêu điểm đến từ bên ngoài. */
+export type SimpleEditorHandle = {
+  /** Con trỏ lên đầu nội dung, sẵn để gõ. */
+  focusStart: () => void;
+  /** Quay lại chỗ đang viết, hoặc xuống cuối bài nếu chưa viết gì. */
+  resume: () => void;
+};
+
 interface SimpleEditorProps {
   content: string;
   onChange: (content: string) => void;
   stickyTop?: string | null;
+  /**
+   * Được gán khi editor dựng xong. Là prop thường chứ không phải `ref`, vì
+   * editor nằm sau `next/dynamic` và prop thường thì chắc chắn đi qua được.
+   */
+  handleRef?: React.MutableRefObject<SimpleEditorHandle | null>;
 }
 
 /**
@@ -176,7 +194,12 @@ function ToolbarButton({
   );
 }
 
-export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEditorProps) {
+export function SimpleEditor({
+  content,
+  onChange,
+  stickyTop = null,
+  handleRef,
+}: SimpleEditorProps) {
   const { uploadImage, isUploading } = useImageUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pastePrompt, setPastePrompt] = useState<PastePrompt | null>(null);
@@ -212,11 +235,14 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
           class: "rounded-lg border my-4",
         },
       }),
+      ImageUpload,
       LinkCard,
       Callout,
       PrivateNote,
+      EditorTable,
       SlashCommand,
       CodeAutoPairs,
+      CodeIndent,
       CodeHighlighting,
       ListNesting,
       SmartArrows,
@@ -243,6 +269,17 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
           "editor-prose prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[max(500px,60vh)] p-4 pb-[clamp(400px,50vh,600px)] text-base leading-normal prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-h1:font-bold prose-h2:font-semibold prose-h3:font-semibold",
       },
       handlePaste: (view, event) => {
+        // Xét ảnh trước link: có file ảnh thì đó là thứ đang được dán (xem
+        // imageFilesFrom). Vùng đang bôi đen bị thay, như dán chữ.
+        const images = imageFilesFrom(event.clipboardData);
+        if (images.length > 0) {
+          if (!view.state.selection.empty) {
+            view.dispatch(view.state.tr.deleteSelection());
+          }
+          void startImageUpload(view, images, view.state.selection.from, uploadImage);
+          return true;
+        }
+
         const url = bareUrl(event.clipboardData?.getData("text/plain"));
         if (!url) return false;
 
@@ -281,6 +318,18 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
         });
         return true;
       },
+      // Thả file ảnh từ máy vào. Không có handler này thì ProseMirror bỏ qua
+      // file, và trình duyệt mở luôn ảnh trong tab, rời khỏi trang soạn.
+      handleDrop: (view, event, _slice, moved) => {
+        // Kéo một khối ngay trong editor là việc của ProseMirror.
+        if (moved) return false;
+        const images = imageFilesFrom(event.dataTransfer);
+        if (images.length === 0) return false;
+        const at = view.posAtCoords({ left: event.clientX, top: event.clientY });
+        if (!at) return false;
+        void startImageUpload(view, images, at.pos, uploadImage);
+        return true;
+      },
     },
   });
 
@@ -290,6 +339,31 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
       editor.commands.setContent(content || "");
     }
   }, [content, editor]);
+
+  // Editor đã được focus lần nào từ lúc mở trang chưa: `resume` dựa vào đó để
+  // chọn giữa về chỗ cũ và xuống cuối bài.
+  const focusedOnceRef = useRef(false);
+  useEffect(() => {
+    if (!editor) return;
+    const onFocus = () => {
+      focusedOnceRef.current = true;
+    };
+    editor.on("focus", onFocus);
+    return () => {
+      editor.off("focus", onFocus);
+    };
+  }, [editor]);
+
+  useEffect(() => {
+    if (!editor || !handleRef) return;
+    handleRef.current = {
+      focusStart: () => focusContentStart(editor),
+      resume: () => resumeWriting(editor, focusedOnceRef.current),
+    };
+    return () => {
+      handleRef.current = null;
+    };
+  }, [editor, handleRef]);
 
   // Keep the offer anchored to its link while the author keeps writing. Without
   // remapping, typing above the link would leave the menu pointing at whatever
@@ -401,22 +475,6 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
     setPastePrompt(null);
   };
 
-  const addLink = () => {
-    const previous = editor.getAttributes("link").href as string | undefined;
-    const url = window.prompt("URL (để trống để xoá link):", previous ?? "");
-    if (url === null) return;
-    if (url === "") {
-      editor.chain().focus().extendMarkRange("link").unsetLink().run();
-      return;
-    }
-    editor
-      .chain()
-      .focus()
-      .extendMarkRange("link")
-      .setLink({ href: url })
-      .run();
-  };
-
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -444,23 +502,9 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
         className={`z-30 flex flex-wrap gap-1 p-2 bg-background/95 backdrop-blur ${stickyTop !== null ? "sticky" : ""}`}
         style={stickyTop !== null ? { top: stickyTop } : undefined}
       >
-        {/* Undo/Redo */}
-        <ToolbarButton
-          onClick={() => editor.chain().focus().undo().run()}
-          disabled={!editor.can().undo()}
-          tooltip="Undo (⌘Z)"
-        >
-          <Undo className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().redo().run()}
-          disabled={!editor.can().redo()}
-          tooltip="Redo (⌘⇧Z)"
-        >
-          <Redo className="w-4 h-4" />
-        </ToolbarButton>
-
-        <div className="w-px h-6 bg-border mx-1" />
+        {/* Chỉ còn thứ dùng ở mọi dòng: kiểu khối, list, thụt lề và "+".
+            Định dạng chữ nằm trong FormatBubble, hiện khi bôi đen; undo/redo
+            để cho Ctrl+Z. Thanh này từng lên 14 nút và tràn sang hàng hai. */}
 
         {/* Block style in one control, the way Substack keeps its Style menu.
             Four buttons that are mutually exclusive read better as a menu
@@ -531,54 +575,6 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
 
         <div className="w-px h-6 bg-border mx-1" />
 
-        {/* Text Formatting */}
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          isActive={editor.isActive("bold")}
-          tooltip="Bold (⌘B)"
-        >
-          <Bold className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          isActive={editor.isActive("italic")}
-          tooltip="Italic (⌘I)"
-        >
-          <Italic className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-          isActive={editor.isActive("underline")}
-          tooltip="Underline (⌘U)"
-        >
-          <UnderlineIcon className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-          isActive={editor.isActive("strike")}
-          tooltip="Strikethrough"
-        >
-          <Strikethrough className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleCode().run()}
-          isActive={editor.isActive("code")}
-          tooltip="Inline Code"
-        >
-          <Code className="w-4 h-4" />
-        </ToolbarButton>
-
-        <div className="w-px h-6 bg-border mx-1" />
-
-        {/* Link */}
-        <ToolbarButton
-          onClick={addLink}
-          isActive={editor.isActive("link")}
-          tooltip="Add Link"
-        >
-          <Link2 className="w-4 h-4" />
-        </ToolbarButton>
-
         {/* Indent / outdent. Tab and Shift-Tab do the same thing, but a list
             nested under another list is not a discoverable feature without a
             control that says it exists. */}
@@ -643,6 +639,18 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
             >
               <Code2 className="w-4 h-4 mr-2" />
               Khối code
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() =>
+                editor
+                  .chain()
+                  .focus()
+                  .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+                  .run()
+              }
+            >
+              <Table2 className="w-4 h-4 mr-2" />
+              Table
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={() => editor.chain().focus().toggleCallout("note").run()}
@@ -730,6 +738,8 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
           `isActive("link")` fires and the two menus stack on top of each
           other. */}
       {!pastePrompt && <LinkBubble editor={editor} />}
+      <TableBubble editor={editor} />
+      <FormatBubble editor={editor} />
     </div>
   );
 }
@@ -748,10 +758,6 @@ export function SimpleEditor({ content, onChange, stickyTop = null }: SimpleEdit
  * lifting it out.
  */
 const LINK_BUBBLE_OPTIONS = { placement: "bottom" } as const;
-
-function linkBubbleShouldShow({ editor }: { editor: Editor }): boolean {
-  return editor.isEditable && editor.isActive("link");
-}
 
 function LinkBubble({ editor }: { editor: Editor }) {
   const [href, setHref] = useState("");

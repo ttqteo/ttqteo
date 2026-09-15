@@ -3,7 +3,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/ttqteo/ttqteo">
-    <img src="public/images/logo.png" alt="Logo" width="80" height="80" style="border-radius: 100%;">
+    <img src="public/images/ttqteo.png" alt="Logo" width="80" height="80">
   </a>
 
   <h3 align="center">ttqteo</h3>

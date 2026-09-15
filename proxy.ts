@@ -46,5 +46,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/auth/callback"],
+  // /auth/callback cố ý nằm ngoài. Route đó tự tạo phiên từ `code`, nên không
+  // cần làm mới gì trước. Chạy getUser() ở đây khi trình duyệt còn giữ một
+  // phiên đã chết thì auth-js dọn phiên và xoá luôn code verifier của PKCE,
+  // nên lần đổi `code` ngay sau đó thất bại và không đăng nhập lại được. Xem
+  // tests/proxy.test.ts.
+  matcher: ["/admin/:path*"],
 };

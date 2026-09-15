@@ -3,12 +3,14 @@
 import { Extension, ReactRenderer, type ChainedCommands, type Editor, type Range } from "@tiptap/react";
 import { PluginKey } from "@tiptap/pm/state";
 import Suggestion from "@tiptap/suggestion";
-import { Code2, Lightbulb, Quote, StickyNote, type LucideIcon } from "lucide-react";
+import { Code2, Lightbulb, Quote, StickyNote, Table2, type LucideIcon } from "lucide-react";
 import { forwardRef, useImperativeHandle, useState } from "react";
 import { cn } from "@/lib/utils";
+import { CODE_LANGUAGES } from "./code-block-language";
 
 export type SlashItem = {
-  id: "callout" | "code" | "note" | "quote";
+  /** `code:<ngôn ngữ>` là các mục "/code" + tên ngôn ngữ, xem codeLanguageItems. */
+  id: "callout" | "code" | "note" | "quote" | "table" | `code:${string}`;
   label: string;
   /** Tên khác để gõ tìm, ngoài `label`. So khớp bỏ dấu, bỏ khoảng trắng. */
   keywords: string[];
@@ -46,6 +48,13 @@ const SLASH_ITEMS: SlashItem[] = [
     icon: Quote,
     apply: (chain) => chain.toggleBlockquote(),
   },
+  {
+    id: "table",
+    label: "Table",
+    keywords: ["bảng"],
+    icon: Table2,
+    apply: (chain) => chain.insertTable({ rows: 3, cols: 3, withHeaderRow: true }),
+  },
 ];
 
 /**
@@ -62,11 +71,57 @@ function fold(text: string): string {
     .replace(/\s+/g, "");
 }
 
+/**
+ * Tên tắt gõ được sau "/code", ngoài tên đầy đủ. Là đuôi file quen tay, nên
+ * "/codejs" ra javascript và "/codeyml" ra yaml.
+ */
+const LANGUAGE_ALIASES: Partial<Record<(typeof CODE_LANGUAGES)[number], string[]>> = {
+  bash: ["sh", "shell"],
+  cpp: ["c++"],
+  csharp: ["c#"],
+  docker: ["dockerfile"],
+  javascript: ["js"],
+  kotlin: ["kt"],
+  markdown: ["md"],
+  python: ["py"],
+  ruby: ["rb"],
+  rust: ["rs"],
+  typescript: ["ts"],
+  yaml: ["yml"],
+};
+
+const CODE_PREFIX = "code";
+
+/**
+ * "/code" rồi tên ngôn ngữ: mỗi ngôn ngữ khớp thành một mục, tạo khối code đã
+ * chọn sẵn ngôn ngữ đó, nên "/codej" gợi ý java, javascript, json. "/code"
+ * trần thì không liệt kê: hai mươi mấy ngôn ngữ sẽ đẩy mục "Khối code" đi mất.
+ */
+function codeLanguageItems(needle: string): SlashItem[] {
+  if (!needle.startsWith(CODE_PREFIX)) return [];
+  const typed = needle.slice(CODE_PREFIX.length);
+  if (!typed) return [];
+  return CODE_LANGUAGES.filter((language) =>
+    [language, ...(LANGUAGE_ALIASES[language] ?? [])].some((name) =>
+      name.startsWith(typed),
+    ),
+  ).map((language) => ({
+    id: `code:${language}`,
+    label: language,
+    keywords: [],
+    icon: Code2,
+    apply: (chain) => chain.toggleCodeBlock({ language }),
+  }));
+}
+
 export function filterSlashItems(query: string): SlashItem[] {
   const needle = fold(query);
-  return SLASH_ITEMS.filter((item) =>
-    [item.label, ...item.keywords].some((name) => fold(name).includes(needle)),
-  );
+  return [
+    ...SLASH_ITEMS.filter((item) =>
+      [item.label, ...item.keywords].some((name) => fold(name).includes(needle)),
+    ),
+    ...codeLanguageItems(needle),
+  ];
 }
 
 /** Xoá "/query" vừa gõ rồi chạy lệnh trong cùng một chain, nên một lần undo là về như cũ. */

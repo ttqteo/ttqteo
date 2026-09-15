@@ -497,14 +497,14 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   padding: 0.75rem 0 !important;
 }
 .code-block-shell > pre > code {
-  /* inline-block, not block: the <pre> scrolls horizontally, and a block child
-     drops its right padding as soon as the content overflows, so a long line
-     ends up flush against the edge. inline-block sizes to the content and keeps
-     both sides; min-width holds the background across the full width when the
-     line is short. */
-  display: inline-block;
-  min-width: 100%;
-  padding: 0 1.25rem !important;
+  /* The <pre> is a row, line numbers then code (see `.code-gutter`), and it
+     scrolls horizontally. The code grows from its content width rather than
+     being a plain block: a block drops its right padding as soon as the
+     content overflows, so a long line would end up flush against the edge.
+     Growing also fills the row when every line is short. */
+  display: block;
+  flex: 1 0 auto;
+  padding: 0 1.25rem 0 0.75rem !important;
 }
 
 /* Code blocks in a rendered post. The bar and button are built by PostHtml at
@@ -539,9 +539,9 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
 }
 .code-shell > pre > code {
   /* See the note on `.code-block-shell > pre > code`. */
-  display: inline-block;
-  min-width: 100%;
-  padding: 0 1.25rem !important;
+  display: block;
+  flex: 1 0 auto;
+  padding: 0 1.25rem 0 0.75rem !important;
 }
 
 /* Đoạn chữ mà prism không gắn class token nào phải lấy màu chữ thường.
@@ -553,6 +553,26 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
 .code-shell > pre,
 .code-block-shell > pre {
   color: inherit;
+}
+
+/* Số dòng của khối code, lúc soạn lẫn trên trang đọc: `<pre>` thành một hàng,
+   cột số rồi tới `<code>`. Cột số kế thừa cỡ chữ và line-height từ `<pre>` y
+   như `<code>`, nên số nào cũng đứng ngang dòng của nó mà không phải đo. Nó
+   dính mép trái khi code cuộn ngang, nên cần nền đặc cùng màu khối để che chữ
+   trôi bên dưới. */
+.code-shell > pre,
+.code-block-shell > pre {
+  display: flex;
+}
+.code-gutter {
+  @apply sticky left-0 z-[1] flex-none select-none bg-muted text-right text-muted-foreground/50;
+  padding: 0 0.75rem 0 1.25rem;
+}
+/* Mỗi số một khối, không dựa vào `white-space: pre`: CSS mà tiptap tự chèn đặt
+   `white-space: normal` cho node không soạn được trong editor, và từng dồn cả
+   cột số lên một hàng. */
+.code-gutter > span {
+  display: block;
 }
 
 /* Sơ đồ mermaid trong bài viết. Dùng lại `.code-shell` và thanh của nó, chỉ
@@ -667,6 +687,72 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
 }
 .private-note-body > :last-child {
   @apply mb-0;
+}
+
+/* Bảng soạn bằng editor. HTML đã lưu là `div.tableWrapper > table > colgroup +
+   tbody`, và hàng tiêu đề là `<th>` nằm trong `<tbody>` chứ không có `<thead>`,
+   nên style bảng của Tailwind Typography (nhắm `thead th`) không chạm tới nó.
+   Viết một lần cho cả khung soạn lẫn trang đọc, như nhịp khối ở trên, để Xem
+   trước khớp với lúc soạn. Bảng của bài MDX vẫn theo Typography. */
+.tableWrapper {
+  @apply overflow-x-auto;
+}
+.editor-prose table,
+.editor-html table {
+  @apply my-0 w-full border-collapse;
+  /* Một cỡ cho cả hai bề mặt. Typography cho `prose-sm` (editor) và `prose`
+     (trang đọc) hai cỡ chữ bảng khác nhau. */
+  font-size: 0.9em;
+}
+.editor-prose :is(th, td),
+.editor-html :is(th, td) {
+  @apply border border-border px-3 py-1.5 text-left align-top;
+}
+.editor-prose th,
+.editor-html th {
+  @apply bg-muted/50 font-semibold;
+}
+/* Mỗi ô chứa khối (ít nhất một `<p>`), và margin đoạn văn của Typography làm
+   ô nào cũng cao gấp đôi chữ bên trong. */
+.editor-prose :is(th, td) > *,
+.editor-html :is(th, td) > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.editor-prose :is(th, td) > * + *,
+.editor-html :is(th, td) > * + * {
+  margin-top: 0.5em;
+}
+/* Trong editor cột chia đều theo bề rộng bảng chứ không theo chữ. Với
+   `table-layout: auto` (mặc định, Typography cũng đặt vậy) trình duyệt chia lại
+   cột ở mỗi phím gõ, nên cả bảng xô qua xô lại trong lúc điền một ô. Trang đọc
+   và Xem trước giữ `auto`: ở đó không ai gõ, cột vừa khít chữ dễ đọc hơn, và
+   bảng rộng vẫn cuộn ngang được trên điện thoại. */
+.editor-prose table {
+  table-layout: fixed;
+}
+.editor-prose :is(th, td) {
+  /* Cột đã cố định thì một URL dài phải tự xuống dòng, không thì tràn sang ô
+     bên cạnh. */
+  overflow-wrap: break-word;
+}
+/* Kéo chuột qua nhiều ô thì prosemirror-tables gắn `.selectedCell` cho từng ô.
+   Không có quy tắc này thì vùng chọn không hiện gì. Chỉ có trong editor. */
+.editor-prose :is(th, td) {
+  position: relative;
+}
+.editor-prose .selectedCell::after {
+  @apply pointer-events-none absolute inset-0 bg-primary/10;
+  content: "";
+}
+
+/* Ảnh dán hay thả vào editor, trong lúc đang tải lên (xem
+   extensions/image-upload.ts). Bản xem trước mờ đi cho tới khi có URL thật. */
+.editor-prose .image-upload-placeholder {
+  display: block;
+}
+.editor-prose .image-upload-placeholder img {
+  @apply my-4 max-h-80 animate-pulse rounded-lg border opacity-50;
 }
 
 

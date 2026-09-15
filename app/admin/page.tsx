@@ -16,6 +16,8 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const user = await getUser();
 
   if (!user) {
+    // /auth/callback gửi về đây kèm cờ này khi đăng nhập thất bại.
+    const loginFailed = (await searchParams).login === "failed";
     return (
       <div className="max-w-[720px] mx-auto px-4">
         <div className="min-h-[70vh] flex flex-col items-center justify-center gap-8">
@@ -26,6 +28,11 @@ export default async function AdminPage({ searchParams }: PageProps) {
             </p>
           </div>
           <LoginButton />
+          {loginFailed && (
+            <p role="alert" className="text-sm text-destructive">
+              Đăng nhập không thành công. Thử lại nhé.
+            </p>
+          )}
         </div>
       </div>
     );

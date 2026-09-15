@@ -493,11 +493,11 @@ export function MindmapViewer() {
               <div className="select-none opacity-80 hover:opacity-100 transition-opacity">
                 <div className="flex items-center gap-2">
                   <Image
-                    src="/images/logo.png"
+                    src="/images/ttqteo.png"
                     width={24}
                     height={24}
                     alt="ttqteo"
-                    className="rounded-full shadow-sm"
+                    className="drop-shadow-sm"
                   />
                   {(user || storage?.syncCode) && (
                     <div
