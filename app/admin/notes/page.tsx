@@ -1,3 +1,4 @@
+import { PostHtml } from "@/components/post-html";
 import { getPostsWithPrivateNotes } from "@/lib/posts";
 import { getUser, isAdmin } from "@/lib/supabase-server";
 import { cn } from "@/lib/utils";
@@ -68,10 +69,13 @@ export default async function AdminNotesPage() {
                   <EyeOffIcon className="h-3 w-3" aria-hidden />
                   {post.notes.length > 1 ? `ghi chú ${i + 1}/${post.notes.length}` : "ghi chú"}
                 </div>
-                {/* The admin's own markup from the editor, never a reader's. */}
-                <div
+                {/* The admin's own markup from the editor, never a reader's.
+                    Through PostHtml, like the published page, so a code block
+                    gets its language bar, copy button, line numbers and
+                    colours instead of a bare <pre>. */}
+                <PostHtml
+                  html={html}
                   className="private-note-body prose prose-sm prose-zinc dark:prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: html }}
                 />
               </aside>
             ))}

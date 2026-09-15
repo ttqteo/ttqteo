@@ -6,6 +6,7 @@ import { MermaidDiagram } from "@/components/mermaid-diagram";
 import { lineCount } from "@/lib/code-gutter";
 import { highlightCodeIn } from "@/lib/code-highlight-dom";
 import { isMermaidPre, languageOf } from "@/lib/mermaid";
+import { cn } from "@/lib/utils";
 
 const COPY = "copy";
 const COPIED = "đã copy";
@@ -22,7 +23,14 @@ type Slot = { key: string; container: HTMLElement; source: string };
  * MDX posts do not come through here — they render as real components and get
  * their button from `components/markdown/pre.tsx` — so the two cannot double up.
  */
-export function PostHtml({ html }: { html: string }) {
+export function PostHtml({
+  html,
+  className,
+}: {
+  html: string;
+  /** Thêm vào chính div chứa HTML, không bọc thêm lớp nào (xem trang Ghi chú riêng). */
+  className?: string;
+}) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [slots, setSlots] = useState<Slot[]>([]);
   // React 19 so sánh prop bằng identity, nên một object `{ __html }` mới ở
@@ -157,7 +165,11 @@ export function PostHtml({ html }: { html: string }) {
 
   return (
     <>
-      <div ref={ref} className="editor-html" dangerouslySetInnerHTML={inner} />
+      <div
+        ref={ref}
+        className={cn("editor-html", className)}
+        dangerouslySetInnerHTML={inner}
+      />
       {slots.map((slot) =>
         createPortal(<MermaidDiagram source={slot.source} />, slot.container, slot.key),
       )}
