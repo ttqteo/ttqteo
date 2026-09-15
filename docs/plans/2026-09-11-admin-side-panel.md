@@ -12,6 +12,34 @@
 
 ---
 
+## Thay đổi khi làm, so với plan gốc
+
+Code trên nhánh là bản đúng. Các khối code trong plan khớp với code tới Task 15, trừ lần sửa cuối của kho note. Từ Task 17 trở đi, code có thêm các thay đổi sau review mà các khối code trong plan không ghi lại. Những thay đổi chính:
+
+- **Ghi nhanh lưu theo nguyên tắc bản sửa mới nhất thắng.**
+  - Trình duyệt đóng dấu `updated_at` cho mỗi lần sửa, luôn sau bản trước (`nextStamp`).
+  - Server chỉ ghi đè bản cũ hơn. Nó từ chối dấu nhanh hơn giờ server quá 5 phút (`code: "clock_ahead"`), và trả 404 `note_deleted` khi note bị xoá đúng lúc đang lưu. Nó bỏ ký tự NUL và thay nửa cặp surrogate.
+  - Kho note có hàng chờ riêng cho từng note. Khi lưu hỏng, kho chỉ giữ bản mới nhất đã gửi.
+  - Lúc đóng tab, kho gửi bằng `keepalive` cả những bản đã gửi mà chưa có trả lời, trong tổng 60 KB.
+  - Kho tải lại danh sách khi quay lại tab hay mở lại panel, nếu không còn gì chờ lưu.
+- **`adminFetch`** mang theo `code` của route, và coi một phản hồi thành công mà không đọc được là lỗi. Toast "Cần đăng nhập lại" chỉ có một, không tự tắt, và tự gỡ khi có request đi qua được (`clearAdminSession`).
+- **Kho task** có hàng chờ riêng cho từng task. Khi lưu hỏng, task trở về bản server đang giữ (`confirmed`). Nút Undo trên toast tick dùng bản hiện tại của task.
+- **Kho lịch** chỉ tải khi người dùng đã là admin.
+  - Múi giờ không được định nghĩa trong file lịch thì quy đổi bằng `Intl`. Giờ không ghi múi giờ được hiểu là Asia/Ho_Chi_Minh.
+  - Id sự kiện có kèm tên lịch.
+  - Khoảng ngày hỏi được giới hạn trong 5 năm quanh hôm nay.
+  - Log không bao giờ ghi link lịch.
+- **Focus:**
+  - Chỉ nhớ chỗ đang focus khi nó nằm ngoài sidebar.
+  - Focus trong popover (portal) vẫn tính là trong panel.
+  - Rời editor, tick, xoá hay sửa tên xong thì focus vẫn ở lại trong panel.
+- **Test:** ngoài hàm thuần trong `lib/`, có thêm `lib/admin-api.test.ts` và hai test kho dữ liệu (`use-notes-store.test.ts`, `use-tasks-store.test.ts`) cho những chỗ dễ mất dữ liệu. Con số "gồm N test mới" ở Task 31 không còn đúng.
+- **Biết trước, chưa làm:**
+  - Xoá note là xoá thật, nên một tab cũ vẫn có thể tạo lại note vừa bị xoá ở tab khác.
+  - Sự kiện dùng một tên múi giờ lạ mà file lịch không định nghĩa sẽ bị bỏ qua.
+  - Tạo sự kiện bằng "+ Sự kiện" xong phải bấm ↻ thì mới thấy.
+  - `discardIfBlank` bỏ qua lỗi khi xoá note trống.
+
 ## Trước khi bắt đầu
 
 - Làm trên nhánh riêng: `git switch -c feat/admin-side-panel`, hoặc tạo worktree theo @superpowers:using-git-worktrees.
