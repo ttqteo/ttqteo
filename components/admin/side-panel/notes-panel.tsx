@@ -18,12 +18,23 @@ import { PanelNotice } from "./panel-notice";
 import { useSidePanel } from "./side-panel-provider";
 import type { SaveState } from "./use-notes-store";
 
+/** Whether `el` already sits fully inside the visible part of `scrollArea`. */
+function isWithinScrollArea(el: HTMLElement, scrollArea: HTMLElement): boolean {
+  const elRect = el.getBoundingClientRect();
+  const areaRect = scrollArea.getBoundingClientRect();
+  return elRect.top >= areaRect.top && elRect.bottom <= areaRect.bottom;
+}
+
 export function NotesPanel({ autoFocus }: { autoFocus: boolean }) {
   const { notes } = useSidePanel();
   const { flush, discardIfBlank } = notes;
   const [editingId, setEditingId] = useState<string | null>(null);
   // null while the search box is closed; the capture box sits there instead.
   const [query, setQuery] = useState<string | null>(null);
+  // The id of the note just left, so focus can land back on its card once the
+  // list is showing again; cleared once that focus has been applied.
+  const leftNoteId = useRef<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Leaving a note, by the back arrow or by closing the panel, saves what is
   // waiting and drops the note if nothing was written in it.
@@ -40,6 +51,27 @@ export function NotesPanel({ autoFocus }: { autoFocus: boolean }) {
     [notes.notes, query],
   );
   const editing = editingId ? notes.notes.find((note) => note.id === editingId) : undefined;
+  // The note being edited disappeared (deleted elsewhere, or dropped by a
+  // refresh): drop editingId too, or the editor would reopen if it comes back.
+  if (editingId && !editing && notes.status === "ready") setEditingId(null);
+
+  // After leaving the editor, focus lands on the card of the note just left,
+  // or the capture box if that card is gone. Scrolling only happens for a
+  // card outside the panel's own scroll area; one already in view stays put.
+  useEffect(() => {
+    const id = leftNoteId.current;
+    if (id === null || editingId !== null) return;
+    leftNoteId.current = null;
+    const root = listRef.current;
+    const card = root?.querySelector<HTMLElement>(`[data-note-id="${id}"]`);
+    if (card) {
+      const scrollArea = card.closest<HTMLElement>(".overflow-y-auto");
+      const inView = !scrollArea || isWithinScrollArea(card, scrollArea);
+      card.focus(inView ? { preventScroll: true } : undefined);
+    } else {
+      root?.querySelector<HTMLElement>("[data-note-capture]")?.focus();
+    }
+  }, [editingId]);
 
   if (notes.status === "missing_table" || notes.status === "error") {
     return <PanelNotice kind={notes.status} onRetry={notes.reload} />;
@@ -50,14 +82,17 @@ export function NotesPanel({ autoFocus }: { autoFocus: boolean }) {
       <NoteEditor
         note={editing}
         saveState={notes.saveState[editing.id]}
-        onBack={() => setEditingId(null)}
+        onBack={() => {
+          leftNoteId.current = editing.id;
+          setEditingId(null);
+        }}
       />
     );
   }
 
   const ready = notes.status === "ready";
   return (
-    <div className="space-y-3 p-3">
+    <div ref={listRef} className="space-y-3 p-3">
       <div className="flex items-center gap-1.5">
         {query === null ? (
           <CaptureBox
@@ -71,11 +106,12 @@ export function NotesPanel({ autoFocus }: { autoFocus: boolean }) {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key !== "Escape") return;
+              if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
               event.stopPropagation();
               setQuery(null);
             }}
             placeholder="Tìm trong ghi nhanh…"
+            aria-label="Tìm trong ghi nhanh"
             className="h-9"
           />
         )}
@@ -158,10 +194,12 @@ function CaptureBox({
   return (
     <Input
       ref={input}
+      data-note-capture
       value={draft}
       disabled={disabled}
       maxLength={MAX_NOTE_LENGTH}
       placeholder="Ghi gì đó…"
+      aria-label="Ghi nhanh mới"
       className="h-9"
       onCompositionStart={() => {
         composing.current = true;
@@ -194,6 +232,7 @@ function NoteCard({
     <button
       type="button"
       onClick={onOpen}
+      data-note-id={note.id}
       className="block w-full rounded-lg border bg-card p-3 text-left transition-colors hover:bg-muted/50"
     >
       <span className="flex items-start gap-2">
@@ -209,7 +248,9 @@ function NoteCard({
           <PinIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Đã ghim" />
         )}
         {failed && (
-          <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-destructive" title="Chưa lưu được" />
+          <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-destructive" title="Chưa lưu được">
+            <span className="sr-only">Chưa lưu được</span>
+          </span>
         )}
       </span>
       {preview && (
@@ -291,7 +332,7 @@ function NoteEditor({
             size="icon"
             className="h-8 w-8"
             onClick={() => notes.togglePin(note)}
-            aria-label={note.pinned ? "Bỏ ghim" : "Ghim"}
+            aria-label="Ghim"
             aria-pressed={note.pinned}
           >
             {note.pinned ? <PinOffIcon className="h-4 w-4" /> : <PinIcon className="h-4 w-4" />}
@@ -317,6 +358,7 @@ function NoteEditor({
         onChange={(event) => notes.edit(note, event.target.value)}
         maxLength={MAX_NOTE_LENGTH}
         placeholder="Ghi gì đó…"
+        aria-label="Nội dung note"
         rows={6}
         className="w-full flex-1 resize-none bg-transparent px-4 py-3 text-sm leading-relaxed outline-none"
       />
