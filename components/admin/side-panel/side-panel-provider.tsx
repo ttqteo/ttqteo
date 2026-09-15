@@ -21,6 +21,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import { useNotesStore, type NotesStore } from "./use-notes-store";
+import { useTasksStore, type TasksStore } from "./use-tasks-store";
 
 type SidePanelContextValue = {
   /** The open panel, on screens with room for the rail; null when closed. */
@@ -34,6 +35,7 @@ type SidePanelContextValue = {
   setSheetOpen: (open: boolean) => void;
   sheetTab: AdminPanelId;
   setSheetTab: (id: AdminPanelId) => void;
+  tasks: TasksStore;
   notes: NotesStore;
   /** Marks an element, portalled popovers included, as focus inside the panel. */
   notePanelFocus: (el: HTMLElement) => void;
@@ -166,6 +168,8 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
     return () => query.removeEventListener("change", onChange);
   }, []);
 
+  // Tasks load as soon as the owner is known: the rail badge needs them.
+  const tasks = useTasksStore(admin);
   const notesShowing = panel === "notes" || (sheetOpen && sheetTab === "notes");
   const notes = useNotesStore(admin && notesShowing);
 
@@ -179,10 +183,11 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
       setSheetOpen,
       sheetTab,
       setSheetTab,
+      tasks,
       notes,
       notePanelFocus,
     }),
-    [panel, openedByUser, toggle, close, sheetOpen, sheetTab, notes, notePanelFocus],
+    [panel, openedByUser, toggle, close, sheetOpen, sheetTab, tasks, notes, notePanelFocus],
   );
 
   return <SidePanelContext.Provider value={value}>{children}</SidePanelContext.Provider>;
