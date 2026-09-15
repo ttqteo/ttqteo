@@ -22,6 +22,7 @@ import {
   type EditorWidth,
 } from "@/lib/editor-prefs";
 import { isComposingKey, isSaveShortcut } from "@/lib/editor-keys";
+import { editorTitle } from "@/lib/editor-title";
 import { navigationTarget } from "@/lib/nav-guard";
 import { clearWriterResume, setWriterResume } from "@/lib/resume-storage";
 import { cn } from "@/lib/utils";
@@ -395,9 +396,10 @@ export default function EditPostClient({
     return () => target.removeEventListener("scroll", onScroll);
   }, [showTldraw]);
 
-  // Update document title with post title
+  // Tiêu đề tab theo tiêu đề đang gõ. Lúc vào trang thì metadata của route đã
+  // đặt đúng nó (xem page.tsx); effect này chỉ để theo kịp khi gõ.
   useEffect(() => {
-    document.title = `edit • ${post.title}` || "New Post";
+    document.title = editorTitle(post.title);
   }, [post.title]);
 
   // Hand the title over to the header once it scrolls away, so there is always

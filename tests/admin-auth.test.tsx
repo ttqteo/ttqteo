@@ -22,7 +22,29 @@ vi.mock("@/app/admin/posts-browser", () => ({ PostsBrowser: () => null }));
 vi.mock("@/app/admin/edit/[id]/edit-post-client", () => ({ default: () => null }));
 
 import AdminPage from "@/app/admin/page";
-import EditPostPage from "@/app/admin/edit/[id]/page";
+import EditPostPage, { generateMetadata } from "@/app/admin/edit/[id]/page";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
+
+describe("tiêu đề tab của trang soạn", () => {
+  it("bài có sẵn: lấy tiêu đề đã lưu", async () => {
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      from: () => ({
+        select: () => ({
+          eq: () => ({ single: async () => ({ data: { title: "Java là gì" } }) }),
+        }),
+      }),
+    } as never);
+    const metadata = await generateMetadata({ params: Promise.resolve({ id: "1" }) });
+    expect(metadata.title).toEqual({ absolute: "edit • Java là gì" });
+  });
+
+  it("bài mới: New Post, không đọc database", async () => {
+    vi.mocked(createSupabaseServerClient).mockClear();
+    const metadata = await generateMetadata({ params: Promise.resolve({ id: "new" }) });
+    expect(metadata.title).toEqual({ absolute: "edit • New Post" });
+    expect(createSupabaseServerClient).not.toHaveBeenCalled();
+  });
+});
 
 describe("chưa đăng nhập", () => {
   it("/admin hiện nút đăng nhập, và báo lỗi khi callback trả về ?login=failed", async () => {
