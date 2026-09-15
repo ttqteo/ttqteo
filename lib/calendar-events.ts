@@ -34,7 +34,10 @@ export function occursOn(event: CalendarEvent, day: DateKey): boolean {
   if (event.allDay) return event.start <= day && day < event.end;
   const dayStart = fromDateKey(day).getTime();
   const dayEnd = fromDateKey(addDaysToKey(day, 1)).getTime();
-  return Date.parse(event.start) < dayEnd && Date.parse(event.end) > dayStart;
+  const startMs = Date.parse(event.start);
+  // A zero-length event exactly at midnight has end === start === dayStart,
+  // which `end > dayStart` alone would miss.
+  return startMs < dayEnd && (Date.parse(event.end) > dayStart || startMs === dayStart);
 }
 
 /** The day's agenda: all-day events first by title, then timed ones by start. */

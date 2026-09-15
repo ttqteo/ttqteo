@@ -43,6 +43,12 @@ describe("occursOn", () => {
     expect(occursOn(evening, "2026-09-14")).toBe(false);
   });
 
+  it("shows a zero-length event exactly at local midnight on that day", () => {
+    const midnight = event({ start: at(14, 0), end: at(14, 0) });
+    expect(occursOn(midnight, "2026-09-14")).toBe(true);
+    expect(occursOn(midnight, "2026-09-13")).toBe(false);
+  });
+
   it("treats an all-day end as exclusive", () => {
     const trip = event({ allDay: true, start: "2026-09-14", end: "2026-09-16" });
     expect(["2026-09-13", "2026-09-14", "2026-09-15", "2026-09-16"].map((d) => occursOn(trip, d)))
