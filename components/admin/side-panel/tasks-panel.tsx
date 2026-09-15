@@ -7,7 +7,7 @@ import { dueLabel, groupTasks, MAX_TASK_TITLE, type AdminTask } from "@/lib/admi
 import { toDateKey, type DateKey } from "@/lib/date-key";
 import { cn } from "@/lib/utils";
 import { ChevronRightIcon, Trash2Icon } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from "react";
 import { DuePicker } from "./due-picker";
 import { PanelNotice } from "./panel-notice";
 import { useSidePanel } from "./side-panel-provider";
@@ -19,6 +19,11 @@ export function TasksPanel({ autoFocus }: { autoFocus: boolean }) {
   const today = toDateKey(now);
   const groups = useMemo(() => groupTasks(tasks.tasks, today, now), [tasks.tasks, today, now]);
   const [showDone, setShowDone] = useState(false);
+  // The frame closes on Esc only while focus is inside it, so a tick or a
+  // delete - which can remove the row focus was on - sends focus here rather
+  // than letting it drop to <body>.
+  const newTaskInput = useRef<HTMLInputElement>(null);
+  const focusNewTask = () => newTaskInput.current?.focus({ preventScroll: true });
 
   if (tasks.status === "missing_table" || tasks.status === "error") {
     return <PanelNotice kind={tasks.status} onRetry={tasks.reload} />;
@@ -29,7 +34,12 @@ export function TasksPanel({ autoFocus }: { autoFocus: boolean }) {
 
   return (
     <div className="space-y-4 p-3">
-      <NewTask today={today} autoFocus={autoFocus} disabled={tasks.status !== "ready"} />
+      <NewTask
+        today={today}
+        autoFocus={autoFocus}
+        disabled={tasks.status !== "ready"}
+        inputRef={newTaskInput}
+      />
 
       {(tasks.status === "idle" || tasks.status === "loading") && (
         <p className="py-6 text-center text-xs text-muted-foreground">Đang tải…</p>
@@ -38,10 +48,10 @@ export function TasksPanel({ autoFocus }: { autoFocus: boolean }) {
         <p className="py-6 text-center text-sm text-muted-foreground">Không còn việc nào.</p>
       )}
 
-      <TaskGroup title="Quá hạn" danger tasks={groups.overdue} today={today} />
-      <TaskGroup title="Hôm nay" tasks={groups.today} today={today} />
-      <TaskGroup title="Sắp tới" tasks={groups.upcoming} today={today} />
-      <TaskGroup title="Không hạn" tasks={groups.someday} today={today} />
+      <TaskGroup title="Quá hạn" danger tasks={groups.overdue} today={today} focusNewTask={focusNewTask} />
+      <TaskGroup title="Hôm nay" tasks={groups.today} today={today} focusNewTask={focusNewTask} />
+      <TaskGroup title="Sắp tới" tasks={groups.upcoming} today={today} focusNewTask={focusNewTask} />
+      <TaskGroup title="Không hạn" tasks={groups.someday} today={today} focusNewTask={focusNewTask} />
 
       {groups.done.length > 0 && (
         <section>
@@ -59,7 +69,7 @@ export function TasksPanel({ autoFocus }: { autoFocus: boolean }) {
           {showDone && (
             <ul className="mt-1 space-y-0.5">
               {groups.done.map((task) => (
-                <TaskRow key={task.id} task={task} today={today} />
+                <TaskRow key={task.id} task={task} today={today} focusNewTask={focusNewTask} />
               ))}
             </ul>
           )}
@@ -73,20 +83,21 @@ function NewTask({
   today,
   autoFocus,
   disabled,
+  inputRef,
 }: {
   today: DateKey;
   autoFocus: boolean;
   disabled: boolean;
+  inputRef: RefObject<HTMLInputElement>;
 }) {
   const { tasks } = useSidePanel();
   const [title, setTitle] = useState("");
   const [due, setDue] = useState<DateKey | null>(null);
-  const input = useRef<HTMLInputElement>(null);
 
   // Disabled until tasks have loaded, and a disabled input cannot take focus.
   useEffect(() => {
-    if (autoFocus && !disabled) input.current?.focus();
-  }, [autoFocus, disabled]);
+    if (autoFocus && !disabled) inputRef.current?.focus();
+  }, [autoFocus, disabled, inputRef]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -99,7 +110,7 @@ function NewTask({
   return (
     <form onSubmit={submit} className="flex items-center gap-1.5">
       <Input
-        ref={input}
+        ref={inputRef}
         value={title}
         onChange={(event) => setTitle(event.target.value)}
         placeholder="Thêm task…"
@@ -117,11 +128,13 @@ function TaskGroup({
   danger = false,
   tasks,
   today,
+  focusNewTask,
 }: {
   title: string;
   danger?: boolean;
   tasks: AdminTask[];
   today: DateKey;
+  focusNewTask: () => void;
 }) {
   if (tasks.length === 0) return null;
   return (
@@ -136,14 +149,22 @@ function TaskGroup({
       </h3>
       <ul className="space-y-0.5">
         {tasks.map((task) => (
-          <TaskRow key={task.id} task={task} today={today} />
+          <TaskRow key={task.id} task={task} today={today} focusNewTask={focusNewTask} />
         ))}
       </ul>
     </section>
   );
 }
 
-function TaskRow({ task, today }: { task: AdminTask; today: DateKey }) {
+function TaskRow({
+  task,
+  today,
+  focusNewTask,
+}: {
+  task: AdminTask;
+  today: DateKey;
+  focusNewTask: () => void;
+}) {
   const { tasks } = useSidePanel();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(task.title);
@@ -153,8 +174,20 @@ function TaskRow({ task, today }: { task: AdminTask; today: DateKey }) {
   // Chrome fire a blur right after; this tells onBlur that key already ended
   // the edit, so it must not commit (or, for Enter, commit a second time).
   const skipBlur = useRef(false);
+  const titleButton = useRef<HTMLButtonElement>(null);
+  // Set whenever an edit just ended, so the effect below sends focus back to
+  // the title button rather than letting it drop to <body>; not set on the
+  // first render, when there is no rename to return focus from.
+  const justEdited = useRef(false);
+
+  useEffect(() => {
+    if (editing || !justEdited.current) return;
+    justEdited.current = false;
+    titleButton.current?.focus({ preventScroll: true });
+  }, [editing]);
 
   const commit = () => {
+    justEdited.current = true;
     setEditing(false);
     const title = draft.trim();
     if (title && title !== task.title) tasks.update(task, { title });
@@ -165,7 +198,10 @@ function TaskRow({ task, today }: { task: AdminTask; today: DateKey }) {
     <li className="group flex items-start gap-2 rounded-md px-1 py-1.5 hover:bg-muted/50">
       <Checkbox
         checked={done}
-        onCheckedChange={() => tasks.toggleDone(task)}
+        onCheckedChange={() => {
+          tasks.toggleDone(task);
+          focusNewTask();
+        }}
         aria-label={done ? "Đánh dấu chưa xong" : "Đánh dấu đã xong"}
         className="mt-0.5"
       />
@@ -194,6 +230,7 @@ function TaskRow({ task, today }: { task: AdminTask; today: DateKey }) {
                 // Cancels the edit only; the panel stays open.
                 event.stopPropagation();
                 skipBlur.current = true;
+                justEdited.current = true;
                 setDraft(task.title);
                 setEditing(false);
               }
@@ -203,6 +240,8 @@ function TaskRow({ task, today }: { task: AdminTask; today: DateKey }) {
         ) : (
           <button
             type="button"
+            ref={titleButton}
+            data-task-title={task.id}
             onClick={() => {
               setDraft(task.title);
               setEditing(true);
@@ -235,7 +274,10 @@ function TaskRow({ task, today }: { task: AdminTask; today: DateKey }) {
           size="icon"
           className="h-7 w-7"
           aria-label="Xoá task"
-          onClick={() => tasks.remove(task)}
+          onClick={() => {
+            tasks.remove(task);
+            focusNewTask();
+          }}
         >
           <Trash2Icon className="h-3.5 w-3.5" />
         </Button>

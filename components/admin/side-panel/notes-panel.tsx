@@ -56,8 +56,10 @@ export function NotesPanel({ autoFocus }: { autoFocus: boolean }) {
   if (editingId && !editing && notes.status === "ready") setEditingId(null);
 
   // After leaving the editor, focus lands on the card of the note just left,
-  // or the capture box if that card is gone. Scrolling only happens for a
-  // card outside the panel's own scroll area; one already in view stays put.
+  // or on the search box if it is open, or on the capture box otherwise; this
+  // runs when that card is gone too (deleted, or blank and about to be
+  // discarded by onBack below). Scrolling only happens for a card outside the
+  // panel's own scroll area; one already in view stays put.
   useEffect(() => {
     const id = leftNoteId.current;
     if (id === null || editingId !== null) return;
@@ -68,10 +70,12 @@ export function NotesPanel({ autoFocus }: { autoFocus: boolean }) {
       const scrollArea = card.closest<HTMLElement>(".overflow-y-auto");
       const inView = !scrollArea || isWithinScrollArea(card, scrollArea);
       card.focus(inView ? { preventScroll: true } : undefined);
+    } else if (query !== null) {
+      root?.querySelector<HTMLElement>("[data-note-search]")?.focus();
     } else {
       root?.querySelector<HTMLElement>("[data-note-capture]")?.focus();
     }
-  }, [editingId]);
+  }, [editingId, query]);
 
   if (notes.status === "missing_table" || notes.status === "error") {
     return <PanelNotice kind={notes.status} onRetry={notes.reload} />;
@@ -84,6 +88,10 @@ export function NotesPanel({ autoFocus }: { autoFocus: boolean }) {
         saveState={notes.saveState[editing.id]}
         onBack={() => {
           leftNoteId.current = editing.id;
+          // Before dropping editingId, so a blank note is already gone from
+          // the list by the time the focus-return effect above runs, rather
+          // than still showing (and receiving focus) for one more render.
+          discardIfBlank(editing.id);
           setEditingId(null);
         }}
       />
@@ -103,6 +111,7 @@ export function NotesPanel({ autoFocus }: { autoFocus: boolean }) {
         ) : (
           <Input
             autoFocus
+            data-note-search
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
