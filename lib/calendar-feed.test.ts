@@ -170,6 +170,55 @@ describe("expandFeed", () => {
   });
 });
 
+describe("expandFeed: a zone this feed does not define", () => {
+  const event = (lines: string[]) =>
+    [
+      "BEGIN:VCALENDAR",
+      "PRODID:-//Google Inc//Google Calendar 70.9054//EN",
+      "VERSION:2.0",
+      "CALSCALE:GREGORIAN",
+      "BEGIN:VEVENT",
+      ...lines,
+      "UID:noVtz@google.com",
+      "SUMMARY:No VTIMEZONE",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+  it("converts a TZID with no VTIMEZONE block by its IANA name", () => {
+    const ics = event([
+      "DTSTART;TZID=Asia/Ho_Chi_Minh:20260915T090000",
+      "DTEND;TZID=Asia/Ho_Chi_Minh:20260915T100000",
+    ]);
+    const [occurrence] = expandFeed(ics, "2026-09-14", "2026-09-16");
+    expect(occurrence).toMatchObject({ start: "2026-09-15T02:00:00.000Z" });
+  });
+
+  it("applies summer DST for a zone with no VTIMEZONE block", () => {
+    const ics = event([
+      "DTSTART;TZID=America/New_York:20260715T090000",
+      "DTEND;TZID=America/New_York:20260715T100000",
+    ]);
+    const [occurrence] = expandFeed(ics, "2026-07-14", "2026-07-16");
+    // EDT is UTC-4 in July.
+    expect(occurrence).toMatchObject({ start: "2026-07-15T13:00:00.000Z" });
+  });
+
+  it("reads a floating time (no TZID, no Z) as Asia/Ho_Chi_Minh", () => {
+    const ics = event(["DTSTART:20260915T090000", "DTEND:20260915T100000"]);
+    const [occurrence] = expandFeed(ics, "2026-09-14", "2026-09-16");
+    expect(occurrence).toMatchObject({ start: "2026-09-15T02:00:00.000Z" });
+  });
+
+  it("skips an event whose TZID is not a name Intl recognises", () => {
+    const ics = event([
+      "DTSTART;TZID=Not/AZone:20260915T090000",
+      "DTEND;TZID=Not/AZone:20260915T100000",
+    ]);
+    expect(expandFeed(ics, "2026-09-14", "2026-09-16")).toEqual([]);
+  });
+});
+
 describe("parseFeedsConfig", () => {
   const url = "https://calendar.google.com/calendar/ical/secret/basic.ics";
 
@@ -200,6 +249,7 @@ describe("parseFeedsConfig", () => {
     ["an entry without url", JSON.stringify([{ name: "MIT" }])],
     ["plain http", JSON.stringify([{ name: "MIT", url: "http://example.com/a.ics" }])],
     ["two feeds with one name", JSON.stringify([{ name: "MIT", url }, { name: "MIT", url }])],
+    ["a url with a space", JSON.stringify([{ name: "MIT", url: "https://example.com/a b.ics" }])],
   ])("rejects %s", (_label, raw) => {
     expect(parseFeedsConfig(raw)).toMatchObject({ ok: false });
   });

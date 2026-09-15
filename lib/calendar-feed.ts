@@ -48,7 +48,18 @@ export function parseFeedsConfig(raw: string | undefined): FeedsConfig {
     }
     // Apple, and Google in places, hand out webcal://, which is https underneath.
     const url = rawUrl.replace(/^webcal:\/\//i, "https://");
-    if (!/^https:\/\//i.test(url)) {
+    // A raw space would otherwise be silently percent-encoded by `new URL()`
+    // rather than rejected, so it needs its own check.
+    if (/\s/.test(url)) {
+      return { ok: false, error: `Lịch "${name}" có URL chứa khoảng trắng` };
+    }
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return { ok: false, error: `Lịch "${name}" có URL không hợp lệ` };
+    }
+    if (parsedUrl.protocol !== "https:") {
       return { ok: false, error: `Lịch "${name}" phải dùng https` };
     }
     const color =
@@ -82,9 +93,19 @@ export function expandFeed(ics: string, from: DateKey, to: DateKey): FeedOccurre
   // A time written as TZID=Asia/Ho_Chi_Minh means nothing to ical.js until the
   // zone is registered. Unregistered, it is read as floating and lands in the
   // server's own zone: seven hours off on Vercel, where that is UTC.
-  for (const vtimezone of root.getAllSubcomponents("vtimezone")) {
+  const vtimezones = root.getAllSubcomponents("vtimezone");
+  for (const vtimezone of vtimezones) {
     ICAL.TimezoneService.register(vtimezone);
   }
+  // Only a TZID this feed defines itself gets ical.js's own zone maths.
+  // ICAL.TimezoneService is a process-wide registry, so a TZID left
+  // unregistered by THIS feed could still resolve if some other feed fetched
+  // earlier in the same process happened to register that name; resolveInstant
+  // below never trusts that, and instead recomputes from the literal
+  // wall-clock digits whenever this feed does not define the zone itself.
+  const definedTzids = new Set(
+    vtimezones.map((vtimezone) => String(vtimezone.getFirstPropertyValue("tzid") ?? "")),
+  );
 
   const lo = addDaysToKey(from, -1);
   const hi = addDaysToKey(to, 1);
@@ -105,7 +126,9 @@ export function expandFeed(ics: string, from: DateKey, to: DateKey): FeedOccurre
   const out: FeedOccurrence[] = [];
   const push = (item: ICAL.Event, start: ICAL.Time, end: ICAL.Time) => {
     if (item.component.getFirstPropertyValue("status") === "CANCELLED") return;
-    const occurrence = toOccurrence(item, start, end);
+    const occurrence = toOccurrence(item, start, end, definedTzids);
+    // A TZID Intl does not recognise either: nothing sane to fall back to.
+    if (!occurrence) return;
     const inRange = occurrence.allDay
       ? occurrence.start < hi && occurrence.end > lo
       : Date.parse(occurrence.start) < hiMs && Date.parse(occurrence.end) > loMs;
@@ -152,7 +175,12 @@ export function expandFeed(ics: string, from: DateKey, to: DateKey): FeedOccurre
   return out;
 }
 
-function toOccurrence(item: ICAL.Event, start: ICAL.Time, end: ICAL.Time | null): FeedOccurrence {
+function toOccurrence(
+  item: ICAL.Event,
+  start: ICAL.Time,
+  end: ICAL.Time | null,
+  definedTzids: Set<string>,
+): FeedOccurrence | null {
   const allDay = start.isDate;
   let startValue: string;
   let endValue: string;
@@ -163,8 +191,15 @@ function toOccurrence(item: ICAL.Event, start: ICAL.Time, end: ICAL.Time | null)
     // DTEND is exclusive; a feed that repeats DTSTART there still means one day.
     if (endValue <= startValue) endValue = addDaysToKey(startValue, 1);
   } else {
-    const startMs = start.toJSDate().getTime();
-    const endMs = end ? end.toJSDate().getTime() : startMs;
+    const startTzid = item.component.getFirstProperty("dtstart")?.getParameter("tzid") as
+      | string
+      | undefined;
+    const endTzid =
+      (item.component.getFirstProperty("dtend")?.getParameter("tzid") as string | undefined) ??
+      startTzid;
+    const startMs = resolveInstant(start, startTzid, definedTzids);
+    const endMs = end ? resolveInstant(end, endTzid, definedTzids) : startMs;
+    if (startMs === null || endMs === null) return null;
     startValue = new Date(startMs).toISOString();
     endValue = new Date(Math.max(startMs, endMs)).toISOString();
   }
@@ -179,6 +214,71 @@ function toOccurrence(item: ICAL.Event, start: ICAL.Time, end: ICAL.Time | null)
     start: startValue,
     end: endValue,
   };
+}
+
+/**
+ * The real UTC instant for a timed value. A TZID this feed defines itself
+ * gets ical.js's own zone maths (`time.toJSDate()`); anything else - a TZID
+ * the feed does not define, or none at all (floating) - is converted from
+ * its literal wall-clock digits with Intl instead, since trusting `time.zone`
+ * there would depend on whatever another feed left in ical.js's shared
+ * timezone registry. Returns null when the TZID names a zone Intl does not
+ * recognise, so the caller can skip just that event.
+ */
+function resolveInstant(
+  time: ICAL.Time,
+  tzid: string | undefined,
+  definedTzids: Set<string>,
+): number | null {
+  if (tzid) {
+    if (definedTzids.has(tzid)) return time.toJSDate().getTime();
+    return zonedWallTimeToUtcMs(time, tzid);
+  }
+  // No TZID and no trailing Z: a floating time. The feeds this reads are the
+  // owner's own, so treat that as their zone rather than the server's.
+  if (time.zone?.tzid === "floating") return zonedWallTimeToUtcMs(time, "Asia/Ho_Chi_Minh");
+  return time.toJSDate().getTime();
+}
+
+/**
+ * A wall-clock date/time in an IANA zone, as a UTC instant (ms). Guesses the
+ * instant by first reading the zone's offset as if the wall time were
+ * already UTC, then re-reads the offset at that guess to settle a DST edge
+ * where the two disagree. Returns null when `timeZone` is not a name Intl
+ * recognises.
+ */
+function zonedWallTimeToUtcMs(time: ICAL.Time, timeZone: string): number | null {
+  let formatter: Intl.DateTimeFormat;
+  try {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  } catch {
+    return null;
+  }
+
+  const offsetAt = (instant: number): number => {
+    const parts: Record<string, number> = {};
+    for (const part of formatter.formatToParts(instant)) {
+      if (part.type !== "literal") parts[part.type] = Number(part.value);
+    }
+    const hour = parts.hour === 24 ? 0 : parts.hour;
+    const asIfUtc = Date.UTC(parts.year, parts.month - 1, parts.day, hour, parts.minute, parts.second);
+    return asIfUtc - instant;
+  };
+
+  const wallAsUtcMs = Date.UTC(time.year, time.month - 1, time.day, time.hour, time.minute, time.second);
+  const firstGuess = offsetAt(wallAsUtcMs);
+  const instant = wallAsUtcMs - firstGuess;
+  const secondGuess = offsetAt(instant);
+  return secondGuess === firstGuess ? instant : wallAsUtcMs - secondGuess;
 }
 
 /** The date as written in the feed, with no time zone applied. */

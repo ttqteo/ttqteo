@@ -68,7 +68,12 @@ export async function GET(request: NextRequest) {
   results.forEach((result, index) => {
     const feed = config.feeds[index];
     if (result.status === "rejected") {
-      console.error(`[admin calendar] ${feed.name}:`, result.reason);
+      // Never log the error itself: Node's fetch failure message and
+      // `cause.input` carry the secret feed URL, and an ical.js parse error
+      // can carry the calendar's own content.
+      const reason = result.reason;
+      const name = reason instanceof Error ? reason.name : "Error";
+      console.error(`[admin calendar] ${feed.name}: ${name}`);
       failed.push(feed.name);
       return;
     }
