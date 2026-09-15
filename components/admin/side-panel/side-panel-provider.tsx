@@ -20,6 +20,7 @@ import {
   useSyncExternalStore,
   type PropsWithChildren,
 } from "react";
+import { useCalendarStore, type CalendarStore } from "./use-calendar-store";
 import { useNotesStore, type NotesStore } from "./use-notes-store";
 import { useTasksStore, type TasksStore } from "./use-tasks-store";
 
@@ -37,6 +38,7 @@ type SidePanelContextValue = {
   setSheetTab: (id: AdminPanelId) => void;
   tasks: TasksStore;
   notes: NotesStore;
+  calendar: CalendarStore;
   /** Marks an element, portalled popovers included, as focus inside the panel. */
   notePanelFocus: (el: HTMLElement) => void;
 };
@@ -172,6 +174,7 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
   const tasks = useTasksStore(admin);
   const notesShowing = panel === "notes" || (sheetOpen && sheetTab === "notes");
   const notes = useNotesStore(admin && notesShowing);
+  const calendar = useCalendarStore(admin);
 
   const value = useMemo(
     () => ({
@@ -185,9 +188,10 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
       setSheetTab,
       tasks,
       notes,
+      calendar,
       notePanelFocus,
     }),
-    [panel, openedByUser, toggle, close, sheetOpen, sheetTab, tasks, notes, notePanelFocus],
+    [panel, openedByUser, toggle, close, sheetOpen, sheetTab, tasks, notes, calendar, notePanelFocus],
   );
 
   return <SidePanelContext.Provider value={value}>{children}</SidePanelContext.Provider>;
