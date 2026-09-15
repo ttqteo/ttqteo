@@ -505,6 +505,12 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   display: block;
   flex: 1 0 auto;
   padding: 0 1.25rem 0 0.75rem !important;
+  /* The size of the <pre>, like the line numbers beside it. `prose-sm` shrinks
+     every `code` by another 0.857em, and its rule comes after Typography's own
+     `pre code { font-size: inherit }`, so it won: the code came out smaller
+     than the <pre>, each line shorter than a line of the gutter, and the
+     numbers drifted down past the end of the code. */
+  font-size: inherit;
 }
 
 /* Code blocks in a rendered post. The bar and button are built by PostHtml at
@@ -542,6 +548,7 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   display: block;
   flex: 1 0 auto;
   padding: 0 1.25rem 0 0.75rem !important;
+  font-size: inherit;
 }
 
 /* Đoạn chữ mà prism không gắn class token nào phải lấy màu chữ thường.
