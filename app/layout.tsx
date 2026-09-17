@@ -31,7 +31,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: {
     template: "%s • ttqteo",
-    default: "Tran Tu Quang • ttqteo",
+    default: "ttqteo",
   },
   metadataBase: new URL("https://ttqteo.vercel.app/"),
   description:
