@@ -1,6 +1,8 @@
 import { Hero } from "@/components/portfolio/Hero";
 import { IndexTable } from "@/components/portfolio/IndexTable";
+import { PublicationList } from "@/components/portfolio/PublicationList";
 import { projectIndex } from "@/data/projects";
+import { SELF, publications, underSubmission } from "@/data/research";
 import { getPublishedPosts } from "@/lib/posts";
 import Link from "next/link";
 
@@ -32,10 +34,18 @@ export default async function Home() {
       title: p.title,
       href: `/blog/${p.slug}`,
     }));
+  const research = [...publications, ...underSubmission].slice(0, 3);
 
   return (
     <div className="max-w-[720px] mx-auto px-4">
       <Hero />
+
+      {research.length > 0 && (
+        <section className="py-12">
+          <SectionHeader title="Research" href="/research" />
+          <PublicationList entries={research} self={SELF} />
+        </section>
+      )}
 
       <section className="py-12">
         <SectionHeader title="Built" href="/projects" />

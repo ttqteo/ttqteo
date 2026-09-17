@@ -74,8 +74,9 @@ export default function AboutPage() {
       <p>I&apos;m Tran Tu Quang.</p>
 
       <p>
-        Backend engineer on distributed and real-time systems: cybersecurity,
-        IAM, IoT, product platforms. Mostly Java/Spring Boot and Go,
+        Master&apos;s student at UIT-VNU, researching software supply-chain
+        security. Alongside that, backend engineer on distributed and real-time
+        systems: cybersecurity, IAM, IoT, product platforms. Mostly Java/Spring Boot and Go,
         event-driven with Kafka, OAuth2/JWT and fine-grained authorization,
         ELK-based observability, plus the frontend work when a feature needs it.
       </p>

@@ -31,11 +31,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: {
     template: "%s • ttqteo",
-    default: "ttqteo",
+    default: "Tran Tu Quang • ttqteo",
   },
   metadataBase: new URL("https://ttqteo.vercel.app/"),
   description:
-    "This personal website, named 'ttqteo,' is crafted with Next.js, offering a sleek and responsive design tailored for showcasing your portfolio and tools effectively.",
+    "Tran Tu Quang (ttqteo): master's student researching software supply-chain security, and backend engineer on distributed, real-time systems. Projects, writing, and research.",
   icons: {
     icon: [
       {

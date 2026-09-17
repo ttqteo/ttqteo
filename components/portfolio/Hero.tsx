@@ -37,11 +37,11 @@ export function Hero() {
       </h1>
 
       <p className="mt-6 text-lg text-muted-foreground leading-relaxed">
-        backend engineer at <Ext href="http://mozox.com/">mozox</Ext> — four
-        years on distributed and real-time systems across security, identity and
-        IoT. currently doing my <span className="text-foreground">MIT</span> at{" "}
-        <Ext href="http://uit.edu.vn/">UIT</Ext>. i write about what i build and
-        what i learn.
+        master&apos;s student at <Ext href="http://uit.edu.vn/">UIT</Ext>,
+        researching software security. also a backend engineer at{" "}
+        <Ext href="http://mozox.com/">mozox</Ext>, working on distributed and
+        real-time systems across security, identity and IoT. i write about what
+        i build and what i learn.
       </p>
 
       <div className="mt-10">
@@ -49,12 +49,15 @@ export function Hero() {
           Now
         </h2>
         <ul className="space-y-2 text-base text-foreground/90">
+          {/* Keep this line free of paper status: that lives in
+              data/research.ts and shows in the Research section below. */}
           <li>
-            — shipping an IAM platform: fine-grained RBAC/ABAC on Ory Keto, in Go
+            — researching software supply-chain security: reproducing
+            vulnerabilities and evaluating the tools that do it
           </li>
           <li>
-            — leading the backend for a real-time chat product that scales
-            sideways
+            — building a SIEM platform backend: security log ingestion and
+            detection
           </li>
         </ul>
       </div>
