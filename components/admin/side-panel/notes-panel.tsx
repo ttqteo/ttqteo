@@ -13,7 +13,8 @@ import {
 import { cn } from "@/lib/utils";
 import { ArrowLeftIcon, PinIcon, PinOffIcon, SearchIcon, Trash2Icon, XIcon } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { NoteBodyEditor } from "./note-body-editor";
 import { LinkedText, NoteLinks } from "./note-links";
 import { PanelNotice } from "./panel-notice";
 import { useSidePanel } from "./side-panel-provider";
@@ -299,24 +300,6 @@ export function NoteEditor({
   headerClassName?: string;
 }) {
   const { notes } = useSidePanel();
-  const textarea = useRef<HTMLTextAreaElement>(null);
-
-  // Cursor at the end, where the capture box left off.
-  useEffect(() => {
-    const el = textarea.current;
-    if (!el) return;
-    el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
-  }, []);
-
-  // Grow with the text, so the panel scrolls rather than a box inside it.
-  useLayoutEffect(() => {
-    const el = textarea.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [note.body]);
-
   const dot = saveState ? SAVE_DOT[saveState] : null;
 
   return (
@@ -376,16 +359,9 @@ export function NoteEditor({
           </Button>
         </div>
       </div>
-      <textarea
-        ref={textarea}
-        value={note.body}
-        onChange={(event) => notes.edit(note, event.target.value)}
-        maxLength={MAX_NOTE_LENGTH}
-        placeholder="Ghi gì đó…"
-        aria-label="Nội dung note"
-        rows={6}
-        className="w-full resize-none bg-transparent px-4 py-3 text-sm leading-relaxed outline-none"
-      />
+      {/* Grows with the text, so the panel scrolls rather than a box inside
+          it. Takes focus at the end, where the capture box left off. */}
+      <NoteBodyEditor body={note.body} onChange={(body) => notes.edit(note, body)} />
       {/* Right under the text, Keep-style, rather than pinned to the panel's
           foot: a short note would otherwise show its links a screen away. */}
       <NoteLinks body={note.body} />

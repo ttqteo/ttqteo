@@ -6,8 +6,8 @@
  * and in the tests, not in the panel.
  */
 
-/** Everything a URL can run into before whitespace; the tail is trimmed after. */
-const URL_PATTERN = /https?:\/\/[^\s<>"'`]+/gi;
+/** Everything a URL can run into before whitespace; the tail is trimmed after (trimUrl). */
+export const URL_PATTERN = /https?:\/\/[^\s<>"'`]+/gi;
 
 /** Characters a sentence puts after a link that are never part of it. */
 const TRAILING = /[.,;:!?'"]+$/;
@@ -19,7 +19,7 @@ const CLOSERS: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
  * bracket with no opening one inside the URL, so `(https://a.com/x)` gives
  * `https://a.com/x` while a Wikipedia `Foo_(bar)` keeps its bracket.
  */
-function trimUrl(raw: string): string {
+export function trimUrl(raw: string): string {
   const count = (text: string, char: string) => text.split(char).length - 1;
   let url = raw;
   for (;;) {

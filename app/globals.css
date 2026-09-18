@@ -469,6 +469,20 @@ html:not([data-reader-hydrated="1"]) .blog-toc-panel {
   border: 0;
 }
 
+/* Ghi nhanh's note editor (components/admin/side-panel/note-body-editor.tsx):
+   a URL shows as a short chip, the full URL in its title. Semantic classes
+   because the markup comes from the linkChip node's renderHTML. */
+.note-link-chip {
+  @apply mx-px inline-block max-w-full cursor-default truncate rounded bg-muted px-1.5 align-bottom text-foreground/80 underline decoration-muted-foreground/40 underline-offset-2;
+}
+.note-link-chip.ProseMirror-selectednode {
+  @apply ring-2 ring-ring;
+}
+.note-body-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply pointer-events-none float-left h-0 text-muted-foreground;
+}
+
 /* tiptap marks the selected atom; without this a card gives no feedback when
    it is clicked in the editor. */
 .yt-embed.ProseMirror-selectednode,

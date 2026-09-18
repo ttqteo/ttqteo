@@ -32,8 +32,18 @@ Một note trong Ghi nhanh thường chỉ là vài link chép vội. Hiện ch�
 
 Vitest cho `note-links` (link giữa câu, dấu câu, ngoặc, slug tiếng Việt), `youtube` (khung hình), `unfurl-cache` (hỏi một lần, gộp request, nhớ lỗi, đầy thì bỏ cũ nhất), và một smoke test render cho `note-links.tsx` (chip, link mở tab mới, tiêu đề điền sau khi route trả lời, play tại chỗ, chờ link đứng yên).
 
+## Cập nhật: link gọn ngay trong ô sửa
+
+Textarea không vẽ được URL ngắn lại, nên ô sửa note giờ là một editor TipTap tối giản (`note-body-editor.tsx`): chỉ có đoạn văn, chữ và node `linkChip` (`components/extensions/link-chip.ts`). URL hiện thành chip ngắn như trên thẻ, rê chuột thấy full URL, Ctrl+click mở tab mới, Backspace xoá cả chip.
+
+- **Định dạng lưu không đổi.** `lib/note-doc.ts` đổi body thành doc (mỗi dòng một đoạn, URL thành chip) và ngược lại; đi qua cả hai thì ra đúng body cũ, kể cả dòng trống và khoảng trắng. Store, API, thẻ và tìm kiếm không biết gì về editor.
+- **URL đang gõ chưa thành chip.** Chỉ khi con trỏ rời khỏi cuối URL (gõ cách, Enter, bấm chỗ khác) thì mới đổi, để `https://a.com/x.html` không bị cắt ở `x`. Dấu câu sau URL vẫn là chữ, cùng cách cắt với `splitLinks`, nên chip tạo lúc gõ và chip tạo lúc mở lại note là một. Dán URL thì thành chip ngay.
+- Tắt hết phần rich text của StarterKit (đậm, list, heading, cả phím tắt Markdown như `- ` thành list, và `trailingNode` vốn thêm một dòng trống cuối note), để thứ được lưu đúng là thứ đã gõ.
+- Dán text giữ nguyên các dòng, cả dòng trống; copy ra là text của note, một xuống dòng mỗi dòng, URL đầy đủ.
+- Giới hạn 20.000 ký tự giữ như `maxLength` cũ, bằng một plugin chặn thay đổi làm note dài quá.
+
 ## Không làm
 
-- Sửa note bằng editor rich text, hay linkify ngay trong textarea.
+- Sửa note bằng editor rich text (đậm, list, heading).
 - Hỏi unfurl cho mọi note trong danh sách: vài chục request server-side mỗi lần mở panel.
 - Lưu cache unfurl qua reload.
