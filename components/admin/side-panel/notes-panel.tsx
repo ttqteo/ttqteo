@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { ArrowLeftIcon, PinIcon, PinOffIcon, SearchIcon, Trash2Icon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { LinkedText, NoteLinks } from "./note-links";
 import { PanelNotice } from "./panel-notice";
 import { useSidePanel } from "./side-panel-provider";
 import type { SaveState } from "./use-notes-store";
@@ -251,7 +252,7 @@ function NoteCard({
             !title && "text-muted-foreground",
           )}
         >
-          {title || "Note trống"}
+          {title ? <LinkedText text={title} /> : "Note trống"}
         </span>
         {note.pinned && (
           <PinIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Đã ghim" />
@@ -264,7 +265,7 @@ function NoteCard({
       </span>
       {preview && (
         <span className="mt-1 line-clamp-3 block whitespace-pre-line text-xs text-muted-foreground">
-          {preview}
+          <LinkedText text={preview} />
         </span>
       )}
     </button>
@@ -369,8 +370,11 @@ function NoteEditor({
         placeholder="Ghi gì đó…"
         aria-label="Nội dung note"
         rows={6}
-        className="w-full flex-1 resize-none bg-transparent px-4 py-3 text-sm leading-relaxed outline-none"
+        className="w-full resize-none bg-transparent px-4 py-3 text-sm leading-relaxed outline-none"
       />
+      {/* Right under the text, Keep-style, rather than pinned to the panel's
+          foot: a short note would otherwise show its links a screen away. */}
+      <NoteLinks body={note.body} />
     </div>
   );
 }

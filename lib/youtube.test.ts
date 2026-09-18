@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseYoutubeUrl, youtubeEmbedSrc } from "./youtube";
+import { parseYoutubeUrl, youtubeEmbedSrc, youtubeThumbnailSrc } from "./youtube";
 
 describe("parseYoutubeUrl", () => {
   it("reads the id from a watch URL", () => {
@@ -131,6 +131,14 @@ describe("youtubeEmbedSrc", () => {
     );
     expect(youtubeEmbedSrc("dQw4w9WgXcQ", null)).toBe(
       "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+    );
+  });
+});
+
+describe("youtubeThumbnailSrc", () => {
+  it("points at the medium poster frame YouTube serves for every video", () => {
+    expect(youtubeThumbnailSrc("dQw4w9WgXcQ")).toBe(
+      "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
     );
   });
 });

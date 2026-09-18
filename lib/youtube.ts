@@ -106,3 +106,11 @@ export function youtubeEmbedSrc(videoId: string, start?: number | null): string 
   const base = `https://www.youtube-nocookie.com/embed/${videoId}`;
   return start && start > 0 ? `${base}?start=${start}` : base;
 }
+
+/**
+ * The 320x180 poster frame. YouTube serves it for every video with no API
+ * key, so a thumbnail needs nothing but the id, unlike the title.
+ */
+export function youtubeThumbnailSrc(videoId: string): string {
+  return `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+}
