@@ -1,11 +1,11 @@
 "use client";
 
 import {
+  EyeOffIcon,
   FileTextIcon,
   MoonIcon,
   PanelRightIcon,
   PencilIcon,
-  StickyNoteIcon,
   SunIcon,
 } from "lucide-react";
 import Image from "next/image";
@@ -14,6 +14,7 @@ import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { AdminNavLink } from "@/components/admin-nav-link";
 import { LogoutForm } from "@/components/admin/logout-form";
+import { PANELS } from "@/components/admin/side-panel/panels";
 import { OPEN_ADMIN_SHEET_EVENT } from "@/lib/admin-panel-prefs";
 
 interface AdminToolbarProps {
@@ -83,11 +84,24 @@ export function AdminToolbar({ editPostId }: AdminToolbarProps) {
             <FileTextIcon className="w-3.5 h-3.5" />
             <span className="sr-only sm:not-sr-only">posts</span>
           </AdminNavLink>
+          {/* The eye the private-note box itself wears; the sticky note now
+              means Ghi nhanh, here as on the rail. */}
           <AdminNavLink href="/admin/notes">
-            <StickyNoteIcon className="w-3.5 h-3.5 shrink-0" />
+            <EyeOffIcon className="w-3.5 h-3.5 shrink-0" />
             {/* Icon only on a phone, so the bar still fits. */}
             <span className="sr-only sm:not-sr-only">notes</span>
           </AdminNavLink>
+          {/* The side panel's three tools as pages. From md up only: a phone
+              reaches them through the sheet, and the bar has no room for
+              three more icons at 390px. */}
+          <div className="hidden md:contents">
+            {PANELS.map(({ id, href, label, icon: Icon }) => (
+              <AdminNavLink key={id} href={href}>
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                {label.toLowerCase()}
+              </AdminNavLink>
+            ))}
+          </div>
           {editPostId && (
             <AdminNavLink href={`/admin/edit/${editPostId}`}>
               <PencilIcon className="w-3.5 h-3.5 shrink-0" />

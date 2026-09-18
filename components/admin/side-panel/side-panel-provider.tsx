@@ -9,6 +9,7 @@ import {
   writeAdminPanel,
   type AdminPanelId,
 } from "@/lib/admin-panel-prefs";
+import { usePathname } from "next/navigation";
 import {
   createContext,
   useCallback,
@@ -20,6 +21,7 @@ import {
   useSyncExternalStore,
   type PropsWithChildren,
 } from "react";
+import { panelMeta } from "./panels";
 import { useCalendarStore, type CalendarStore } from "./use-calendar-store";
 import { useNotesStore, type NotesStore } from "./use-notes-store";
 import { useTasksStore, type TasksStore } from "./use-tasks-store";
@@ -172,7 +174,12 @@ export function SidePanelProvider({ children }: PropsWithChildren) {
 
   // Tasks load as soon as the owner is known: the rail badge needs them.
   const tasks = useTasksStore(admin);
-  const notesShowing = panel === "notes" || (sheetOpen && sheetTab === "notes");
+  // Notes only where they show: the panel, the sheet, or their own page.
+  const pathname = usePathname();
+  const notesShowing =
+    panel === "notes" ||
+    (sheetOpen && sheetTab === "notes") ||
+    pathname === panelMeta("notes").href;
   const notes = useNotesStore(admin && notesShowing);
   const calendar = useCalendarStore(admin);
 

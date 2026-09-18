@@ -26,9 +26,23 @@ function isWithinScrollArea(el: HTMLElement, scrollArea: HTMLElement): boolean {
   return elRect.top >= areaRect.top && elRect.bottom <= areaRect.bottom;
 }
 
+/**
+ * Leaving a note, by the back arrow or by closing the panel or page, saves
+ * what is waiting and drops the note if nothing was written in it.
+ */
+export function useSaveOnLeave(editingId: string | null) {
+  const { flush, discardIfBlank } = useSidePanel().notes;
+  useEffect(() => {
+    if (!editingId) return;
+    return () => {
+      flush(editingId);
+      discardIfBlank(editingId);
+    };
+  }, [editingId, flush, discardIfBlank]);
+}
+
 export function NotesPanel({ autoFocus }: { autoFocus: boolean }) {
   const { notes } = useSidePanel();
-  const { flush, discardIfBlank } = notes;
   const [editingId, setEditingId] = useState<string | null>(null);
   // null while the search box is closed; the capture box sits there instead.
   const [query, setQuery] = useState<string | null>(null);
@@ -37,15 +51,7 @@ export function NotesPanel({ autoFocus }: { autoFocus: boolean }) {
   const leftNoteId = useRef<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Leaving a note, by the back arrow or by closing the panel, saves what is
-  // waiting and drops the note if nothing was written in it.
-  useEffect(() => {
-    if (!editingId) return;
-    return () => {
-      flush(editingId);
-      discardIfBlank(editingId);
-    };
-  }, [editingId, flush, discardIfBlank]);
+  useSaveOnLeave(editingId);
 
   const visible = useMemo(
     () => filterNotes(sortNotes(notes.notes), query ?? ""),
@@ -92,7 +98,7 @@ export function NotesPanel({ autoFocus }: { autoFocus: boolean }) {
           // Before dropping editingId, so a blank note is already gone from
           // the list by the time the focus-return effect above runs, rather
           // than still showing (and receiving focus) for one more render.
-          discardIfBlank(editing.id);
+          notes.discardIfBlank(editing.id);
           setEditingId(null);
         }}
       />
@@ -173,7 +179,7 @@ export function NotesPanel({ autoFocus }: { autoFocus: boolean }) {
  * editor takes over with the cursor after it. An IME composition is left to
  * finish first, so the switch never cuts a character in half.
  */
-function CaptureBox({
+export function CaptureBox({
   autoFocus,
   disabled,
   onStart,
@@ -226,7 +232,7 @@ function CaptureBox({
   );
 }
 
-function NoteCard({
+export function NoteCard({
   note,
   failed,
   onOpen,
@@ -280,7 +286,7 @@ const SAVE_DOT: Record<SaveState, { dot: string; label: string }> = {
   error: { dot: "bg-destructive", label: "Lưu lỗi, bấm để thử lại" },
 };
 
-function NoteEditor({
+export function NoteEditor({
   note,
   saveState,
   onBack,

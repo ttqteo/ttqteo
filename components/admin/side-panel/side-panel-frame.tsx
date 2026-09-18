@@ -1,6 +1,7 @@
 "use client";
 
-import { XIcon } from "lucide-react";
+import { Maximize2Icon, XIcon } from "lucide-react";
+import Link from "next/link";
 import type { KeyboardEvent } from "react";
 import { PanelBody } from "./panel-body";
 import { panelMeta } from "./panels";
@@ -34,16 +35,29 @@ export function SidePanelFrame() {
         <>
           <header className="flex h-11 shrink-0 items-center justify-between border-b px-3">
             <h2 className="text-sm font-medium">{meta.label}</h2>
-            <button
-              type="button"
-              onClick={close}
-              data-panel-close
-              aria-label="Đóng panel"
-              title="Đóng (Esc)"
-              className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <XIcon className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-0.5">
+              {/* The same tool as a page, with room to work. The panel closes
+                  on the way: the page would only repeat it. */}
+              <Link
+                href={meta.href}
+                onClick={close}
+                aria-label={`Mở trang ${meta.label}`}
+                title="Mở trang đầy đủ"
+                className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Maximize2Icon className="h-3.5 w-3.5" />
+              </Link>
+              <button
+                type="button"
+                onClick={close}
+                data-panel-close
+                aria-label="Đóng panel"
+                title="Đóng (Esc)"
+                className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <XIcon className="h-4 w-4" />
+              </button>
+            </div>
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto">
             <PanelBody id={meta.id} autoFocus={openedByUser} />

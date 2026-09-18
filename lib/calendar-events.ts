@@ -94,3 +94,32 @@ export function dayLabel(day: DateKey): string {
   const date = fromDateKey(day);
   return `${WEEKDAYS[date.getDay()]}, ${date.getDate()}/${date.getMonth() + 1}`;
 }
+
+/** "Tháng 9, 2026". */
+export function monthLabel(month: string): string {
+  const [year, index] = month.split("-").map(Number);
+  return `Tháng ${index}, ${year}`;
+}
+
+/** The month `months` after (or before) this one, "YYYY-MM". */
+export function shiftMonth(month: string, months: number): string {
+  const [year, index] = month.split("-").map(Number);
+  return monthKeyOf(toDateKey(new Date(year, index - 1 + months, 1)));
+}
+
+/**
+ * The days a Monday-first month grid shows: whole weeks from the one holding
+ * the 1st to the one holding the last day, so five or six rows of seven.
+ */
+export function monthGridDays(month: string): DateKey[] {
+  const first = `${month}-01`;
+  // getDay is 0 for Sunday; Monday-first, Sunday is the sixth day of its week.
+  const startOffset = (fromDateKey(first).getDay() + 6) % 7;
+  const start = addDaysToKey(first, -startOffset);
+  const nextFirst = `${shiftMonth(month, 1)}-01`;
+  const days: DateKey[] = [];
+  for (let day = start; day < nextFirst || days.length % 7 !== 0; day = addDaysToKey(day, 1)) {
+    days.push(day);
+  }
+  return days;
+}

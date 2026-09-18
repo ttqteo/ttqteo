@@ -73,8 +73,7 @@ export default function AdminLayout({
           body[data-scroll-locked] :is(.admin-side-rail, .admin-side-panel) { z-index: 49; }
         `}
       </style>
-      {children}
-      <AdminSidePanel />
+      <AdminSidePanel>{children}</AdminSidePanel>
     </>
   );
 }

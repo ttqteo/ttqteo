@@ -4,9 +4,12 @@ import {
   daysWithEvents,
   eventsOn,
   eventTimeLabel,
+  monthGridDays,
   monthKeyOf,
+  monthLabel,
   monthRange,
   occursOn,
+  shiftMonth,
   type CalendarEvent,
 } from "@/lib/calendar-events";
 
@@ -100,5 +103,33 @@ describe("labels", () => {
   it("names the day in Vietnamese", () => {
     expect(dayLabel("2026-09-11")).toBe("Thứ 6, 11/9");
     expect(dayLabel("2026-09-13")).toBe("Chủ nhật, 13/9");
+  });
+
+  it("names the month in Vietnamese", () => {
+    expect(monthLabel("2026-09")).toBe("Tháng 9, 2026");
+  });
+});
+
+describe("monthGridDays", () => {
+  it("runs from the Monday on or before the 1st to the Sunday on or after the last day", () => {
+    const days = monthGridDays("2026-09");
+    expect(days[0]).toBe("2026-08-31");
+    expect(days[days.length - 1]).toBe("2026-10-04");
+    expect(days).toHaveLength(35);
+  });
+
+  it("takes six weeks when the month needs them", () => {
+    const days = monthGridDays("2026-03");
+    expect(days[0]).toBe("2026-02-23");
+    expect(days[days.length - 1]).toBe("2026-04-05");
+    expect(days).toHaveLength(42);
+  });
+});
+
+describe("shiftMonth", () => {
+  it("steps across a year boundary either way", () => {
+    expect(shiftMonth("2026-12", 1)).toBe("2027-01");
+    expect(shiftMonth("2026-01", -1)).toBe("2025-12");
+    expect(shiftMonth("2026-09", 0)).toBe("2026-09");
   });
 });
