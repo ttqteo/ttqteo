@@ -47,6 +47,21 @@ describe("docToBody", () => {
     ).toBe("xem https://a.com/x.\n");
   });
 
+  it("reads a run of inline nodes with no paragraph around them as one line", () => {
+    // What a copied selection of a chip, or of text and chips inside one line, holds.
+    expect(docToBody({ content: [{ type: "linkChip", attrs: { url: "https://a.com/x" } }] })).toBe(
+      "https://a.com/x",
+    );
+    expect(
+      docToBody({
+        content: [
+          { type: "text", text: "xem " },
+          { type: "linkChip", attrs: { url: "https://a.com/x" } },
+        ],
+      }),
+    ).toBe("xem https://a.com/x");
+  });
+
   it("round-trips a note, spaces and blank lines included", () => {
     const body = "  free key deepseek \n\nhttps://www.orcarouter.ai/\ngroq https://console.groq.com/home (đọc)\n";
     expect(docToBody(bodyToDoc(body))).toBe(body);

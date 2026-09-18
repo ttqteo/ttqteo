@@ -31,18 +31,30 @@ export function bodyToDoc(body: string): DocJson {
 
 type AnyNode = { type?: string; text?: string; attrs?: { url?: string }; content?: AnyNode[] };
 
-/** The body a document holds; anything that is not text or a chip writes nothing. */
+const inlineText = (node: AnyNode) => {
+  if (node.type === "text") return node.text ?? "";
+  if (node.type === "linkChip") return node.attrs?.url ?? "";
+  return "";
+};
+
+/**
+ * The body a document holds, one line per paragraph; anything that is not
+ * text or a chip writes nothing. Inline nodes with no paragraph around them,
+ * which is what a copied chip, or a copy inside one line, holds, read as a
+ * line of their own.
+ */
 export function docToBody(doc: { type?: string; content?: unknown[] }): string {
-  const paragraphs = (doc.content ?? []) as AnyNode[];
-  return paragraphs
-    .map((paragraph) =>
-      (paragraph.content ?? [])
-        .map((node) => {
-          if (node.type === "text") return node.text ?? "";
-          if (node.type === "linkChip") return node.attrs?.url ?? "";
-          return "";
-        })
-        .join(""),
-    )
-    .join("\n");
+  const lines: string[] = [];
+  let loose: string | null = null;
+  for (const node of (doc.content ?? []) as AnyNode[]) {
+    if (node.type === "paragraph") {
+      if (loose !== null) lines.push(loose);
+      loose = null;
+      lines.push((node.content ?? []).map(inlineText).join(""));
+    } else {
+      loose = (loose ?? "") + inlineText(node);
+    }
+  }
+  if (loose !== null) lines.push(loose);
+  return lines.join("\n");
 }

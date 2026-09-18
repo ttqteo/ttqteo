@@ -42,6 +42,13 @@ Textarea không vẽ được URL ngắn lại, nên ô sửa note giờ là m�
 - Dán text giữ nguyên các dòng, cả dòng trống; copy ra là text của note, một xuống dòng mỗi dòng, URL đầy đủ.
 - Giới hạn 20.000 ký tự giữ như `maxLength` cũ, bằng một plugin chặn thay đổi làm note dài quá.
 
+### Bấm và copy link (sửa sau khi dùng thử)
+
+- **Bấm vào chip** là chọn nó, và một menu nhỏ hiện ngay dưới chip: full URL (bấm là mở tab mới), nút Copy, nút Sửa (trả chip về URL dạng chữ, con trỏ ở cuối). Esc bỏ chọn chip mà không đóng panel. Ctrl+click vẫn mở thẳng. Menu nằm trong khung editor chứ không portal ra `body`, vì hộp thoại (Radix, modal) chặn bấm ra ngoài nó.
+- **Copy**: trước đây copy một chip đang chọn ra chuỗi rỗng, vì node inline dạng atom không có chữ của riêng nó. `docToBody` giờ đọc được cả một dãy node inline không có đoạn bọc ngoài, nên copy chip ra full URL. Chip render thành `<a href>` thật, nên dán vào Docs hay Slack vẫn là link, và chuột phải có "Copy link address". Parse rule của chip đặt priority 60 như link card, để mark link của StarterKit không giành mất.
+- Phần clipboard, giới hạn độ dài và Esc gom vào extension `components/extensions/note-plain-text.ts` để test được bằng editor thật.
+- Đổi chip sang chữ hay ngược lại không đổi nội dung note, nên không gửi lần lưu nào.
+
 ## Không làm
 
 - Sửa note bằng editor rich text (đậm, list, heading).

@@ -29,6 +29,13 @@ describe("LinkChip", () => {
     expect(html).toContain(`data-link-chip="${URL}"`);
   });
 
+  it("is a real link, so a copy pasted into a rich editor stays one", () => {
+    const html = generateHTML(doc, extensions);
+    expect(html).toMatch(/^<p>đọc <a /);
+    expect(html).toContain(`href="${URL}"`);
+    expect(html).toContain('target="_blank"');
+  });
+
   it("reads itself back from its own markup", () => {
     const html = generateHTML(doc, extensions);
     expect(generateJSON(html, extensions)).toEqual(doc);

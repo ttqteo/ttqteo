@@ -6,10 +6,16 @@ import { linkLabel, trimUrl, URL_PATTERN } from "@/lib/note-links";
 
 /**
  * A URL inside a quick note, shown as a short chip (the site and path) with
- * the full URL on hover; Ctrl+click (Cmd+click) opens it. An inline atom:
- * the caret steps over it, Backspace selects then removes it whole. The note
- * itself stays plain text; the chip writes its URL back out (renderText, and
- * lib/note-doc's docToBody).
+ * the full URL on hover. A click selects it, and the note editor shows a
+ * small menu for it (open, copy, edit); Ctrl+click (Cmd+click) opens it
+ * straight away. An inline atom: the caret steps over it, Backspace selects
+ * then removes it whole. The note itself stays plain text; the chip writes
+ * its URL back out (renderText, and lib/note-doc's docToBody).
+ *
+ * Rendered as a real `<a href>`, so a copy pasted into a rich editor (Docs,
+ * Slack) arrives as a link, and right-click offers "Copy link address". The
+ * browser's own navigation on a plain click is stopped below: in an editor a
+ * click is for selecting.
  *
  * A typed URL becomes a chip once the caret leaves its end: a space after
  * it, Enter, a click elsewhere. Not before, so `https://a.com/x.html` is not
@@ -37,14 +43,22 @@ export const LinkChip = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: "span[data-link-chip]" }];
+    // Above the default 50, as in link-card.ts: a chip is an anchor, so a
+    // link mark's `a[href]` rule matches it too and would win the tie.
+    return [
+      { tag: "a[data-link-chip]", priority: 60 },
+      { tag: "span[data-link-chip]", priority: 60 },
+    ];
   },
 
   renderHTML({ node, HTMLAttributes }) {
     const url = node.attrs.url as string;
     return [
-      "span",
+      "a",
       mergeAttributes(HTMLAttributes, {
+        href: url,
+        target: "_blank",
+        rel: "noopener noreferrer",
         "data-link-chip": url,
         title: url,
         class: "note-link-chip",
@@ -100,6 +114,16 @@ export const LinkChip = Node.create({
             if (node.type !== type || !(event.ctrlKey || event.metaKey)) return false;
             window.open(node.attrs.url as string, "_blank", "noopener,noreferrer");
             return true;
+          },
+          handleDOMEvents: {
+            // The chip is an <a>, and a browser may follow it on click even
+            // inside an editor. Selecting it is ProseMirror's job, which runs
+            // off mousedown and mouseup, so stopping the click costs nothing.
+            click(_view, event) {
+              const target = event.target as Element | null;
+              if (target?.closest?.("a[data-link-chip]")) event.preventDefault();
+              return false;
+            },
           },
         },
       }),
