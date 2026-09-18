@@ -1,11 +1,11 @@
 "use client";
 
 import {
-  EyeOffIcon,
   FileTextIcon,
   MoonIcon,
   PanelRightIcon,
   PencilIcon,
+  StickyNoteIcon,
   SunIcon,
 } from "lucide-react";
 import Image from "next/image";
@@ -84,18 +84,18 @@ export function AdminToolbar({ editPostId }: AdminToolbarProps) {
             <FileTextIcon className="w-3.5 h-3.5" />
             <span className="sr-only sm:not-sr-only">posts</span>
           </AdminNavLink>
-          {/* The eye the private-note box itself wears; the sticky note now
-              means Ghi nhanh, here as on the rail. */}
+          {/* Every note, quick and in-post, on one page; same icon as the
+              rail's Ghi nhanh, which is the panel of the same notes. */}
           <AdminNavLink href="/admin/notes">
-            <EyeOffIcon className="w-3.5 h-3.5 shrink-0" />
+            <StickyNoteIcon className="w-3.5 h-3.5 shrink-0" />
             {/* Icon only on a phone, so the bar still fits. */}
             <span className="sr-only sm:not-sr-only">notes</span>
           </AdminNavLink>
-          {/* The side panel's three tools as pages. From md up only: a phone
-              reaches them through the sheet, and the bar has no room for
-              three more icons at 390px. */}
+          {/* Calendar and Task as pages. From md up only: a phone reaches
+              them through the sheet, and the bar has no room for more icons
+              at 390px. */}
           <div className="hidden md:contents">
-            {PANELS.map(({ id, href, label, icon: Icon }) => (
+            {PANELS.filter((panel) => panel.id !== "notes").map(({ id, href, label, icon: Icon }) => (
               <AdminNavLink key={id} href={href}>
                 <Icon className="w-3.5 h-3.5 shrink-0" />
                 {label.toLowerCase()}

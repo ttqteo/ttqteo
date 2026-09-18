@@ -168,7 +168,7 @@ export function NotesPanel({ autoFocus }: { autoFocus: boolean }) {
         href="/admin/notes"
         className="block pt-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
       >
-        Ghi chú riêng trong bài →
+        Mở trang ghi chú, kèm ghi chú trong bài →
       </Link>
     </div>
   );
@@ -290,10 +290,13 @@ export function NoteEditor({
   note,
   saveState,
   onBack,
+  headerClassName,
 }: {
   note: AdminNote;
   saveState: SaveState | undefined;
   onBack: () => void;
+  /** Room in the header for whatever the host draws over its corner, such as a dialog's Esc. */
+  headerClassName?: string;
 }) {
   const { notes } = useSidePanel();
   const textarea = useRef<HTMLTextAreaElement>(null);
@@ -318,7 +321,12 @@ export function NoteEditor({
 
   return (
     <div className="flex min-h-full flex-col">
-      <div className="sticky top-0 z-10 flex items-center gap-1 border-b bg-background px-2 py-1.5">
+      <div
+        className={cn(
+          "sticky top-0 z-10 flex items-center gap-1 border-b bg-background px-2 py-1.5",
+          headerClassName,
+        )}
+      >
         <Button
           type="button"
           variant="ghost"

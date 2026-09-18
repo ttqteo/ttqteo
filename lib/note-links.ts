@@ -83,3 +83,12 @@ export function linkLabel(url: string): string {
   const path = decodePath(parsed.pathname).replace(/\/+$/, "");
   return host + path;
 }
+
+/** The site alone, without `www.`, for the line under a link preview's title. */
+export function linkHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}

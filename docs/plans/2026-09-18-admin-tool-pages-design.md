@@ -6,6 +6,8 @@ Date: 2026-09-18
 
 Panel 360px đủ để liếc, không đủ để làm việc lâu: lịch chỉ có chấm và agenda một ngày, note phải rời danh sách mới sửa được. Ba công cụ của side panel có thêm trang riêng, rộng, dùng chung dữ liệu với panel.
 
+Cùng ngày, trang Ghi nhanh ở đây được gộp vào `/admin/notes` cùng ghi chú trong bài; xem `2026-09-18-notes-board-design.md`. Phần Calendar và Task bên dưới vẫn đúng.
+
 ## Decisions
 
 | Câu hỏi | Quyết định |

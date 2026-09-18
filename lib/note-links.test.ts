@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractLinks, linkLabel, splitLinks } from "./note-links";
+import { extractLinks, linkHost, linkLabel, splitLinks } from "./note-links";
 
 describe("extractLinks", () => {
   it("finds every http(s) URL in a note, in order, once each", () => {
@@ -61,6 +61,14 @@ describe("linkLabel", () => {
 
   it("returns something unparseable as it is", () => {
     expect(linkLabel("https://")).toBe("https://");
+  });
+});
+
+describe("linkHost", () => {
+  it("gives the site alone, without www", () => {
+    expect(linkHost("https://www.omelet.tech/deepseek-v4?x=1")).toBe("omelet.tech");
+    expect(linkHost("https://youtu.be/dQw4w9WgXcQ")).toBe("youtu.be");
+    expect(linkHost("https://")).toBe("https://");
   });
 });
 

@@ -36,7 +36,8 @@ export const PANELS: readonly PanelMeta[] = [
     label: "Ghi nhanh",
     shortcut: shortcutLabel("notes"),
     icon: StickyNoteIcon,
-    href: "/admin/quick-notes",
+    // The notes page holds the quick notes and the private notes in posts together.
+    href: "/admin/notes",
   },
 ];
 

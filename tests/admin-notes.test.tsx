@@ -8,6 +8,24 @@ vi.mock("@/lib/supabase-server", () => ({
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("next-themes", () => ({ useTheme: () => ({ resolvedTheme: "light" }) }));
 vi.mock("mermaid", () => ({ default: { initialize: vi.fn(), render: vi.fn() } }));
+// The board reads the quick notes from the side panel's store, which lives in
+// the admin layout; this page renders on its own here, with no quick notes.
+vi.mock("@/components/admin/side-panel/side-panel-provider", () => ({
+  useSidePanel: () => ({
+    notes: {
+      status: "ready",
+      notes: [],
+      saveState: {},
+      reload: vi.fn(),
+      create: vi.fn(),
+      edit: vi.fn(),
+      togglePin: vi.fn(),
+      remove: vi.fn(),
+      flush: vi.fn(),
+      discardIfBlank: vi.fn(),
+    },
+  }),
+}));
 vi.mock("@/lib/posts", () => ({
   getPostsWithPrivateNotes: async () => [
     {
@@ -24,7 +42,7 @@ vi.mock("@/lib/posts", () => ({
 
 import AdminNotesPage from "@/app/admin/notes/page";
 
-describe("trang Ghi chú riêng", () => {
+describe("trang Ghi chú, thẻ ghi chú trong bài", () => {
   it("khối code trong ghi chú có thanh ngôn ngữ, nút copy và số dòng như trên trang đọc", async () => {
     const { container } = render(await AdminNotesPage());
     const note = container.querySelector(".private-note")!;

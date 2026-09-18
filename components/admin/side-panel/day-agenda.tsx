@@ -45,12 +45,9 @@ export function DayAgenda({
 
   return (
     <>
+      {/* No Google feed configured (payload.configured false) says nothing
+          here: the agenda is then the day's tasks, which is fine on its own. */}
       <div className="space-y-1 px-3 pt-2">
-        {payload && !payload.configured && (
-          <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-            Chưa nối lịch Google: {payload.error}. Xem ADMIN_CALENDAR_FEEDS trong .env.example.
-          </p>
-        )}
         {payload && payload.failed.length > 0 && (
           <p className="text-xs text-destructive">Không tải được: {payload.failed.join(", ")}</p>
         )}

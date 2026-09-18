@@ -1,6 +1,6 @@
 "use client";
 
-import { extractLinks, linkLabel, splitLinks } from "@/lib/note-links";
+import { extractLinks, linkHost, linkLabel, splitLinks } from "@/lib/note-links";
 import { cn } from "@/lib/utils";
 import { parseYoutubeUrl, youtubeEmbedSrc, youtubeThumbnailSrc, type YoutubeRef } from "@/lib/youtube";
 import { ExternalLinkIcon, LinkIcon, PlayIcon } from "lucide-react";
@@ -74,6 +74,65 @@ function LinkChip({ url }: { url: string }) {
       )}
       <span className="truncate">{label}</span>
     </span>
+  );
+}
+
+/**
+ * Keep-style foot of a card: the note's first link as a row with its picture
+ * or favicon, title and site, and how many more links the note holds. The
+ * card is a button, so this is spans only; the links themselves are in the
+ * note. Looks the first link up, once, and keeps the answer for a week.
+ */
+export function LinkPreview({ body }: { body: string }) {
+  const links = useMemo(() => extractLinks(body), [body]);
+  const first = links[0];
+  if (!first) return null;
+
+  return (
+    <span className="mt-2 flex items-center gap-2 rounded-md border bg-background/60 px-2 py-1.5">
+      <LinkPreviewRow url={first} />
+      {links.length > 1 && (
+        <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          +{links.length - 1}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function LinkPreviewRow({ url }: { url: string }) {
+  const answer = useUnfurl(url, true);
+  const video = parseYoutubeUrl(url);
+  const picture = video ? youtubeThumbnailSrc(video.videoId) : (answer?.image ?? null);
+  const title = answer?.title || (video ? "YouTube" : linkLabel(url));
+
+  return (
+    <>
+      {picture ? (
+        // eslint-disable-next-line @next/next/no-img-element -- any site's picture, no remotePatterns entry
+        <img
+          src={picture}
+          alt=""
+          loading="lazy"
+          onError={hideOnError}
+          className="h-9 w-9 shrink-0 rounded object-cover"
+        />
+      ) : answer?.favicon ? (
+        // eslint-disable-next-line @next/next/no-img-element -- any site's favicon, no remotePatterns entry
+        <img
+          src={answer.favicon}
+          alt=""
+          onError={hideOnError}
+          className="h-4 w-4 shrink-0 rounded-sm"
+        />
+      ) : (
+        <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-xs font-medium">{title}</span>
+        <span className="block truncate text-[11px] text-muted-foreground">{linkHost(url)}</span>
+      </span>
+    </>
   );
 }
 

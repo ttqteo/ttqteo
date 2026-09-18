@@ -28,6 +28,8 @@ async function cache() {
 
 beforeEach(() => {
   calls = [];
+  window.localStorage.clear();
+  vi.restoreAllMocks();
   vi.stubGlobal(
     "fetch",
     vi.fn(
@@ -88,6 +90,42 @@ describe("unfurl cache", () => {
     await loadUnfurl("https://a.com");
     await flush();
     expect(readUnfurl("https://a.com")).toBeNull();
+  });
+
+  it("keeps its answers in localStorage, so a reload starts with them", async () => {
+    const first = await cache();
+    const done = first.loadUnfurl("https://a.com");
+    calls[0].resolve(res(200, result("https://a.com", "A")));
+    await done;
+
+    const second = await cache();
+    expect(second.readUnfurl("https://a.com")?.title).toBe("A");
+    await second.loadUnfurl("https://a.com");
+    expect(calls).toHaveLength(1);
+  });
+
+  it("lets a stored answer go after a week", async () => {
+    const now = Date.parse("2026-09-18T00:00:00.000Z");
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    const first = await cache();
+    const done = first.loadUnfurl("https://a.com");
+    calls[0].resolve(res(200, result("https://a.com", "A")));
+    await done;
+
+    vi.spyOn(Date, "now").mockReturnValue(now + 8 * 24 * 60 * 60_000);
+    const second = await cache();
+    expect(second.readUnfurl("https://a.com")).toBeUndefined();
+  });
+
+  it("works on without storage when the browser refuses it", async () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    const { loadUnfurl, readUnfurl } = await cache();
+    const done = loadUnfurl("https://a.com");
+    calls[0].resolve(res(200, result("https://a.com", "A")));
+    await done;
+    expect(readUnfurl("https://a.com")?.title).toBe("A");
   });
 
   it("drops the oldest answer once the cache is full", async () => {
